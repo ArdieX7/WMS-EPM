@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gestione Magazzino - WMS EPM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/warehouse.css">
+    <link rel="stylesheet" href="/static/css/collapsible.css">
+    <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body>
+    {% include 'partials/navbar.html' %}
+
+    <h1>Gestione Magazzino</h1>
+
+    <div class="collapsible-container">
+        <details>
+            <summary>Aggiungi Nuova Ubicazione</summary>
+            <div class="details-content">
+                <form action="/warehouse/add-location" method="post">
+                    <label for="location-name">Nome Ubicazione:</label><br>
+                    <input type="text" id="location-name" name="location_name" required><br><br>
+                    <button type="submit">Aggiungi Ubicazione</button>
+                </form>
+            </div>
+        </details>
+
+        <details>
+            <summary>Genera Ubicazioni Massivamente</summary>
+            <div class="details-content">
+                <form action="/warehouse/generate-locations" method="post">
+                    <label for="row_start">File (range):</label><br>
+                    <input type="number" id="row_start" name="row_start" min="1" placeholder="Da" required style="width: 70px;">
+                    <input type="number" id="row_end" name="row_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
+                    
+                    <label for="bay_start">Campate (range numerico, es. 1-8 per A-H):</label><br>
+                    <input type="number" id="bay_start" name="bay_start" min="1" placeholder="Da" required style="width: 70px;">
+                    <input type="number" id="bay_end" name="bay_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
+
+                    <label for="level_start">Piani (range):</label><br>
+                    <input type="number" id="level_start" name="level_start" min="1" placeholder="Da" required style="width: 70px;">
+                    <input type="number" id="level_end" name="level_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
+
+                    <label for="position_start">Posizione (range):</label><br>
+                    <input type="number" id="position_start" name="position_start" min="1" placeholder="Da" required style="width: 70px;">
+                    <input type="number" id="position_end" name="position_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
+
+                    <button type="submit">Genera Ubicazioni</button>
+                </form>
+            </div>
+        </details>
+
+        <details>
+            <summary>Cancella Ubicazioni Massivamente</summary>
+            <div class="details-content">
+                <form id="delete-locations-form">
+                    <label for="del_row_start">File (range):</label><br>
+                    <input type="number" id="del_row_start" name="row_start" min="1" placeholder="Da" required style="width: 70px;">
+                    <input type="number" id="del_row_end" name="row_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
+                    
+                    <label for="del_bay_start">Campate (range numerico, es. 1-8 per A-H):</label><br>
+                    <input type="number" id="del_bay_start" name="bay_start" min="1" placeholder="Da" required style="width: 70px;">
+                    <input type="number" id="del_bay_end" name="bay_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
+
+                    <label for="del_level_start">Piani (range):</label><br>
+                    <input type="number" id="del_level_start" name="level_start" min="1" placeholder="Da" required style="width: 70px;">
+                    <input type="number" id="del_level_end" name="level_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
+
+                    <label for="del_position_start">Posizione (range):</label><br>
+                    <input type="number" id="del_position_start" name="position_start" min="1" placeholder="Da" required style="width: 70px;">
+                    <input type="number" id="del_position_end" name="position_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
+
+                    <button type="button" onclick="previewDelete()">Cancella Ubicazioni</button>
+                </form>
+            </div>
+        </details>
+    </div>
+
+    <!-- Modal for delete confirmation -->
+    <div id="delete-confirmation-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal()">&times;</span>
+            <h2>Conferma Cancellazione</h2>
+            <p>Stai per cancellare le seguenti ubicazioni. Quelle occupate non verranno eliminate.</p>
+            <div id="delete-summary"></div>
+            <button id="confirm-delete-button" onclick="commitDelete()">Conferma Cancellazione</button>
+        </div>
+    </div>
+
+    <h2>Mappa Magazzino</h2>
+    <div class="table-container location-grid-container">
+        {% for row_number, locations in locations_by_row.items() %}
+        <div class="location-row">
+            <h4>Fila {{ row_number }}</h4>
+            {% for loc in locations %}
+            <div class="location-cell {{ 'location-occupied' if loc.is_occupied else 'location-free' }}">
+                {{ loc.name }}
+                {% if loc.tooltip %}
+                <span class="tooltiptext">{{ loc.tooltip }}</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        let locationsToDelete = [];
+
+        async function previewDelete() {
+            const form = document.getElementById('delete-locations-form');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
+            const response = await fetch('/warehouse/preview-delete-locations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                alert('Errore durante l\'anteprima della cancellazione.');
+                return;
+            }
+
+            const result = await response.json();
+            locationsToDelete = result.locations_to_delete;
+            
+            const summaryDiv = document.getElementById('delete-summary');
+            let summaryHtml = '<h4>Ubicazioni da cancellare:</h4><ul>';
+            result.locations_to_delete.forEach(loc => {
+                summaryHtml += `<li>${loc}</li>`;
+            });
+            summaryHtml += '</ul>';
+
+            if (result.locations_not_empty.length > 0) {
+                summaryHtml += '<h4>Ubicazioni occupate (non verranno cancellate):</h4><ul>';
+                result.locations_not_empty.forEach(loc => {
+                    summaryHtml += `<li>${loc}</li>`;
+                });
+                summaryHtml += '</ul>';
+            }
+            
+            summaryDiv.innerHTML = summaryHtml;
+            document.getElementById('delete-confirmation-modal').style.display = 'block';
+        }
+
+        async function commitDelete() {
+            if (locationsToDelete.length === 0) {
+                alert('Nessuna ubicazione valida da cancellare.');
+                closeModal();
+                return;
+            }
+
+            const response = await fetch('/warehouse/commit-delete-locations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ locations: locationsToDelete })
+            });
+
+            if (response.ok) {
+                alert('Ubicazioni cancellate con successo!');
+                window.location.reload();
+            } else {
+                alert('Errore durante la cancellazione delle ubicazioni.');
+            }
+            closeModal();
+        }
+
+        function closeModal() {
+            document.getElementById('delete-confirmation-modal').style.display = 'none';
+        }
+    </script>
+    <script src="/static/js/navbar.js"></script>
+</body>
+</html>

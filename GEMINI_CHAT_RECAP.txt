@@ -1,0 +1,178 @@
+# Recap Conversazione Gemini CLI - WMS EPM
+
+**Data Ultima Interazione:** 12 Luglio 2025
+
+**Contesto Iniziale:**
+Abbiamo iniziato a sviluppare un'applicazione web WMS (Warehouse Management System) basata su FastAPI, SQLAlchemy e Jinja2.
+
+**Funzionalità Implementate e Problemi Risolti:**
+
+1.  **Analisi Iniziale del Progetto:**
+    *   Identificata la struttura base con sezioni per Prodotti, Inventario, Ordini.
+    *   Tecnologie: FastAPI, Uvicorn, SQLAlchemy, Jinja2.
+
+2.  **Correzione Bug Sezione Ordini (Picking List):**
+    *   **Problema:** Errore 400 (Bad Request) durante la visualizzazione dei dettagli/picking per ordini completati.
+    *   **Causa:** Il frontend richiedeva suggerimenti di picking anche per ordini già completati, e il backend rifiutava correttamente.
+    *   **Soluzione:** Modificato `templates/orders.html` per:
+        *   Non richiedere suggerimenti di picking per ordini completati.
+        *   Mostrare "Vedi Dettagli" invece di "Dettagli/Picking" per ordini completati.
+        *   Semplificata la logica di visualizzazione dei dettagli usando un `div` separato invece di manipolare le righe della tabella.
+        *   Ottimizzato il recupero dati nel frontend per `confirmPicking` (passando `order_line_id` direttamente).
+
+3.  **Funzionalità "Importa Prodotti/EAN da File TXT" (Sezione Prodotti):**
+    *   **Spiegazione:** Caricamento massivo di prodotti e EAN da file TXT (`SKU,EAN1,EAN2,...`). Se SKU esiste, aggiunge nuovi EAN.
+    *   **Correzione Bug:**
+        *   **Problema:** `TypeError: Cannot read properties of undefined (reading 'map')` e 404 (Not Found) su SKU con `/`.
+        *   **Causa:** SKU con `/` non codificati nell'URL; mancava endpoint GET per singolo prodotto; bug in `update_product` e `import_ean_txt`.
+        *   **Soluzione:**
+            *   Aggiunto `GET /products/{sku:path}` endpoint in `routers/products.py`.
+            *   Usato `encodeURIComponent` nel frontend (`products.html`) per SKU negli URL.
+            *   Corretto `update_product` per salvare correttamente le modifiche.
+            *   Corretto `import_products_ean_from_txt` per aggiungere EAN a prodotti esistenti.
+
+4.  **Funzionalità "Controllo Inventariale da File TXT" (Sezione Inventario):**
+    *   **Requisito:** Non sommare, ma confrontare e sostituire le giacenze esistenti con quelle del file.
+    *   **Funzionamento:**
+        *   **File TXT:** Ubicazione su una riga, seguita da EAN/SKU dei prodotti in quella posizione (uno per riga).
+        *   **Backend (`routers/inventory.py`):**
+            *   Endpoint `/parse-stock-file` ora confronta giacenze del file con quelle del DB, restituendo un riepilogo dettagliato (`current_quantity`, `new_quantity`, `status` come 'new', 'update', 'no_change', 'delete_implicit').
+            *   Endpoint `/commit-stock-update` ora **sostituisce** la giacenza esistente con la `new_quantity` dal file.
+        *   **Frontend (`templates/inventory.html`):** Modale di conferma migliorata con tabella di confronto chiara e gestione errori.
+    *   **Correzione Bug:**
+        *   **Problema:** Conteggio errato delle ubicazioni totali nella dashboard (numero troppo alto).
+        *   **Causa:** Query SQLAlchemy errata che creava un prodotto cartesiano.
+        *   **Soluzione:** Suddiviso il calcolo dei KPI in query separate e più precise in `routers/analysis.py`.
+
+5.  **Nuova Sezione "Analisi Dati" (Dashboard):**
+    *   **Funzionalità:**
+        *   **KPI:** Mostra ubicazioni totali, occupate, libere, a terra.
+        *   **Giacenza Totale per Prodotto:** Tabella con SKU, descrizione e quantità totale.
+        *   **Ricerca Prodotto per Ubicazione:** Dato uno SKU, mostra le ubicazioni che lo contengono (modale con tabella, esportabile in CSV).
+        *   **Ricerca Prodotti per Fila:** Data una fila, mostra tutti i prodotti, ubicazioni e quantità in quella fila (modale con tabella, esportabile in PDF).
+    *   **Implementazione:**
+        *   Nuovi file: `schemas/analysis.py`, `routers/analysis.py`, `templates/analysis.html`.
+        *   Integrazione in `main.py` e aggiunta link in tutte le navbar.
+    *   **Correzione Bug:**
+        *   **Problema:** `SyntaxError` persistente in `analysis.py` su query SQLAlchemy.
+        *   **Causa:** Python 3.8 ha problemi con lunghe catene di metodi su più righe; importazioni errate dei modelli.
+        *   **Soluzione:** Spezzate le query in passaggi più espliciti; corrette le importazioni dei modelli (`from wms_app.models.products import Product` ecc.).
+        *   **Problema:** `TypeError: unsupported operand type(s) for |: 'type' and 'NoneType'` in `schemas/analysis.py`.
+        *   **Causa:** Sintassi `str | None` non supportata in Python 3.8.
+        *   **Soluzione:** Sostituito con `Optional[str]` e importato `Optional` da `typing`.
+        *   **Problema:** `NameError: name 'SimpleDocTemplate'` durante esportazione PDF.
+        *   **Causa:** Importazioni di ReportLab mancanti o errate in `routers/analysis.py`.
+        *   **Soluzione:** Assicurato che le importazioni di ReportLab fossero corrette.
+        *   **Problema:** `TypeError: object list can't be used in 'await' expression` durante esportazione PDF.
+        *   **Causa:** Chiamata `await` su funzione non asincrona.
+        *   **Soluzione:** Rimosso `await` dalla chiamata a `get_products_by_row`.
+
+6.  **Introduzione Pagina di Benvenuto:**
+    *   **Funzionalità:** Creazione di una pagina di benvenuto (`wms_app/templates/index.html`) come hub centrale per la navigazione.
+    *   **Implementazione:** Modifica di `wms_app/main.py` per servire `index.html` sulla root (`/`). Correzione dei link in `index.html` per puntare agli endpoint HTML corretti (`/products-page`, `/inventory/manage`, `/orders/manage`, `/analysis/dashboard`).
+
+7.  **Funzionalità "Importa Ordini da File TXT" (Sezione Ordini):**
+    *   **Funzionalità:** Permette l'importazione massiva di ordini da un file di testo strutturato come `NumeroOrdine,Cliente,SKU,Qty`.
+    *   **Implementazione:**
+        *   Aggiunto modulo di upload in `wms_app/templates/orders.html`.
+        *   Implementato nuovo endpoint `/orders/import-orders-txt` in `wms_app/routers/orders.py` per processare il file.
+        *   Logica per creare nuovi ordini o aggiungere righe a ordini esistenti (se non già completati).
+
+8.  **Nuova Sezione "Gestione Magazzino":**
+    *   **Funzionalità:** Sezione dedicata alla gestione fisica delle ubicazioni del magazzino.
+    *   **Implementazione:**
+        *   Creazione di `wms_app/routers/warehouse.py` e `wms_app/templates/warehouse.html`.
+        *   Integrazione del nuovo router in `wms_app/main.py`.
+        *   Spostamento delle funzioni "Aggiungi Nuova Ubicazione" e "Genera Ubicazioni Massivamente" da `inventory.py` a `warehouse.py`.
+        *   **Miglioramento Generazione Massiva:** Il form ora accetta range "Da-A" per Fila, Campata, Piano e **Posizione**, permettendo una generazione più granular.
+        *   **Visualizzazione Mappa Magazzino:** Implementata una griglia visiva delle ubicazioni in `warehouse.html` con scroll orizzontale. Le ubicazioni sono raggruppate per fila e colorate (rosso per occupate, verde per libere) in base allo stato recuperato dal database.
+
+9.  **Miglioramento Navigazione (Consistenza UI):**
+    *   **Funzionalità:** Uniformare la barra di navigazione su tutte le pagine.
+    *   **Implementazione:**
+        *   Creazione di `wms_app/templates/partials/navbar.html` per una navbar centralizzata.
+        *   Inclusione del partial in tutti i template HTML (`index.html`, `products.html`, `inventory.html`, `orders.html`, `analysis.html`, `warehouse.html`).
+        *   Creazione di `wms_app/static/css/navbar.css` per gli stili della navbar e inclusione in tutti i template per garantire uno stile uniforme.
+
+10. **Correzioni e Miglioramenti Recenti (Pre-10/07):**
+    *   **Correzione Autocompletamento SKU (Pagina Gestione Inventario):** Risolti vari problemi per rendere la ricerca SKU più flessibile e funzionante.
+    *   **Implementazione Sezioni Espandibili (Collapsible):** Aggiunto stile CSS e markup HTML per sezioni a scomparsa in tutta l'applicazione.
+    *   **Aggiornamento e Stilizzazione Navbar:** Migliorata la UI della navbar, con evidenziazione della pagina attiva.
+
+11. **Miglioramenti Sezione Magazzino (10/07/2025):**
+    *   **Funzionalità "Cancella Ubicazioni Massivamente":**
+        *   **UI:** Aggiunto pannello a scomparsa in `warehouse.html` con form per definire un range di ubicazioni da eliminare.
+        *   **Logica Sicura:** Implementato un sistema a due passaggi:
+            1.  **Anteprima:** Un endpoint `/warehouse/preview-delete-locations` controlla quali ubicazioni nel range sono vuote e quali contengono merce.
+            2.  **Conferma:** Una modale mostra l'anteprima all'utente. Solo dopo la conferma, l'endpoint `/warehouse/commit-delete-locations` procede alla cancellazione delle sole ubicazioni vuote.
+    *   **Funzionalità "Tooltip Dettagli Inventario":**
+        *   **Obiettivo:** Mostrare il contenuto di un'ubicazione al passaggio del mouse sulla mappa del magazzino.
+        *   **Backend:** Modificato l'endpoint `/warehouse/manage` per recuperare SKU e quantità per ogni ubicazione occupata.
+        *   **Frontend:** Inizialmente implementato con l'attributo `title`, causava un ritardo nella visualizzazione.
+    *   **Correzione Bug "Internal Server Error":**
+        *   **Problema:** La pagina Gestione Magazzino restituiva un errore 500 dopo l'aggiunta della funzione tooltip.
+        *   **Causa:** `AttributeError` in `warehouse.py` dovuto a un riferimento errato (`models.Inventory.sku` invece del corretto `models.Inventory.product_sku`).
+        *   **Soluzione:** Corretto il nome del campo nella query SQLAlchemy.
+    *   **Miglioramento "Tooltip Istantaneo":**
+        *   **Problema:** Il tooltip standard del browser appariva con un leggero ritardo.
+        *   **Soluzione:** Sostituito l'attributo `title` con un tooltip personalizzato creato con CSS e un elemento `<span>` in `warehouse.html`. Questo ha reso la visualizzazione immediata.
+
+12. **Ottimizzazione Responsive (11/07/2025):**
+    *   **Obiettivo:** Rendere l'intera applicazione mobile-friendly, con un burger menu funzionante e layout adattivi.
+    *   **Implementazione Iniziale:**
+        *   Creazione di `wms_app/static/css/responsive.css` per stili generali responsive.
+        *   Creazione di `wms_app/static/js/navbar.js` per la logica del burger menu.
+        *   Aggiornamento di tutti i template HTML per includere il meta tag `viewport` e i nuovi file CSS/JS.
+        *   Modifica di `wms_app/templates/partials/navbar.html` per la struttura del burger menu.
+    *   **Problemi Riscontrati:**
+        *   **Navbar Incoerente/Non Funzionante:** Il burger menu non si visualizzava correttamente o non funzionava su tutte le pagine, con il menu esteso e l'icona posizionata male.
+        *   **Scroll Orizzontale:** Le pagine (in particolare "Analisi Dati") presentavano ancora scroll orizzontale su mobile.
+    *   **Tentativi di Soluzione:**
+        *   Riorganizzazione degli stili CSS tra `navbar.css` e `responsive.css` con approccio "mobile-first".
+        *   Aggiunta di `!important` in `navbar.css` per forzare la priorità degli stili.
+        *   Aggiunta di media query specifiche in `analysis.css`, `styles.css`, `products.css`, `inventory.css`, `orders.css` per gestire il layout di KPI, tabelle e contenitori su schermi piccoli.
+        *   Aggiunta di `overflow-x: hidden` al `body` e `max-width: 100%` a vari elementi per prevenire lo scroll orizzontale.
+    *   **Stato Attuale:** Il burger menu funziona ma è posizionato in modo incoerente (centrato in alto, "mega tasto"). La pagina "Analisi Dati" ha ancora problemi di layout e scroll orizzontale. Le altre pagine sembrano migliorare ma non sono ancora perfette.
+
+13. **Ottimizzazione Responsive (Continuazione - 11/07/2025):**
+    *   **Risoluzione Problemi Navbar:**
+        *   **Desktop:** Allineamento menu a sinistra, bottoni più grandi e integrazione della palette colori (`#00516E`, `#F2F2F2`, `#0097E0`).
+        *   **Mobile:** Implementazione di un burger menu a tendina (non più laterale) che spinge il contenuto della pagina verso il basso, risolvendo problemi di sovrapposizione e funzionamento.
+        *   **Implementazione:** Ristrutturazione completa di `wms_app/templates/partials/navbar.html`, `wms_app/static/css/navbar.css` (con approccio Mobile-First) e `wms_app/static/js/navbar.js`.
+    *   **Risoluzione Problemi Scroll Orizzontale su Mobile:**
+        *   **Causa:** Elementi più larghi dello schermo che forzavano lo scroll orizzontale dell'intera pagina.
+        *   **Soluzione Generale:** Aggiunto `overflow-x: hidden` al `body` e `max-width: 100%; box-sizing: border-box;` a tutti gli elementi all'interno del `body` in `wms_app/static/css/responsive.css` (all'interno della media query mobile).
+        *   **Tabelle:** Tutte le tabelle (`products.html`, `orders.html`, `inventory.html`, `warehouse.html`) sono state avvolte in un `<div class="table-container">` e rese scrollabili orizzontalmente solo al loro interno (`overflow-x: auto; white-space: nowrap;` in `responsive.css`).
+        *   **KPI Pagina Analisi (`analysis.html`):** I blocchi KPI (`.kpi-box`) sono stati configurati per visualizzare 3 elementi per riga su mobile (`flex: 0 0 30%;`) all'interno di `responsive.css`, risolvendo lo scroll orizzontale specifico di quella pagina.
+    *   **Backup:** Creata una copia di backup del progetto (`backup_pre_mobile_fix`) prima delle modifiche responsive.
+
+**Modifiche Implementate il 12 Luglio 2025 (Oggi):**
+
+1.  **Miglioramenti Sezione Inventario:**
+    *   **Rinominazione Funzionalità:**
+        *   "Aggiorna Giacenza (Carico/Scarico)" rinominata in "**Aggiorna Giacenza Manuale (Carico/Scarico)**".
+        *   "Importa Giacenze da File TXT" rinominata in "**Riallineamento Inventario (Sostituisci)**".
+    *   **Nuove Funzionalità di Movimentazione da File:**
+        *   Aggiunta "**Carico Inventario da File (Aggiungi)**": Permette di aggiungere quantità di prodotti alle ubicazioni esistenti tramite file TXT.
+        *   Aggiunta "**Scarico Inventario da File (Sottrai)**": Permette di sottrarre quantità di prodotti dalle ubicazioni esistenti tramite file TXT, con controllo per evitare giacenze negative.
+    *   **Descrizioni e Template per Upload:**
+        *   Aggiunte descrizioni chiare del formato richiesto per i file TXT di importazione/movimentazione.
+        *   Aggiunti pulsanti "Scarica Template" per fornire file di esempio (`template_products.txt`, `template_inventory.txt`, `template_inventory_movement.txt`, `template_orders.txt`).
+    *   **Correzioni Backend (routers/inventory.py):**
+        *   Migliorata la robustezza della funzione `_parse_movement_file` per l'associazione EAN/SKU, gestendo correttamente i codici a barre numerici.
+        *   Implementata la gestione degli errori per i file di movimentazione vuoti o non validi, fornendo feedback più chiari.
+    *   **Correzioni Frontend (static/js/inventory.js):**
+        *   Aggiornata la logica JavaScript per supportare i nuovi form di carico e scarico da file.
+        *   Risolti problemi di comunicazione tra frontend e backend che impedivano l'aggiornamento delle giacenze.
+    *   **Ripristino UI:**
+        *   Rimossa l'implementazione delle notifiche in sovraimpressione, tornando agli `alert()` del browser come richiesto.
+        *   Corretto il bug della doppia navbar nella pagina di gestione inventario.
+
+**Idee per Prossime Implementazioni (13 Luglio 2025):**
+
+1.  **Gestione Backup Giacenze:**
+    *   **Crea Backup Giacenza:** Esportare la giacenza attuale in un file di testo (`ubicazione,sku,quantità`).
+    *   **Carica Backup Giacenza:** Importare un file di backup per ripristinare lo stato della giacenza.
+2.  **Eliminazione Giacenze:**
+    *   **Elimina Tutte le Giacenze:** Funzione per azzerare tutte le giacenze nel magazzino.
+    *   **Elimina Giacenze per Fila:** Opzione per azzerare le giacenze solo per un range specifico di file.

@@ -1,0 +1,46 @@
+/* responsive.css */
+
+@media (max-width: 768px) {
+    /* Impedisce lo scroll orizzontale a livello di pagina */
+    body {
+        overflow-x: hidden;
+    }
+
+    /* Regola generale per prevenire overflow */
+    body * {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Rende i contenitori delle tabelle scrollabili orizzontalmente */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch; /* Migliora lo scroll su iOS */
+        padding-bottom: 10px; /* Aggiunge spazio per la barra di scorrimento */
+    }
+
+    /* Stili aggiuntivi per migliorare la leggibilità delle tabelle su mobile */
+    .table-container table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .table-container th, .table-container td {
+        padding: 8px;
+        text-align: left;
+        white-space: nowrap; /* Impedisce al testo di andare a capo */
+    }
+
+    /* KPI specifici per la pagina di analisi */
+    .kpi-container {
+        flex-wrap: wrap; /* Permette ai KPI di andare a capo */
+        justify-content: space-around; /* Distribuisce i KPI uniformemente */
+    }
+
+    .kpi-box {
+        flex: 0 0 30%; /* Tre elementi per riga con un piccolo spazio tra loro */
+        margin-bottom: 10px; /* Spazio sotto ogni KPI */
+        flex-grow: 0; /* Resetta flex-grow per mobile */
+    }
+
+    }

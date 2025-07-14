@@ -1,0 +1,129 @@
+/* --- Stili Globali e Contenitore --- */
+body {
+    margin: 0;
+    font-family: sans-serif;
+    padding-top: 60px; /* Spazio per la navbar fissa */
+}
+
+.navbar-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #00516E;
+    padding: 0.5rem 1rem;
+    color: #F2F2F2;
+    position: fixed; /* Fissata in alto */
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+    box-sizing: border-box;
+}
+
+.logo a {
+    color: #F2F2F2;
+    text-decoration: none;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+/* --- Menu di Navigazione (Logica Mobile-First) --- */
+.navbar {
+    display: none; /* Nascosto di default */
+    width: 100%;
+    background-color: #00516E;
+    position: absolute;
+    top: 100%; /* Si posiziona sotto il container */
+    left: 0;
+    box-shadow: 0 4px 2px -2px gray;
+}
+
+.navbar.active {
+    display: block; /* Mostrato quando attivo */
+}
+
+.navbar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column; /* Verticale su mobile */
+    align-items: center;
+}
+
+.navbar ul li {
+    width: 100%;
+    text-align: center;
+}
+
+.navbar ul li a {
+    display: block;
+    padding: 1rem;
+    color: #F2F2F2;
+    text-decoration: none;
+    border-top: 1px solid #006a8d;
+}
+
+.navbar ul li a:hover,
+.navbar ul li a.active {
+    background-color: #0097E0;
+}
+
+/* --- Icona Burger (Mobile) --- */
+.menu-icon {
+    display: flex; /* Visibile su mobile */
+    flex-direction: column;
+    justify-content: space-around;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+}
+
+.menu-icon span {
+    display: block;
+    width: 100%;
+    height: 3px;
+    background-color: #F2F2F2;
+}
+
+/* --- Stili Desktop --- */
+@media (min-width: 769px) {
+    .menu-icon {
+        display: none; /* Nascosto su desktop */
+    }
+
+    .navbar-container {
+        position: sticky; /* Torna a scorrere con la pagina */
+        justify-content: flex-start;
+        gap: 2rem;
+        padding: 0.5rem 2rem;
+    }
+    
+    body {
+        padding-top: 0; /* Rimuovi lo spazio su desktop */
+    }
+
+    .navbar {
+        display: block;
+        position: static;
+        width: auto;
+        background-color: transparent;
+        box-shadow: none;
+    }
+
+    .navbar ul {
+        flex-direction: row;
+    }
+
+    .navbar ul li {
+        width: auto;
+    }
+
+    .navbar ul li a {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 6px;
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+}

@@ -1,0 +1,8 @@
+body { font-family: sans-serif; margin: 2em; }
+table { width: 100%; border-collapse: collapse; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background-color: #f2f2f2; }
+.form-container { padding: 2em; border: 1px solid #ccc; margin-bottom: 2em; }
+#edit-product-section { display: none; padding: 2em; border: 1px solid #ccc; background-color: #f9f9f9; margin-top: 2em; }
+
+

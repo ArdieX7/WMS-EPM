@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gestione Inventario - WMS EPM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/inventory.css">
+    <link rel="stylesheet" href="/static/css/collapsible.css">
+    <link rel="stylesheet" href="/static/css/templates.css">
+    <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body>
+    {% include 'partials/navbar.html' %}
+
+    <h1>Gestione Inventario</h1>
+
+    <div class="collapsible-container">
+        <details>
+            <summary>Aggiorna Giacenza Manuale (Carico/Scarico)</summary>
+            <div class="details-content">
+                <form id="update-stock-form">
+                    <label for="product-sku">Prodotto (SKU):</label><br>
+                    <input type="text" id="product-sku" list="product-skus" required><br>
+                    <datalist id="product-skus"></datalist><br>
+
+                    <label for="location">Ubicazione:</label><br>
+                    <input type="text" id="location" required><br><br>
+
+                    <label for="quantity">Quantità:</label><br>
+                    <input type="number" id="quantity" required><br>
+                    <small>Usare un numero positivo per caricare, negativo per scaricare.</small><br><br>
+
+                    <button type="submit">Esegui Movimento</button>
+                </form>
+            </div>
+        </details>
+
+        <details>
+            <summary>Movimentazione Interna</summary>
+            <div class="details-content">
+                <form id="internal-move-form">
+                    <label for="move-product-sku">Prodotto (SKU):</label><br>
+                    <input type="text" id="move-product-sku" list="product-skus" required><br>
+
+                    <label for="from-location">Da Ubicazione:</label><br>
+                    <input type="text" id="from-location" required><br><br>
+
+                    <label for="to-location">A Ubicazione:</label><br>
+                    <input type="text" id="to-location" required><br><br>
+
+                    <label for="move-quantity">Quantità da Spostare:</label><br>
+                    <input type="number" id="move-quantity" value="0"><br>
+                    <small>Inserire 0 per spostare l'intera quantità.</small><br><br>
+
+                    <button type="submit">Sposta Merce</button>
+                </form>
+            </div>
+        </details>
+
+        <details>
+            <summary>Carico Inventario da File (Aggiungi)</summary>
+            <div class="details-content">
+                <form id="add-stock-form">
+                    <p class="template-description">
+                        Il file TXT deve contenere una o più sezioni, ognuna con l'ubicazione su una riga, seguita dagli EAN/SKU dei prodotti da aggiungere, uno per riga. Ogni EAN/SKU rappresenta una quantità di 1.
+                        <br>Esempio per aggiungere 2 SKU123 e 1 SKU456 a FILA-01-A-01:
+                        <code>
+                            FILA-01-A-01<br>
+                            SKU123<br>
+                            SKU123<br>
+                            SKU456
+                        </code>
+                    </p>
+                    <a href="/static/templates/template_inventory_movement.txt" download="template_inventory_movement.txt" class="btn-template">Scarica Template</a>
+                    <br><br>
+                    <label for="add-stock-file">Seleziona File TXT:</label><br>
+                    <input type="file" id="add-stock-file" accept=".txt" required><br><br>
+                    <button type="submit">Carica Prodotti</button>
+                </form>
+            </div>
+        </details>
+
+        <details>
+            <summary>Scarico Inventario da File (Sottrai)</summary>
+            <div class="details-content">
+                <form id="subtract-stock-form">
+                    <p class="template-description">
+                        Il file TXT deve contenere una o più sezioni, ognuna con l'ubicazione su una riga, seguita dagli EAN/SKU dei prodotti da scaricare, uno per riga. Ogni EAN/SKU rappresenta una quantità di 1.
+                        <br>Esempio per scaricare 2 SKU123 e 1 SKU456 da FILA-01-A-01:
+                        <code>
+                            FILA-01-A-01<br>
+                            SKU123<br>
+                            SKU123<br>
+                            SKU456
+                        </code>
+                    </p>
+                    <a href="/static/templates/template_inventory_movement.txt" download="template_inventory_movement.txt" class="btn-template">Scarica Template</a>
+                    <br><br>
+                    <label for="subtract-stock-file">Seleziona File TXT:</label><br>
+                    <input type="file" id="subtract-stock-file" accept=".txt" required><br><br>
+                    <button type="submit">Scarica Prodotti</button>
+                </form>
+            </div>
+        </details>
+
+        <details>
+            <summary>Riallineamento Inventario (Sostituisci)</summary>
+            <div class="details-content">
+                <form id="import-stock-form">
+                    <p class="template-description">
+                        Il file TXT deve avere l'ubicazione sulla prima riga, seguita da uno o più EAN/SKU, uno per riga. La giacenza verrà SOSTITUITA con il contenuto del file.
+                        <br>Esempio:
+                        <code>
+                            FILA-01-A-01<br>
+                            SKU123<br>
+                            8001234567890
+                        </code>
+                    </p>
+                    <a href="/static/templates/template_inventory.txt" download="template_inventory.txt" class="btn-template">Scarica Template</a>
+                    <br><br>
+                    <label for="stock-file">Seleziona File TXT:</label><br>
+                    <input type="file" id="stock-file" accept=".txt" required><br><br>
+                    <button type="submit">Analizza File</button>
+                </form>
+            </div>
+        </details>
+
+        <details>
+            <summary>Gestione Dati Giacenze</summary>
+            <div class="details-content">
+                <div class="stock-data-actions">
+                    <button id="backup-stock-btn">Crea Backup Giacenze</button>
+                    
+                    <div class="restore-stock-container">
+                        <form id="restore-stock-form">
+                            <label for="restore-stock-file">Ripristina da Backup:</label>
+                            <input type="file" id="restore-stock-file" accept=".txt" required>
+                            <button type="submit">Carica e Ripristina</button>
+                        </form>
+                    </div>
+
+                    <button id="delete-all-stock-btn" class="btn-danger">Elimina Tutte le Giacenze</button>
+
+                    <div class="delete-by-row-container">
+                        <form id="delete-by-row-form">
+                            <label for="row-prefix">Elimina Giacenze per Fila:</label>
+                            <input type="text" id="row-prefix" placeholder="Es. A01" required>
+                            <button type="submit" class="btn-danger">Elimina per Fila</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </details>
+    </div>
+
+    <div class="table-container">
+        <h2>Giacenza Attuale</h2>
+            <table id="inventory-table-content">
+                <thead>
+                    <tr>
+                        <th>Ubicazione</th>
+                        <th>SKU Prodotto</th>
+                        <th>Descrizione</th>
+                        <th>Quantità</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in inventory %}
+                    <tr>
+                        <td>{{ item.location_name }}</td>
+                        <td>{{ item.product_sku }}</td>
+                        <td>{{ item.product.description }}</td>
+                        <td>{{ item.quantity }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modale di Conferma Importazione -->
+    <div id="confirmation-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Riepilogo Importazione</h2>
+            <div id="modal-body"></div>
+            <button id="confirm-import-button">Conferma e Importa</button>
+            <button id="cancel-import-button">Annulla</button>
+        </div>
+    </div>
+
+    <script src="/static/js/inventory.js"></script>
+    <script src="/static/js/navbar.js"></script>
+</body>
+</html>

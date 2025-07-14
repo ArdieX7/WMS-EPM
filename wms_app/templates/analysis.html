@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Analisi Dati - WMS EPM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/analysis.css">
+    <link rel="stylesheet" href="/static/css/collapsible.css">
+    <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body>
+    {% include 'partials/navbar.html' %}
+
+    <h1>Dashboard Analisi Magazzino</h1>
+
+    <div id="kpi-container" class="kpi-container">
+        <!-- I KPI verranno caricati qui -->
+    </div>
+
+    <div class="collapsible-container">
+        <details>
+            <summary>Ricerca Prodotto per Ubicazione</summary>
+            <div class="details-content">
+                <form id="product-location-form">
+                    <label for="product-sku">Inserisci SKU Prodotto:</label>
+                    <input type="text" id="product-sku" list="product-skus" required>
+                    <datalist id="product-skus"></datalist>
+                    <button type="submit">Cerca</button>
+                </form>
+            </div>
+        </details>
+
+        <details>
+            <summary>Ricerca Prodotti per Fila</summary>
+            <div class="details-content">
+                <form id="products-by-row-form">
+                    <label for="row-number">Inserisci Numero Fila:</label>
+                    <input type="number" id="row-number" required>
+                    <button type="submit">Cerca</button>
+                </form>
+            </div>
+        </details>
+    </div>
+
+    <div class="table-container" style="margin-top: 2em;">
+        <h2>Giacenza Totale per Prodotto</h2>
+        <table id="total-stock-table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Descrizione</th>
+                    <th>Quantità Totale</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- I dati verranno caricati qui -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modale per i risultati della ricerca SKU -->
+    <div id="product-location-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 id="modal-title"></h2>
+            <div id="modal-body"></div>
+            <button id="export-csv-button">Esporta in CSV</button>
+        </div>
+    </div>
+
+    <!-- Modale per i risultati della ricerca per Fila -->
+    <div id="products-by-row-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 id="row-modal-title"></h2>
+            <div id="row-modal-body"></div>
+            <button id="export-pdf-button">Esporta in PDF</button>
+        </div>
+    </div>
+
+    <script src="/static/js/analysis.js"></script>
+    <script src="/static/js/navbar.js"></script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gestione Prodotti - WMS EPM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/products.css">
+    <link rel="stylesheet" href="/static/css/collapsible.css">
+    <link rel="stylesheet" href="/static/css/templates.css">
+    <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/responsive.css">
+</head>
+<body>
+    {% include 'partials/navbar.html' %}
+
+    <h1>Gestione Prodotti</h1>
+
+    <div class="collapsible-container">
+        <details>
+            <summary>Aggiungi Nuovo Prodotto</summary>
+            <div class="details-content">
+                <form id="create-product-form">
+                    <label for="sku">SKU:</label><br>
+                    <input type="text" id="sku" name="sku" required><br><br>
+                    
+                    <label for="description">Descrizione:</label><br>
+                    <input type="text" id="description" name="description"><br><br>
+
+                    <label for="estimated_value">Valore Stimato (€):</label><br>
+                    <input type="number" id="estimated_value" name="estimated_value" step="0.01" value="0.00"><br><br>
+
+                    <label for="eans">Codici EAN (separati da virgola):</label><br>
+                    <input type="text" id="eans" name="eans"><br><br>
+
+                    <button type="submit">Aggiungi Prodotto</button>
+                </form>
+            </div>
+        </details>
+
+        <details>
+            <summary>Importa Prodotti/EAN da File TXT</summary>
+            <div class="details-content">
+                <form id="import-products-ean-form">
+                    <p class="template-description">
+                        Il file TXT deve avere una riga per ogni SKU. Ogni riga deve contenere lo SKU, la descrizione, il valore stimato (opzionale) e uno o più EAN, tutti separati da virgola.
+                        <br>Esempio: <code>SKU123,Descrizione Prova,19.99,8001234567890,8001234567891</code>
+                    </p>
+                    <a href="/static/templates/template_products.txt" download="template_products.txt" class="btn-template">Scarica Template</a>
+                    <br><br>
+                    <label for="products-ean-file">Seleziona File TXT:</label><br>
+                    <input type="file" id="products-ean-file" accept=".txt" required><br><br>
+                    <button type="submit">Importa Prodotti/EAN</button>
+                </form>
+            </div>
+        </details>
+    </div>
+
+    <div id="edit-product-section" style="display:none;">
+        <h2>Modifica Prodotto</h2>
+        <form id="edit-product-form">
+            <label for="edit-sku">SKU:</label><br>
+            <input type="text" id="edit-sku" name="edit-sku" readonly><br><br>
+            
+            <label for="edit-description">Descrizione:</label><br>
+            <input type="text" id="edit-description" name="edit-description"><br><br>
+
+            <label for="edit-estimated_value">Valore Stimato (€):</label><br>
+            <input type="number" id="edit-estimated_value" name="edit-estimated_value" step="0.01"><br><br>
+
+            <label for="edit-eans">Codici EAN (separati da virgola):</label><br>
+            <input type="text" id="edit-eans" name="edit-eans"><br><br>
+
+            <button type="submit">Salva Modifiche</button>
+            <button type="button" id="cancel-edit-button">Annulla</button>
+        </form>
+    </div>
+
+    <h2>Elenco Prodotti</h2>
+    <div class="table-container">
+        <table id="products-table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Descrizione</th>
+                    <th>Valore Stimato</th>
+                    <th>Codici EAN</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- I dati verranno inseriti qui da JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <script src="/static/js/products.js"></script>
+    <script src="/static/js/navbar.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Benvenuto in WMS EPM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/responsive.css">
+<body>
+    {% include 'partials/navbar.html' %}
+
+    <div class="container text-center mt-5">
+        <div class="welcome-header">
+            <h1 class="display-4">Benvenuto nel WMS EPM</h1>
+            <p class="lead">Il tuo sistema di gestione del magazzino centralizzato.</p>
+        </div>
+
+        <div class="row mt-5 justify-content-center">
+            <div class="col-md-4 col-lg-3 mb-4">
+                <a href="/warehouse/manage" class="card-link">
+                    <div class="card h-100 text-center shadow-sm feature-card">
+                        <div class="card-body">
+                            <h5 class="card-title">Gestione Magazzino</h5>
+                            <p class="card-text">Crea e visualizza le ubicazioni del magazzino.</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-4 col-lg-3 mb-4">
+                <a href="/products-page" class="card-link">
+                    <div class="card h-100 text-center shadow-sm feature-card">
+                        <div class="card-body">
+                            <h5 class="card-title">Gestione Prodotti</h5>
+                            <p class="card-text">Visualizza, aggiungi e gestisci i prodotti e i loro codici EAN.</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-4 col-lg-3 mb-4">
+                <a href="/inventory/manage" class="card-link">
+                    <div class="card h-100 text-center shadow-sm feature-card">
+                        <div class="card-body">
+                            <h5 class="card-title">Controllo Inventario</h5>
+                            <p class="card-text">Controlla e aggiorna le giacenze del magazzino.</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-4 col-lg-3 mb-4">
+                <a href="/orders/manage" class="card-link">
+                    <div class="card h-100 text-center shadow-sm feature-card">
+                        <div class="card-body">
+                            <h5 class="card-title">Gestione Ordini</h5>
+                            <p class="card-text">Visualizza gli ordini e gestisci il processo di picking.</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-4 col-lg-3 mb-4">
+                <a href="/analysis/dashboard" class="card-link">
+                    <div class="card h-100 text-center shadow-sm feature-card">
+                        <div class="card-body">
+                            <h5 class="card-title">Analisi Dati</h5>
+                            <p class="card-text">Accedi alla dashboard con i KPI e le analisi del magazzino.</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/navbar.js"></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+/* Stili per il contenitore dei pulsanti espandibili */
+.collapsible-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+/* Stili per ogni singolo elemento <details> */
+details {
+    border: 1px solid #00516E; /* Bordo con colore primario */
+    border-radius: 8px;
+    background-color: #F2F2F2; /* Sfondo secondario */
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    flex: 1;
+    min-width: 280px;
+    transition: box-shadow 0.2s;
+}
+
+details:hover {
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+/* Stili per il <summary>, che agisce come pulsante */
+summary {
+    padding: 16px 20px;
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #FFFFFF; /* Testo bianco */
+    background-color: #00516E; /* Colore primario scuro */
+    cursor: pointer;
+    outline: none;
+    list-style: none;
+    transition: background-color 0.2s;
+    border-radius: 7px 7px 0 0; /* Arrotonda solo gli angoli superiori */
+}
+
+details[open] > summary {
+    background-color: #0097E0; /* Colore primario medio quando aperto */
+    border-radius: 7px 7px 0 0;
+}
+
+summary::-webkit-details-marker {
+    display: none;
+}
+
+summary:before {
+    content: '＋';
+    margin-right: 12px;
+    color: #FF5913; /* Colore arancione per l'icona */
+    font-weight: bold;
+}
+
+details[open] > summary:before {
+    content: '−';
+}
+
+summary:hover {
+    background-color: #0097E0; /* Colore primario medio al passaggio del mouse */
+}
+
+/* Stili per il contenuto all'interno del <details> */
+.details-content {
+    padding: 20px;
+    border-top: 1px solid #00516E;
+}

@@ -1,0 +1,20 @@
+<!-- wms_app/templates/partials/navbar.html -->
+<div class="navbar-container">
+    <div class="logo">
+        <a href="/">WMS</a>
+    </div>
+    <div id="menu-icon" class="menu-icon">
+        <span></span>
+        <span></span>
+        <span></span>
+    </div>
+    <nav id="navbar-links" class="navbar">
+        <ul>
+            <li><a href="/products-page" class="{{ 'active' if request.url.path == '/products-page' else '' }}">Prodotti</a></li>
+            <li><a href="/inventory/manage" class="{{ 'active' if request.url.path == '/inventory/manage' else '' }}">Inventario</a></li>
+            <li><a href="/orders/manage" class="{{ 'active' if request.url.path == '/orders/manage' else '' }}">Ordini</a></li>
+            <li><a href="/warehouse/manage" class="{{ 'active' if request.url.path == '/warehouse/manage' else '' }}">Magazzino</a></li>
+            <li><a href="/analysis/dashboard" class="{{ 'active' if request.url.path == '/analysis/dashboard' else '' }}">Analisi</a></li>
+        </ul>
+    </nav>
+</div>
