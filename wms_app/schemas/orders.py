@@ -30,6 +30,10 @@ class Order(OrderBase):
     id: int
     order_date: datetime
     is_completed: bool
+    is_archived: bool = False
+    is_cancelled: bool = False
+    archived_date: Optional[datetime] = None
+    cancelled_date: Optional[datetime] = None
     lines: List[OrderLine] = []
 
     class Config:

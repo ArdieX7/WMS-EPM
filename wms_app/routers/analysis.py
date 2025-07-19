@@ -12,9 +12,12 @@ from reportlab.lib.units import inch
 
 from wms_app.models.products import Product
 from wms_app.models.inventory import Inventory, Location
+from wms_app.models.orders import OutgoingStock
 from wms_app.schemas import analysis as analysis_schemas
 from wms_app.database import get_db
-from wms_app.main import templates # Importa l'oggetto templates
+from fastapi.templating import Jinja2Templates
+
+templates = Jinja2Templates(directory="wms_app/templates")
 
 router = APIRouter(
     prefix="/analysis",
@@ -34,12 +37,14 @@ def get_analysis_data(db: Session = Depends(get_db)):
     occupied_locations_query = db.query(func.count(func.distinct(Inventory.location_name)))
     occupied_locations = occupied_locations_query.scalar() or 0
     
-    ground_floor_locations = db.query(func.count(Location.name)).filter(Location.name.like('%-1-P%')).scalar() or 0
-    occupied_ground_floor_locations = occupied_locations_query.filter(Inventory.location_name.like('%-1-P%')).scalar() or 0
+    ground_floor_locations = db.query(func.count(Location.name)).filter(Location.name.like('%1P%')).scalar() or 0
+    occupied_ground_floor_locations = occupied_locations_query.filter(Inventory.location_name.like('%1P%')).scalar() or 0
     free_ground_floor_locations = ground_floor_locations - occupied_ground_floor_locations
 
     # 2. Calcolo dei KPI di inventario
-    total_pieces_in_stock = db.query(func.sum(Inventory.quantity)).scalar() or 0
+    total_pieces_in_shelves = db.query(func.sum(Inventory.quantity)).filter(Inventory.location_name != 'TERRA').scalar() or 0
+    total_pieces_on_ground = db.query(func.sum(Inventory.quantity)).filter(Inventory.location_name == 'TERRA').scalar() or 0
+    total_pieces_outgoing = db.query(func.sum(OutgoingStock.quantity)).scalar() or 0
     unique_skus_in_stock = db.query(func.count(func.distinct(Inventory.product_sku))).scalar() or 0
 
     # 3. Calcolo della valorizzazione totale
@@ -52,30 +57,73 @@ def get_analysis_data(db: Session = Depends(get_db)):
         free_locations=total_locations - occupied_locations,
         ground_floor_locations=ground_floor_locations,
         free_ground_floor_locations=free_ground_floor_locations,
-        total_pieces_in_stock=total_pieces_in_stock,
+        total_pieces_in_shelves=total_pieces_in_shelves,
+        total_pieces_on_ground=total_pieces_on_ground,
+        total_pieces_outgoing=total_pieces_outgoing,
         unique_skus_in_stock=unique_skus_in_stock,
         total_inventory_value=round(total_inventory_value, 2)
     )
 
-    # 4. Calcolo della giacenza totale per prodotto
-    stock_by_product_query = db.query(
+    # 4. Calcolo della giacenza per prodotto (scaffalata + terra + in uscita)
+    # Giacenza in scaffali (esclusa TERRA)
+    shelves_results = db.query(
         Inventory.product_sku,
         Product.description,
-        func.sum(Inventory.quantity).label("total_quantity")
-    ).join(Product, Inventory.product_sku == Product.sku)
+        func.sum(Inventory.quantity).label("quantity_in_shelves")
+    ).join(Product, Inventory.product_sku == Product.sku).filter(
+        Inventory.location_name != 'TERRA'
+    ).group_by(
+        Inventory.product_sku, Product.description
+    ).all()
     
-    stock_by_product_grouped = stock_by_product_query.group_by(Inventory.product_sku, Product.description)
-    stock_by_product_ordered = stock_by_product_grouped.order_by(Inventory.product_sku)
-    stock_by_product_all = stock_by_product_ordered.all()
-
-    total_stock_list = [
-        analysis_schemas.ProductTotalStock(
-            sku=item.product_sku,
-            description=item.description,
-            total_quantity=item.total_quantity
-        )
-        for item in stock_by_product_all
-    ]
+    # Giacenza a terra (solo TERRA)
+    ground_results = db.query(
+        Inventory.product_sku,
+        Product.description,
+        func.sum(Inventory.quantity).label("quantity_on_ground")
+    ).join(Product, Inventory.product_sku == Product.sku).filter(
+        Inventory.location_name == 'TERRA'
+    ).group_by(
+        Inventory.product_sku, Product.description
+    ).all()
+    
+    # Giacenza in uscita con descrizione prodotto
+    outgoing_results = db.query(
+        OutgoingStock.product_sku,
+        Product.description,
+        func.sum(OutgoingStock.quantity).label("quantity_outgoing")
+    ).join(Product, OutgoingStock.product_sku == Product.sku).group_by(
+        OutgoingStock.product_sku, Product.description
+    ).all()
+    
+    # Recuperiamo tutti i prodotti per le descrizioni
+    all_products = {p.sku: p.description for p in db.query(Product.sku, Product.description).all()}
+    
+    # Creiamo mappe per facilitare l'aggregazione
+    shelves_map = {item.product_sku: item.quantity_in_shelves for item in shelves_results}
+    ground_map = {item.product_sku: item.quantity_on_ground for item in ground_results}
+    outgoing_map = {item.product_sku: item.quantity_outgoing for item in outgoing_results}
+    
+    # Combiniamo tutti i prodotti che hanno giacenza in almeno una categoria
+    all_relevant_skus = set(shelves_map.keys()) | set(ground_map.keys()) | set(outgoing_map.keys())
+    
+    total_stock_list = []
+    for sku in all_relevant_skus:
+        quantity_in_shelves = shelves_map.get(sku, 0)
+        quantity_on_ground = ground_map.get(sku, 0)
+        quantity_outgoing = outgoing_map.get(sku, 0)
+        
+        total_stock_list.append(analysis_schemas.ProductTotalStock(
+            sku=sku,
+            description=all_products.get(sku, ""),
+            quantity_in_shelves=quantity_in_shelves,
+            quantity_on_ground=quantity_on_ground,
+            quantity_outgoing=quantity_outgoing,
+            total_quantity=quantity_in_shelves + quantity_on_ground + quantity_outgoing
+        ))
+    
+    # Ordiniamo per SKU
+    total_stock_list.sort(key=lambda x: x.sku)
 
     return analysis_schemas.AnalysisPageData(kpis=kpis, total_stock_by_product=total_stock_list)
 

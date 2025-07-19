@@ -1,21 +1,100 @@
-body { font-family: sans-serif; margin: 2em; background-color: #f4f7f6; }
-h1, h2, h3 { color: #333; }
+body {
+    font-family: sans-serif;
+    margin: 2em;
+    background-color: #f4f7f6;
+}
 
-.kpi-container { display: flex; gap: 1.5em; margin-bottom: 2em; }
-.kpi-box { background-color: white; padding: 1.5em; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; flex-grow: 1; }
-.kpi-box h3 { margin: 0; color: #555; font-size: 1em; }
-.kpi-box .value { font-size: 2.5em; font-weight: bold; color: #0056b3; margin-top: 0.2em; }
+h1,
+h2,
+h3 {
+    color: #333;
+}
 
-.table-container { background-color: white; padding: 1.5em; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-table { width: 100%; border-collapse: collapse; }
-th, td { border-bottom: 1px solid #ddd; padding: 12px 15px; text-align: left; }
-th { background-color: #f2f2f2; }
+.kpi-container {
+    display: flex;
+    gap: 1.5em;
+    margin-bottom: 2em;
+}
 
-.query-section { background-color: white; padding: 1.5em; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 2em; }
+.kpi-box {
+    background-color: white;
+    padding: 1.5em;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    flex-grow: 1;
+}
+
+.kpi-box h3 {
+    margin: 0;
+    color: #555;
+    font-size: 1em;
+}
+
+.kpi-box .value {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #0056b3;
+    margin-top: 0.2em;
+}
+
+.table-container {
+    background-color: white;
+    padding: 1.5em;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    border-bottom: 1px solid #ddd;
+    padding: 12px 15px;
+    text-align: left;
+}
+
+th {
+    background-color: #f2f2f2;
+}
+
+.query-section {
+    background-color: white;
+    padding: 1.5em;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-top: 2em;
+}
 
 /* Stili per la modale */
-.modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
-.modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 60%; border-radius: 8px; }
-.close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+}
 
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 60%;
+    border-radius: 8px;
+}
 
+.close-button {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}

@@ -20,7 +20,9 @@
                         <div class="kpi-box"><h3>Ubicazioni Libere</h3><div class="value">${kpis.free_locations}</div></div>
                         <div class="kpi-box"><h3>Ubicazioni a Terra</h3><div class="value">${kpis.ground_floor_locations}</div></div>
                         <div class="kpi-box"><h3>Ubicazioni a Terra Libere</h3><div class="value">${kpis.free_ground_floor_locations}</div></div>
-                        <div class="kpi-box"><h3>Totale Pezzi in Giacenza</h3><div class="value">${kpis.total_pieces_in_stock}</div></div>
+                        <div class="kpi-box"><h3>Pezzi in Scaffali</h3><div class="value">${kpis.total_pieces_in_shelves}</div></div>
+                        <div class="kpi-box"><h3>Pezzi a Terra</h3><div class="value">${kpis.total_pieces_on_ground}</div></div>
+                        <div class="kpi-box"><h3>Pezzi in Uscita</h3><div class="value">${kpis.total_pieces_outgoing}</div></div>
                         <div class="kpi-box"><h3>SKU Univoci a Magazzino</h3><div class="value">${kpis.unique_skus_in_stock}</div></div>
                         <div class="kpi-box"><h3>Valore Totale Inventario</h3><div class="value">${formattedInventoryValue}</div></div>
                     `;
@@ -31,6 +33,9 @@
                         const row = `<tr>
                             <td>${item.sku}</td>
                             <td>${item.description || 'N/D'}</td>
+                            <td>${item.quantity_in_shelves}</td>
+                            <td>${item.quantity_on_ground}</td>
+                            <td>${item.quantity_outgoing}</td>
                             <td>${item.total_quantity}</td>
                         </tr>`;
                         totalStockTableBody.innerHTML += row;

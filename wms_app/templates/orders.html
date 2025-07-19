@@ -59,6 +59,28 @@
                 </form>
             </div>
         </details>
+        
+        <details>
+            <summary>Prelievo da File TXT (Pistola Scanner)</summary>
+            <div class="details-content">
+                <form id="import-picking-form">
+                    <p class="template-description">
+                        <strong>Formato pistola scanner:</strong><br>
+                        - <strong>Riga 1:</strong> Numero Ordine<br>
+                        - <strong>Riga 2:</strong> Ubicazione<br>
+                        - <strong>Righe successive:</strong> EAN/SKU ripetuti (quantità = ripetizioni) oppure EAN/SKU_quantità<br>
+                        - Il pattern si ripete per più ordini<br>
+                        <br>Esempio: <code>1888</code> → <code>15A1P2</code> → <code>9512012430306</code> (ripetuto 5 volte) oppure <code>SND-12SFU-OD_10</code>
+                    </p>
+                    <a href="/static/templates/template_picking.txt" download="template_picking.txt" class="btn-template">Scarica Template</a>
+                    <br><br>
+                    <label for="picking-file">Seleziona file TXT:</label><br>
+                    <input type="file" id="picking-file" accept=".txt" required><br><br>
+                    <button type="submit">Esegui Prelievo</button>
+                </form>
+                <div id="import-picking-result" style="margin-top: 1em;"></div>
+            </div>
+        </details>
     </div>
 
     <h2>Elenco Ordini</h2>
@@ -71,6 +93,7 @@
                     <th>Cliente</th>
                     <th>Data Ordine</th>
                     <th>Stato</th>
+                    <th>Progresso Picking</th>
                     <th>Azioni</th>
                 </tr>
             </thead>
@@ -80,10 +103,57 @@
         </table>
     </div>
 
+    <!-- Sezione Ordini Archiviati -->
+    <div class="collapsible-container" style="margin-top: 2em;">
+        <details id="archived-orders-section">
+            <summary>Visualizza Ordini Archiviati</summary>
+            <div class="details-content">
+                <div id="archived-orders-container">
+                    <div class="table-container">
+                        <table id="archived-orders-table">
+                            <thead>
+                                <tr>
+                                    <th>ID Ordine</th>
+                                    <th>Numero Ordine</th>
+                                    <th>Cliente</th>
+                                    <th>Data Ordine</th>
+                                    <th>Data Archiviazione</th>
+                                    <th>Stato</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Gli ordini archiviati verranno caricati qui da JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </details>
+    </div>
+
     <!-- Contenitore per i dettagli dell'ordine -->
     <div id="order-details-container" class="order-details-container"></div>
 
     <datalist id="product-skus"></datalist>
+
+    <!-- Modale per recap validazione picking -->
+    <div id="picking-validation-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 80%; max-height: 80%; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 id="validation-modal-title">Recap Validazione Picking</h3>
+                <button class="close-button" onclick="closeValidationModal()">×</button>
+            </div>
+            <div id="validation-modal-body" class="modal-body">
+                <!-- Contenuto dinamico -->
+            </div>
+            <div class="modal-footer">
+                <button id="commit-all-button" onclick="commitPicking(false)" class="btn-success">Conferma Solo Operazioni Valide</button>
+                <button id="commit-force-button" onclick="commitPicking(true)" class="btn-warning">Forza Tutte le Operazioni Possibili</button>
+                <button onclick="closeValidationModal()" class="btn-secondary">Annulla</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/static/js/orders.js"></script>
     <script src="/static/js/navbar.js"></script>

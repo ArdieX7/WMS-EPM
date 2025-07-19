@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://wms_user:wms_password@db:5432/wms_db
+    depends_on:
+      - db
+    volumes:
+      - ./wms.db:/app/wms.db  # For SQLite fallback
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=wms_db
+      - POSTGRES_USER=wms_user
+      - POSTGRES_PASSWORD=wms_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

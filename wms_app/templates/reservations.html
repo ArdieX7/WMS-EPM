@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gestione Prenotazioni - WMS EPM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/collapsible.css">
+    <link rel="stylesheet" href="/static/css/responsive.css">
+    <style>
+        .stats-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .stat-box {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            min-width: 150px;
+            flex: 1;
+        }
+        .stat-box h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        .stat-active { color: #28a745; }
+        .stat-expired { color: #dc3545; }
+        .stat-completed { color: #6c757d; }
+        
+        .cleanup-section {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .cleanup-emergency {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        .btn-cleanup {
+            background: #ffc107;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn-emergency {
+            background: #dc3545;
+            color: white;
+        }
+        .reservations-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .reservations-table th,
+        .reservations-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .reservations-table th {
+            background-color: #f2f2f2;
+        }
+        .status-active { color: #28a745; font-weight: bold; }
+        .status-expired { color: #dc3545; }
+        .status-completed { color: #6c757d; }
+        
+        .btn-cancel {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    {% include 'partials/navbar.html' %}
+
+    <h1>🔒 Gestione Prenotazioni Inventario</h1>
+
+    <!-- Statistiche -->
+    <div class="stats-container">
+        <div class="stat-box">
+            <h3>Prenotazioni Attive</h3>
+            <div class="stat-value stat-active">{{ stats.active }}</div>
+        </div>
+        <div class="stat-box">
+            <h3>Prenotazioni Scadute</h3>
+            <div class="stat-value stat-expired">{{ stats.expired }}</div>
+        </div>
+        <div class="stat-box">
+            <h3>Prenotazioni Completate</h3>
+            <div class="stat-value stat-completed">{{ stats.completed }}</div>
+        </div>
+    </div>
+
+    <!-- Sezione Cleanup -->
+    <div class="collapsible-container">
+        <details>
+            <summary>🧹 Operazioni di Pulizia</summary>
+            <div class="details-content">
+                <div class="cleanup-section">
+                    <h3>Pulizia Automatica</h3>
+                    <p>Rimuove automaticamente le prenotazioni scadute (oltre 4 ore).</p>
+                    <button class="btn-cleanup" onclick="cleanupExpired()">Pulisci Scadute</button>
+                </div>
+                
+                <div class="cleanup-section cleanup-emergency">
+                    <h3>⚠️ Reset Emergenza</h3>
+                    <p><strong>ATTENZIONE:</strong> Cancella TUTTE le prenotazioni attive. Usare solo in caso di problemi gravi.</p>
+                    <button class="btn-cleanup btn-emergency" onclick="emergencyCleanup()">RESET TOTALE</button>
+                </div>
+            </div>
+        </details>
+
+        <details>
+            <summary>📊 Controllo Disponibilità Prodotto</summary>
+            <div class="details-content">
+                <form id="availability-form">
+                    <label for="product-sku">SKU Prodotto:</label>
+                    <input type="text" id="product-sku" placeholder="Inserisci SKU" required>
+                    <button type="submit">Controlla Disponibilità</button>
+                </form>
+                <div id="availability-result"></div>
+            </div>
+        </details>
+    </div>
+
+    <!-- Tabella Prenotazioni Attive -->
+    <h2>📋 Prenotazioni Attive</h2>
+    <div class="table-container">
+        <table class="reservations-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Ordine</th>
+                    <th>SKU</th>
+                    <th>Ubicazione</th>
+                    <th>Quantità</th>
+                    <th>Prenotato</th>
+                    <th>Scade</th>
+                    <th>Status</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for reservation in active_reservations %}
+                <tr>
+                    <td>{{ reservation.id }}</td>
+                    <td>{{ reservation.order_id }}</td>
+                    <td>{{ reservation.product_sku }}</td>
+                    <td>{{ reservation.location_name }}</td>
+                    <td>{{ reservation.reserved_quantity }}</td>
+                    <td>{{ reservation.reserved_at.strftime('%H:%M %d/%m') }}</td>
+                    <td>{{ reservation.expires_at.strftime('%H:%M %d/%m') }}</td>
+                    <td><span class="status-{{ reservation.status }}">{{ reservation.status }}</span></td>
+                    <td>
+                        {% if reservation.status == 'active' %}
+                        <button class="btn-cancel" onclick="cancelReservation({{ reservation.id }})">Cancella</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not active_reservations %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 20px;">Nessuna prenotazione attiva</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Funzioni di cleanup
+        async function cleanupExpired() {
+            if (confirm('Vuoi pulire tutte le prenotazioni scadute?')) {
+                try {
+                    const response = await fetch('/reservations/cleanup/expired', { method: 'POST' });
+                    const data = await response.json();
+                    alert(data.message);
+                    window.location.reload();
+                } catch (error) {
+                    alert('Errore durante la pulizia: ' + error.message);
+                }
+            }
+        }
+
+        async function emergencyCleanup() {
+            if (confirm('⚠️ ATTENZIONE: Stai per cancellare TUTTE le prenotazioni attive!\n\nQuesta operazione non può essere annullata.\n\nSei sicuro di voler procedere?')) {
+                if (confirm('Ultima conferma: RESET TOTALE delle prenotazioni?')) {
+                    try {
+                        const response = await fetch('/reservations/cleanup/all', { method: 'POST' });
+                        const data = await response.json();
+                        alert(data.message);
+                        window.location.reload();
+                    } catch (error) {
+                        alert('Errore durante il reset: ' + error.message);
+                    }
+                }
+            }
+        }
+
+        // Cancellazione singola prenotazione
+        async function cancelReservation(reservationId) {
+            if (confirm(`Vuoi cancellare la prenotazione ${reservationId}?`)) {
+                try {
+                    const response = await fetch(`/reservations/${reservationId}`, { method: 'DELETE' });
+                    const data = await response.json();
+                    alert(data.message);
+                    window.location.reload();
+                } catch (error) {
+                    alert('Errore durante la cancellazione: ' + error.message);
+                }
+            }
+        }
+
+        // Controllo disponibilità prodotto
+        document.getElementById('availability-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const sku = document.getElementById('product-sku').value;
+            
+            try {
+                const response = await fetch(`/reservations/availability/${encodeURIComponent(sku)}`);
+                const data = await response.json();
+                
+                let resultHtml = `<h3>Disponibilità per ${sku}:</h3>`;
+                if (data.locations.length > 0) {
+                    resultHtml += '<table class="reservations-table"><tr><th>Ubicazione</th><th>Fisico</th><th>Disponibile</th><th>Prenotabile</th></tr>';
+                    data.locations.forEach(loc => {
+                        resultHtml += `<tr>
+                            <td>${loc.location_name}</td>
+                            <td>${loc.physical_quantity}</td>
+                            <td>${loc.available_quantity}</td>
+                            <td>${loc.can_fulfill ? '✅' : '❌'}</td>
+                        </tr>`;
+                    });
+                    resultHtml += '</table>';
+                    resultHtml += `<p><strong>Totale disponibile: ${data.total_available} pz</strong></p>`;
+                } else {
+                    resultHtml += '<p>Nessuna ubicazione disponibile per questo SKU.</p>';
+                }
+                
+                document.getElementById('availability-result').innerHTML = resultHtml;
+            } catch (error) {
+                document.getElementById('availability-result').innerHTML = `<p style="color: red;">Errore: ${error.message}</p>`;
+            }
+        });
+
+        // Aggiorna automaticamente ogni 30 secondi
+        setInterval(() => {
+            window.location.reload();
+        }, 30000);
+    </script>
+    <script src="/static/js/navbar.js"></script>
+</body>
+</html>

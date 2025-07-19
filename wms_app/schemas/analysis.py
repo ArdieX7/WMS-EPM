@@ -7,6 +7,9 @@ class ProductTotalStock(BaseModel):
     """Rappresenta la giacenza totale di un singolo prodotto."""
     sku: str
     description: Optional[str]
+    quantity_in_shelves: int = 0
+    quantity_on_ground: int = 0
+    quantity_outgoing: int = 0
     total_quantity: int
 
 class AnalysisKPIs(BaseModel):
@@ -16,7 +19,9 @@ class AnalysisKPIs(BaseModel):
     free_locations: int
     ground_floor_locations: int
     free_ground_floor_locations: int
-    total_pieces_in_stock: int
+    total_pieces_in_shelves: int
+    total_pieces_on_ground: int
+    total_pieces_outgoing: int
     unique_skus_in_stock: int
     total_inventory_value: float
 

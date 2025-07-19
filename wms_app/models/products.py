@@ -10,6 +10,7 @@ class Product(Base):
     estimated_value = Column(Float, default=0.0)
 
     eans = relationship("EanCode", back_populates="product")
+    serials = relationship("ProductSerial", back_populates="product")
 
 class EanCode(Base):
     __tablename__ = "ean_codes"

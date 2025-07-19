@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Finale TERRA</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin-bottom: 30px; padding: 15px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+        button { padding: 10px 15px; margin: 5px; }
+        .result { margin-top: 10px; padding: 10px; background: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Test Finale - Implementazione TERRA</h1>
+    
+    <div class="test-section">
+        <h2>1. Test Pagina Analisi</h2>
+        <button onclick="testAnalysis()">Test Analisi Dati</button>
+        <div id="analysis-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Test Carico/Scarico TERRA</h2>
+        <button onclick="testInventoryAdd()">Aggiungi 5 pz a TERRA</button>
+        <button onclick="testInventorySubtract()">Rimuovi 2 pz da TERRA</button>
+        <div id="inventory-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Test Movimentazione</h2>
+        <button onclick="testMove()">Sposta da scaffale a TERRA</button>
+        <div id="move-result" class="result"></div>
+    </div>
+    
+    <script>
+        async function testAnalysis() {
+            try {
+                const response = await fetch('http://localhost:8002/analysis/data');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                document.getElementById('analysis-result').innerHTML = `
+                    <div class="success">✅ Analisi funzionante!</div>
+                    <p><strong>Giacenza Scaffali:</strong> ${data.kpis.total_pieces_in_shelves} pz</p>
+                    <p><strong>Giacenza TERRA:</strong> ${data.kpis.total_pieces_on_ground} pz</p>
+                    <p><strong>Giacenza in Uscita:</strong> ${data.kpis.total_pieces_outgoing} pz</p>
+                    <p><strong>Prodotti totali:</strong> ${data.total_stock_by_product.length}</p>
+                `;
+            } catch (error) {
+                document.getElementById('analysis-result').innerHTML = `
+                    <div class="error">❌ Errore analisi: ${error.message}</div>
+                `;
+            }
+        }
+        
+        async function testInventoryAdd() {
+            try {
+                const response = await fetch('http://localhost:8002/inventory/update-stock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        product_sku: 'ICG-09INT3-ID',
+                        location_name: 'TERRA',
+                        quantity: 5
+                    })
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                
+                document.getElementById('inventory-result').innerHTML = `
+                    <div class="success">✅ Carico TERRA: ${data.message}</div>
+                `;
+            } catch (error) {
+                document.getElementById('inventory-result').innerHTML = `
+                    <div class="error">❌ Errore carico: ${error.message}</div>
+                `;
+            }
+        }
+        
+        async function testInventorySubtract() {
+            try {
+                const response = await fetch('http://localhost:8002/inventory/update-stock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        product_sku: 'ICG-09INT3-ID',
+                        location_name: 'TERRA',
+                        quantity: -2
+                    })
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                
+                document.getElementById('inventory-result').innerHTML += `
+                    <div class="success">✅ Scarico TERRA: ${data.message}</div>
+                `;
+            } catch (error) {
+                document.getElementById('inventory-result').innerHTML += `
+                    <div class="error">❌ Errore scarico: ${error.message}</div>
+                `;
+            }
+        }
+        
+        async function testMove() {
+            try {
+                const response = await fetch('http://localhost:8002/inventory/move-stock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        product_sku: 'ICG-09INT3-ID',
+                        from_location: '6A4P2',
+                        to_location: 'TERRA',
+                        quantity: 1
+                    })
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                
+                document.getElementById('move-result').innerHTML = `
+                    <div class="success">✅ Movimentazione: ${data.message}</div>
+                `;
+            } catch (error) {
+                document.getElementById('move-result').innerHTML = `
+                    <div class="error">❌ Errore movimentazione: ${error.message}</div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Seriali Prodotto - WMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/navbar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/serials.css') }}">
+</head>
+<body>
+    {% include 'partials/navbar.html' %}
+    
+    <div class="container">
+        <div class="header">
+            <h1>🏷️ Gestione Seriali Prodotto</h1>
+            <p>Upload, validazione e controllo qualità seriali associati agli ordini</p>
+        </div>
+
+        <!-- Sezione Upload File -->
+        <div class="section">
+            <h2 class="section-title" onclick="toggleSection('upload-section')">
+                📁 Carica File Seriali
+                <span class="toggle-icon">▼</span>
+            </h2>
+            <div id="upload-section" class="section-content">
+                <!-- Sezione formato file collassabile -->
+                <div class="format-help">
+                    <button type="button" class="format-toggle-btn" onclick="toggleFormatInfo()">
+                        ℹ️ Info Formato File <span id="format-toggle-icon">▶</span>
+                    </button>
+                    <div id="format-info" class="format-info-collapsible" style="display: none;">
+                        <div class="format-info">
+                            <h3>📋 Formato File Richiesto</h3>
+                            <p><strong>Formato:</strong> Ogni elemento su una riga separata</p>
+                            <p><strong>Esempio:</strong></p>
+                            <pre><code>1234
+9788838668001
+SN001
+9788838668001
+SN002
+5678
+9788838668002
+SN100</code></pre>
+                            <ul>
+                                <li>Numero ordine: 1-10 cifre numeriche (una riga)</li>
+                                <li>EAN code: deve esistere in anagrafica prodotti (una riga)</li>
+                                <li>Seriale: qualsiasi stringa alfanumerica (una riga)</li>
+                                <li>Ogni elemento è su una riga separata (a capo)</li>
+                                <li>I seriali sono associati all'ultimo EAN sparato</li>
+                                <li>Tutti gli EAN e seriali sono associati all'ultimo numero ordine sparato</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form upload migliorato -->
+                <div class="upload-form-container">
+                    <form id="uploadForm" enctype="multipart/form-data" class="upload-form">
+                        <div class="form-group-large">
+                            <label for="serialFile" class="form-label-large">📁 Seleziona File Seriali (.txt, .csv)</label>
+                            <input type="file" id="serialFile" name="file" accept=".txt,.csv" required class="file-input-large">
+                        </div>
+                        <div class="form-group-large">
+                            <label for="uploadedBy" class="form-label-large">👤 Caricato da</label>
+                            <input type="text" id="uploadedBy" name="uploaded_by" value="utente" required class="text-input-large">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-upload">📤 Carica e Analizza File</button>
+                    </form>
+                </div>
+
+                <div id="uploadResult" class="result-container" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Sezione Lista Ordini -->
+        <div class="section">
+            <h2 class="section-title" onclick="toggleSection('orders-section')">
+                📋 Ordini con Seriali Caricati
+                <span class="toggle-icon">▼</span>
+            </h2>
+            <div id="orders-section" class="section-content">
+                <div class="controls">
+                    <button onclick="refreshOrdersList()" class="btn btn-secondary">🔄 Aggiorna Lista</button>
+                </div>
+
+                <div class="table-container">
+                    <table id="ordersTable">
+                        <thead>
+                            <tr>
+                                <th>Numero Ordine</th>
+                                <th>Stato Ordine</th>
+                                <th>Prodotti Attesi</th>
+                                <th>Seriali Trovati</th>
+                                <th>Stato Validazione</th>
+                                <th>Ultima Modifica</th>
+                                <th>Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ordersTableBody">
+                            {% for order in orders_with_serials %}
+                            <tr>
+                                <td><strong>{{ order.order_number }}</strong></td>
+                                <td>
+                                    {% if order.order_exists %}
+                                        <span class="status-badge status-{{ order.order_status }}">
+                                            {{ order.order_status | title }}
+                                        </span>
+                                    {% else %}
+                                        <span class="status-badge status-not-found">Non Trovato</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ order.expected_products | length }}</td>
+                                <td>
+                                    {% set total_serials = order.found_serials.values() | map('length') | sum %}
+                                    {{ total_serials }}
+                                </td>
+                                <td>
+                                    {% if order.validation_summary %}
+                                        <span class="status-badge status-{{ order.validation_summary.overall_status }}">
+                                            {{ order.validation_summary.overall_status | title }}
+                                        </span>
+                                    {% else %}
+                                        <span class="status-badge status-pending">Non Validato</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if order.last_upload_date %}
+                                        {{ order.last_upload_date.strftime('%d/%m/%Y %H:%M') }}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </td>
+                                <td class="actions">
+                                    <button onclick="viewOrderDetails('{{ order.order_number }}')" 
+                                            class="btn btn-small btn-info" title="Visualizza Dettagli">
+                                        👁️ Dettagli
+                                    </button>
+                                    <button onclick="validateOrder('{{ order.order_number }}')" 
+                                            class="btn btn-small btn-warning" title="Valida Seriali">
+                                        ✅ Valida
+                                    </button>
+                                    <button onclick="generateOrderPDF('{{ order.order_number }}')" 
+                                            class="btn btn-small btn-success" title="Genera PDF">
+                                        📄 PDF
+                                    </button>
+                                    <button onclick="deleteOrderSerials('{{ order.order_number }}')" 
+                                            class="btn btn-small btn-danger" title="Elimina Seriali">
+                                        🗑️ Elimina
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Dettagli Ordine -->
+        <div id="orderDetailsModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modalOrderTitle">Dettagli Seriali Ordine</h3>
+                    <span class="close" onclick="closeOrderDetailsModal()">&times;</span>
+                </div>
+                <div class="modal-body" id="orderDetailsContent">
+                    <!-- Contenuto dinamico -->
+                </div>
+                <div class="modal-footer">
+                    <button onclick="closeOrderDetailsModal()" class="btn btn-secondary">Chiudi</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Validazione -->
+        <div id="validationModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="validationModalTitle">Risultato Validazione</h3>
+                    <span class="close" onclick="closeValidationModal()">&times;</span>
+                </div>
+                <div class="modal-body" id="validationContent">
+                    <!-- Contenuto dinamico -->
+                </div>
+                <div class="modal-footer">
+                    <button onclick="closeValidationModal()" class="btn btn-secondary">Chiudi</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', path='/js/navbar.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/serials.js') }}"></script>
+</body>
+</html>

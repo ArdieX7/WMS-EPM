@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test TERRA API</title>
+</head>
+<body>
+    <h1>Test TERRA Implementation</h1>
+    
+    <h2>Test Analysis Data</h2>
+    <button onclick="testAnalysis()">Test Analysis</button>
+    <div id="analysis-result"></div>
+    
+    <h2>Test Inventory Update</h2>
+    <button onclick="testInventoryUpdate()">Test Inventory Update to TERRA</button>
+    <div id="inventory-result"></div>
+    
+    <script>
+        async function testAnalysis() {
+            try {
+                const response = await fetch('http://localhost:8002/analysis/data');
+                const data = await response.json();
+                document.getElementById('analysis-result').innerHTML = `
+                    <h3>Analysis Data:</h3>
+                    <p>Pieces in shelves: ${data.kpis.total_pieces_in_shelves}</p>
+                    <p>Pieces on ground: ${data.kpis.total_pieces_on_ground}</p>
+                    <p>Pieces outgoing: ${data.kpis.total_pieces_outgoing}</p>
+                    <p>Total products: ${data.total_stock_by_product.length}</p>
+                `;
+            } catch (error) {
+                document.getElementById('analysis-result').innerHTML = `Error: ${error.message}`;
+            }
+        }
+        
+        async function testInventoryUpdate() {
+            try {
+                const response = await fetch('http://localhost:8002/inventory/update-stock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        product_sku: 'ICG-09INT3-ID',
+                        location_name: 'TERRA',
+                        quantity: 5
+                    })
+                });
+                const data = await response.json();
+                document.getElementById('inventory-result').innerHTML = `
+                    <h3>Inventory Update Result:</h3>
+                    <p>${data.message || data.detail}</p>
+                `;
+            } catch (error) {
+                document.getElementById('inventory-result').innerHTML = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

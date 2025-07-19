@@ -62,13 +62,13 @@
             <div class="details-content">
                 <form id="add-stock-form">
                     <p class="template-description">
-                        Il file TXT deve contenere una o più sezioni, ognuna con l'ubicazione su una riga, seguita dagli EAN/SKU dei prodotti da aggiungere, uno per riga. Ogni EAN/SKU rappresenta una quantità di 1.
-                        <br>Esempio per aggiungere 2 SKU123 e 1 SKU456 a FILA-01-A-01:
+                        Il file TXT deve contenere l'ubicazione su una riga, seguita dagli EAN/SKU. Ogni riga può rappresentare una singola unità o una quantità specificata con il formato <b>EAN/SKU_quantità</b>.
+                        <br>Esempio per aggiungere 2 pz di SKU123 e 5 pz di SKU456 a FILA-01-A-01:
                         <code>
                             FILA-01-A-01<br>
                             SKU123<br>
                             SKU123<br>
-                            SKU456
+                            SKU456_5
                         </code>
                     </p>
                     <a href="/static/templates/template_inventory_movement.txt" download="template_inventory_movement.txt" class="btn-template">Scarica Template</a>
@@ -85,13 +85,13 @@
             <div class="details-content">
                 <form id="subtract-stock-form">
                     <p class="template-description">
-                        Il file TXT deve contenere una o più sezioni, ognuna con l'ubicazione su una riga, seguita dagli EAN/SKU dei prodotti da scaricare, uno per riga. Ogni EAN/SKU rappresenta una quantità di 1.
-                        <br>Esempio per scaricare 2 SKU123 e 1 SKU456 da FILA-01-A-01:
+                        Il file TXT deve contenere l'ubicazione su una riga, seguita dagli EAN/SKU. Ogni riga può rappresentare una singola unità o una quantità specificata con il formato <b>EAN/SKU_quantità</b>.
+                        <br>Esempio per scaricare 2 pz di SKU123 e 5 pz di SKU456 da FILA-01-A-01:
                         <code>
                             FILA-01-A-01<br>
                             SKU123<br>
                             SKU123<br>
-                            SKU456
+                            SKU456_5
                         </code>
                     </p>
                     <a href="/static/templates/template_inventory_movement.txt" download="template_inventory_movement.txt" class="btn-template">Scarica Template</a>

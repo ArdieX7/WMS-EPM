@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guida al Deploy WMS EPM</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        h2 {
+            color: #34495e;
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+            margin-top: 40px;
+            page-break-before: avoid;
+        }
+        
+        h3 {
+            color: #2980b9;
+            margin-top: 25px;
+        }
+        
+        .highlight-box {
+            background: #e8f6f3;
+            border: 2px solid #16a085;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .warning-box {
+            background: #fef9e7;
+            border: 2px solid #f39c12;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .error-box {
+            background: #fdedec;
+            border: 2px solid #e74c3c;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        pre, code {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        
+        code {
+            padding: 3px 6px;
+            display: inline;
+        }
+        
+        .step {
+            background: #f8f9fa;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .step-number {
+            background: #28a745;
+            color: white;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .checklist li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .checklist li:before {
+            content: "☐ ";
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        
+        .provider-card {
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            background: #f8f9fa;
+        }
+        
+        .provider-card h4 {
+            color: #2c3e50;
+            margin-top: 0;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        .pros {
+            color: #27ae60;
+        }
+        
+        .cons {
+            color: #e74c3c;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                font-size: 12px;
+                line-height: 1.4;
+            }
+            
+            .container {
+                box-shadow: none;
+                padding: 20px;
+            }
+            
+            h2 {
+                page-break-before: auto;
+            }
+            
+            .step, .highlight-box, .warning-box, .error-box {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Guida Completa al Deploy<br>WMS EPM su Server</h1>
+        
+        <div class="highlight-box">
+            <h3>📋 Panoramica</h3>
+            <p>Questa guida ti permetterà di trasferire il sistema WMS EPM dalla tua macchina locale a un server di produzione accessibile via internet. Il processo include la configurazione del database, la gestione del server web e la sicurezza.</p>
+        </div>
+
+        <h2>1. Preparazione del Progetto</h2>
+        
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>Verifica file di configurazione</strong>
+        </div>
+        
+        <p>Prima del deploy, assicurati che il progetto contenga questi file:</p>
+        
+        <ul class="checklist">
+            <li><code>requirements.txt</code> - Dipendenze Python</li>
+            <li><code>.env.example</code> - Template configurazione</li>
+            <li><code>Dockerfile</code> - Configurazione container</li>
+            <li><code>docker-compose.yml</code> - Setup multi-container</li>
+            <li><code>nginx.conf</code> - Configurazione web server</li>
+        </ul>
+
+        <div class="step">
+            <span class="step-number">2</span>
+            <strong>Setup Repository Git</strong>
+        </div>
+        
+        <pre><code># Inizializza repository Git
+git init
+git add .
+git commit -m "Initial commit"
+
+# Collega a GitHub/GitLab
+git remote add origin https://github.com/tuoaccount/WMS_EPM.git
+git push -u origin main</code></pre>
+
+        <h2>2. Opzioni di Deployment</h2>
+
+        <div class="provider-card">
+            <h4>🟢 Railway (Consigliato per Principianti)</h4>
+            <p><strong>Costo:</strong> $5-10/mese | <strong>Difficoltà:</strong> ⭐⭐</p>
+            
+            <p class="pros">✅ <strong>Vantaggi:</strong></p>
+            <ul>
+                <li>Deploy automatico da GitHub</li>
+                <li>Database PostgreSQL incluso</li>
+                <li>HTTPS automatico</li>
+                <li>Backup automatici</li>
+                <li>Zero configurazione server</li>
+            </ul>
+            
+            <p class="cons">❌ <strong>Svantaggi:</strong></p>
+            <ul>
+                <li>Meno controllo sul server</li>
+                <li>Limitazioni di personalizzazione</li>
+            </ul>
+        </div>
+
+        <div class="provider-card">
+            <h4>🔵 VPS con Docker (Controllo Completo)</h4>
+            <p><strong>Costo:</strong> $6-20/mese | <strong>Difficoltà:</strong> ⭐⭐⭐⭐</p>
+            
+            <p class="pros">✅ <strong>Vantaggi:</strong></p>
+            <ul>
+                <li>Controllo completo del server</li>
+                <li>Performance migliori</li>
+                <li>Backup personalizzati</li>
+                <li>Scalabilità totale</li>
+            </ul>
+            
+            <p class="cons">❌ <strong>Svantaggi:</strong></p>
+            <ul>
+                <li>Richiede conoscenze tecniche</li>
+                <li>Gestione manuale aggiornamenti</li>
+                <li>Responsabilità sicurezza</li>
+            </ul>
+        </div>
+
+        <div class="page-break"></div>
+
+        <h2>3. Deploy su Railway (Metodo Semplice)</h2>
+
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>Registrazione e Setup</strong>
+        </div>
+
+        <ol>
+            <li>Vai su <strong>railway.app</strong> e registrati</li>
+            <li>Clicca <strong>"New Project"</strong></li>
+            <li>Seleziona <strong>"Deploy from GitHub repo"</strong></li>
+            <li>Autorizza Railway ad accedere al tuo repository</li>
+            <li>Seleziona il repository <strong>WMS_EPM</strong></li>
+        </ol>
+
+        <div class="step">
+            <span class="step-number">2</span>
+            <strong>Configurazione Database</strong>
+        </div>
+
+        <ol>
+            <li>Nel dashboard Railway, clicca <strong>"Add Service"</strong></li>
+            <li>Seleziona <strong>"PostgreSQL"</strong></li>
+            <li>Railway creerà automaticamente il database</li>
+            <li>Copia il <strong>DATABASE_URL</strong> dalla sezione Connect</li>
+        </ol>
+
+        <div class="step">
+            <span class="step-number">3</span>
+            <strong>Variabili di Ambiente</strong>
+        </div>
+
+        <p>Nel tuo servizio web, vai su <strong>Variables</strong> e aggiungi:</p>
+
+        <pre><code>DATABASE_URL=postgresql://username:password@host:port/database
+HOST=0.0.0.0
+PORT=8000
+DEBUG=False
+SECRET_KEY=your-secret-key-here</code></pre>
+
+        <div class="warning-box">
+            <strong>⚠️ Importante:</strong> Sostituisci <code>your-secret-key-here</code> con una chiave segreta sicura di almeno 32 caratteri.
+        </div>
+
+        <div class="step">
+            <span class="step-number">4</span>
+            <strong>Deploy Automatico</strong>
+        </div>
+
+        <p>Railway inizierà automaticamente il deploy. Potrai seguire i logs in tempo reale. Una volta completato, otterrai un URL pubblico tipo: <code>https://wms-epm-production.up.railway.app</code></p>
+
+        <h2>4. Deploy su VPS (Metodo Avanzato)</h2>
+
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>Scelta del Provider VPS</strong>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Provider</th>
+                    <th>Piano Base</th>
+                    <th>Costo/mese</th>
+                    <th>Caratteristiche</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>DigitalOcean</td>
+                    <td>Basic Droplet</td>
+                    <td>$6</td>
+                    <td>1GB RAM, 25GB SSD</td>
+                </tr>
+                <tr>
+                    <td>Vultr</td>
+                    <td>Regular Performance</td>
+                    <td>$6</td>
+                    <td>1GB RAM, 25GB SSD</td>
+                </tr>
+                <tr>
+                    <td>Linode</td>
+                    <td>Nanode</td>
+                    <td>$5</td>
+                    <td>1GB RAM, 25GB SSD</td>
+                </tr>
+                <tr>
+                    <td>Hetzner</td>
+                    <td>CX11</td>
+                    <td>€4</td>
+                    <td>1GB RAM, 20GB SSD</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="step">
+            <span class="step-number">2</span>
+            <strong>Setup Iniziale Server</strong>
+        </div>
+
+        <pre><code># Connetti al server via SSH
+ssh root@your-server-ip
+
+# Aggiorna il sistema
+apt update && apt upgrade -y
+
+# Installa Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+
+# Installa Docker Compose
+curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+
+# Crea utente non-root
+adduser wms
+usermod -aG docker wms
+usermod -aG sudo wms</code></pre>
+
+        <div class="step">
+            <span class="step-number">3</span>
+            <strong>Deploy dell'Applicazione</strong>
+        </div>
+
+        <pre><code># Cambia utente
+su - wms
+
+# Clone repository
+git clone https://github.com/tuoaccount/WMS_EPM.git
+cd WMS_EPM
+
+# Crea file di configurazione
+cp .env.example .env
+nano .env  # Modifica le configurazioni
+
+# Avvia i servizi
+docker-compose up -d
+
+# Verifica che tutto funzioni
+docker-compose ps
+docker-compose logs web</code></pre>
+
+        <div class="page-break"></div>
+
+        <h2>5. Configurazione Dominio e SSL</h2>
+
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>Configurazione DNS</strong>
+        </div>
+
+        <p>Nel pannello del tuo provider di domini (es. Aruba, Register.it), crea un record A:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Nome</th>
+                    <th>Valore</th>
+                    <th>TTL</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>A</td>
+                    <td>wms</td>
+                    <td>IP_DEL_TUO_SERVER</td>
+                    <td>3600</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="step">
+            <span class="step-number">2</span>
+            <strong>Certificato SSL (Solo VPS)</strong>
+        </div>
+
+        <pre><code># Installa Certbot
+apt install certbot python3-certbot-nginx
+
+# Modifica nginx.conf con il tuo dominio
+nano nginx.conf
+# Cambia: server_name your-domain.com;
+# Con: server_name wms.tuodominio.com;
+
+# Riavvia nginx
+docker-compose restart nginx
+
+# Ottieni certificato SSL
+certbot --nginx -d wms.tuodominio.com</code></pre>
+
+        <h2>6. Migrazione Database</h2>
+
+        <div class="warning-box">
+            <strong>⚠️ Backup Importante:</strong> Prima di procedere, crea sempre un backup del database SQLite esistente.
+        </div>
+
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>Backup Dati Esistenti</strong>
+        </div>
+
+        <pre><code># Crea backup del database SQLite
+cp wms.db wms_backup_$(date +%Y%m%d).db
+
+# Esporta struttura e dati
+sqlite3 wms.db .dump > wms_data_export.sql</code></pre>
+
+        <div class="step">
+            <span class="step-number">2</span>
+            <strong>Import in PostgreSQL</strong>
+        </div>
+
+        <p>Crea uno script Python per la migrazione:</p>
+
+        <pre><code>import sqlite3
+import psycopg2
+from sqlalchemy import create_engine
+import pandas as pd
+
+# Connessioni
+sqlite_conn = sqlite3.connect('wms.db')
+postgres_url = 'postgresql://user:pass@host:5432/dbname'
+postgres_engine = create_engine(postgres_url)
+
+# Lista delle tabelle
+tables = ['products', 'ean_codes', 'inventory', 'orders', 'order_lines', 
+          'reservations', 'product_serials', 'serial_validation_reports']
+
+# Migra ogni tabella
+for table in tables:
+    df = pd.read_sql_query(f"SELECT * FROM {table}", sqlite_conn)
+    df.to_sql(table, postgres_engine, if_exists='replace', index=False)
+    print(f"Migrated {table}: {len(df)} records")
+
+print("Migration completed!")</code></pre>
+
+        <h2>7. Checklist Post-Deploy</h2>
+
+        <ul class="checklist">
+            <li>Testare login e funzionalità principali</li>
+            <li>Verificare upload/download file</li>
+            <li>Controllare generazione PDF ed Excel</li>
+            <li>Testare da dispositivi mobili</li>
+            <li>Configurare backup automatici database</li>
+            <li>Setup monitoraggio server (opzionale)</li>
+            <li>Documentare credenziali e procedure</li>
+        </ul>
+
+        <h2>8. Manutenzione e Backup</h2>
+
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>Backup Automatico Database</strong>
+        </div>
+
+        <pre><code># Crea script backup giornaliero
+#!/bin/bash
+DATE=$(date +%Y%m%d_%H%M%S)
+pg_dump $DATABASE_URL > /backups/wms_backup_$DATE.sql
+find /backups -name "wms_backup_*.sql" -mtime +7 -delete
+
+# Aggiungi a crontab per esecuzione giornaliera
+crontab -e
+# Aggiungi: 0 2 * * * /path/to/backup_script.sh</code></pre>
+
+        <div class="step">
+            <span class="step-number">2</span>
+            <strong>Aggiornamenti</strong>
+        </div>
+
+        <pre><code># Per aggiornare l'applicazione
+git pull origin main
+docker-compose build
+docker-compose up -d
+
+# Per aggiornare il sistema
+apt update && apt upgrade -y
+docker system prune -f</code></pre>
+
+        <h2>9. Troubleshooting Comuni</h2>
+
+        <div class="error-box">
+            <h4>🚨 Problemi Frequenti e Soluzioni</h4>
+            
+            <p><strong>Errore: "Port 8000 already in use"</strong></p>
+            <p><strong>Soluzione:</strong> Cambia la porta nel file <code>.env</code>: <code>PORT=8001</code></p>
+            
+            <p><strong>Errore: "Database connection failed"</strong></p>
+            <p><strong>Soluzione:</strong> Verifica il <code>DATABASE_URL</code> e che il database sia avviato</p>
+            
+            <p><strong>Errore: "502 Bad Gateway"</strong></p>
+            <p><strong>Soluzione:</strong> Controlla che l'app sia in esecuzione: <code>docker-compose ps</code></p>
+            
+            <p><strong>File statici non caricano</strong></p>
+            <p><strong>Soluzione:</strong> Verifica configurazione Nginx per servire <code>/static/</code></p>
+        </div>
+
+        <h2>10. Costi e Considerazioni</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Voce</th>
+                    <th>Railway</th>
+                    <th>VPS</th>
+                    <th>Note</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Server</td>
+                    <td>$5-10</td>
+                    <td>$6-20</td>
+                    <td>Mensile</td>
+                </tr>
+                <tr>
+                    <td>Dominio</td>
+                    <td>-</td>
+                    <td>$10-15</td>
+                    <td>Annuale</td>
+                </tr>
+                <tr>
+                    <td>SSL</td>
+                    <td>Incluso</td>
+                    <td>Gratis</td>
+                    <td>Let's Encrypt</td>
+                </tr>
+                <tr>
+                    <td>Backup</td>
+                    <td>Incluso</td>
+                    <td>$5-10</td>
+                    <td>Opzionale</td>
+                </tr>
+                <tr>
+                    <td><strong>Totale</strong></td>
+                    <td><strong>$5-10/mese</strong></td>
+                    <td><strong>$11-30/mese</strong></td>
+                    <td>-</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="highlight-box">
+            <h3>🎯 Raccomandazione Finale</h3>
+            <p><strong>Per iniziare:</strong> Usa Railway per la semplicità e velocità di setup</p>
+            <p><strong>Per crescere:</strong> Migra su VPS quando hai bisogno di più controllo</p>
+            <p><strong>Per aziende:</strong> VPS con backup professionale e monitoraggio</p>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+            <p><strong>📞 Supporto Tecnico</strong></p>
+            <p>Per assistenza specifica sul deploy, contatta il team di sviluppo con i dettagli dell'errore e i log del sistema.</p>
+            <p><em>Documento generato il: <script>document.write(new Date().toLocaleDateString('it-IT'))</script></em></p>
+        </div>
+    </div>
+</body>
+</html>

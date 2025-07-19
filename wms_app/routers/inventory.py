@@ -7,7 +7,9 @@ from collections import defaultdict
 from wms_app import models
 from wms_app.schemas import inventory as inventory_schemas
 from wms_app.database import get_db
-from wms_app.main import templates
+from fastapi.templating import Jinja2Templates
+
+templates = Jinja2Templates(directory="wms_app/templates")
 
 router = APIRouter(
     prefix="/inventory",
@@ -41,6 +43,17 @@ async def _parse_movement_file(file: UploadFile, db: Session) -> Dict[str, Dict[
             continue
 
         ean_or_sku = line
+        quantity = 1
+
+        if '_' in ean_or_sku:
+            parts = ean_or_sku.rsplit('_', 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                ean_or_sku = parts[0]
+                quantity = int(parts[1])
+            else:
+                errors.append(f"Riga {i+1}: Formato EAN/SKU_Quantità non valido: '{line}'")
+                continue
+
         sku_found = None
 
         ean_code = db.query(models.EanCode).filter(models.EanCode.ean == ean_or_sku).first()
@@ -52,7 +65,7 @@ async def _parse_movement_file(file: UploadFile, db: Session) -> Dict[str, Dict[
                 sku_found = product.sku
 
         if sku_found:
-            parsed_data[current_location][sku_found] += 1
+            parsed_data[current_location][sku_found] += quantity
         else:
             errors.append(f"Riga {i+1}: EAN/SKU '{ean_or_sku}' non trovato nel database.")
 
@@ -309,6 +322,125 @@ async def delete_stock_by_row(row_prefix: str, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Errore durante l'eliminazione delle giacenze per fila: {str(e)}")
 
+
+@router.post("/update-stock")
+async def update_stock(update_data: dict, db: Session = Depends(get_db)):
+    """Aggiorna la giacenza di un prodotto in una specifica ubicazione (carico/scarico manuale)."""
+    product_sku = update_data.get("product_sku")
+    location_name = update_data.get("location_name")
+    quantity_change = update_data.get("quantity")
+    
+    if not product_sku or not location_name or quantity_change is None:
+        raise HTTPException(status_code=400, detail="SKU prodotto, ubicazione e quantità sono obbligatori.")
+    
+    # Verifica che il prodotto esista
+    product = db.query(models.Product).filter(models.Product.sku == product_sku).first()
+    if not product:
+        raise HTTPException(status_code=404, detail=f"Prodotto con SKU '{product_sku}' non trovato.")
+    
+    # Verifica che l'ubicazione esista
+    location = db.query(models.Location).filter(models.Location.name == location_name).first()
+    if not location:
+        raise HTTPException(status_code=404, detail=f"Ubicazione '{location_name}' non trovata.")
+    
+    # Trova o crea l'elemento di inventario
+    inventory_item = db.query(models.Inventory).filter(
+        models.Inventory.product_sku == product_sku,
+        models.Inventory.location_name == location_name
+    ).first()
+    
+    if inventory_item:
+        new_quantity = inventory_item.quantity + quantity_change
+        if new_quantity < 0:
+            raise HTTPException(status_code=400, detail=f"Giacenza insufficiente. Attuale: {inventory_item.quantity}, richiesto: {abs(quantity_change)}")
+        
+        if new_quantity == 0:
+            db.delete(inventory_item)
+            action = "eliminato (giacenza zero)"
+        else:
+            inventory_item.quantity = new_quantity
+            action = f"aggiornato a {new_quantity}"
+    else:
+        if quantity_change <= 0:
+            raise HTTPException(status_code=400, detail="Impossibile scaricare da una giacenza inesistente.")
+        
+        inventory_item = models.Inventory(
+            product_sku=product_sku,
+            location_name=location_name,
+            quantity=quantity_change
+        )
+        db.add(inventory_item)
+        action = f"creato con giacenza {quantity_change}"
+    
+    db.commit()
+    return {"message": f"Inventario {action} per {product_sku} in {location_name}."}
+
+@router.post("/move-stock")
+async def move_stock(move_data: dict, db: Session = Depends(get_db)):
+    """Sposta giacenza da una ubicazione a un'altra."""
+    product_sku = move_data.get("product_sku")
+    from_location = move_data.get("from_location")
+    to_location = move_data.get("to_location")
+    quantity_to_move = move_data.get("quantity", 0)
+    
+    if not product_sku or not from_location or not to_location:
+        raise HTTPException(status_code=400, detail="SKU prodotto, ubicazione di origine e destinazione sono obbligatori.")
+    
+    if from_location == to_location:
+        raise HTTPException(status_code=400, detail="L'ubicazione di origine e destinazione non possono essere uguali.")
+    
+    # Verifica che il prodotto esista
+    product = db.query(models.Product).filter(models.Product.sku == product_sku).first()
+    if not product:
+        raise HTTPException(status_code=404, detail=f"Prodotto con SKU '{product_sku}' non trovato.")
+    
+    # Verifica che entrambe le ubicazioni esistano
+    from_loc = db.query(models.Location).filter(models.Location.name == from_location).first()
+    to_loc = db.query(models.Location).filter(models.Location.name == to_location).first()
+    if not from_loc:
+        raise HTTPException(status_code=404, detail=f"Ubicazione di origine '{from_location}' non trovata.")
+    if not to_loc:
+        raise HTTPException(status_code=404, detail=f"Ubicazione di destinazione '{to_location}' non trovata.")
+    
+    # Trova l'elemento di inventario di origine
+    from_inventory = db.query(models.Inventory).filter(
+        models.Inventory.product_sku == product_sku,
+        models.Inventory.location_name == from_location
+    ).first()
+    
+    if not from_inventory or from_inventory.quantity <= 0:
+        raise HTTPException(status_code=400, detail=f"Nessuna giacenza trovata per {product_sku} in {from_location}.")
+    
+    # Determina la quantità da spostare
+    if quantity_to_move <= 0:
+        quantity_to_move = from_inventory.quantity
+    
+    if quantity_to_move > from_inventory.quantity:
+        raise HTTPException(status_code=400, detail=f"Quantità richiesta ({quantity_to_move}) supera la giacenza disponibile ({from_inventory.quantity}).")
+    
+    # Aggiorna l'origine
+    from_inventory.quantity -= quantity_to_move
+    if from_inventory.quantity == 0:
+        db.delete(from_inventory)
+    
+    # Trova o crea l'elemento di inventario di destinazione
+    to_inventory = db.query(models.Inventory).filter(
+        models.Inventory.product_sku == product_sku,
+        models.Inventory.location_name == to_location
+    ).first()
+    
+    if to_inventory:
+        to_inventory.quantity += quantity_to_move
+    else:
+        to_inventory = models.Inventory(
+            product_sku=product_sku,
+            location_name=to_location,
+            quantity=quantity_to_move
+        )
+        db.add(to_inventory)
+    
+    db.commit()
+    return {"message": f"Spostati {quantity_to_move} pz di {product_sku} da {from_location} a {to_location}."}
 
 @router.get("/manage", response_class=HTMLResponse)
 async def get_inventory_management_page(request: Request, db: Session = Depends(get_db)):

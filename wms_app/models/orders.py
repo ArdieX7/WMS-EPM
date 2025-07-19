@@ -12,6 +12,10 @@ class Order(Base):
     customer_name = Column(String)
     order_date = Column(DateTime, default=func.now())
     is_completed = Column(Boolean, default=False)
+    is_archived = Column(Boolean, default=False)  # Per ordini completati e archiviati
+    is_cancelled = Column(Boolean, default=False)  # Per ordini annullati
+    archived_date = Column(DateTime, nullable=True)  # Data archiviazione
+    cancelled_date = Column(DateTime, nullable=True)  # Data annullamento
 
     lines = relationship("OrderLine", back_populates="order")
 

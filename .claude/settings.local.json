@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(./venv/Scripts/python:*)",
+      "Bash(./venv/bin/python:*)",
+      "Bash(pkill:*)",
+      "Bash(curl:*)",
+      "Bash(kill:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(lsof:*)",
+      "Bash(python:*)",
+      "Bash(taskkill:*)",
+      "Bash(ss:*)",
+      "Bash(cat:*)",
+      "Bash(./venv/Scripts/pip.exe install httpx)",
+      "Bash(source:*)",
+      "Bash(./venv/Scripts/activate)",
+      "Bash(./venv/Scripts/pip.exe install requests)"
+    ],
+    "deny": []
+  }
+}
