@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione DDT - WMS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/navbar.css" rel="stylesheet">
+    <link href="/static/css/responsive.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 2em;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+        }
+        
+        .section-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        
+        .section-header {
+            background: linear-gradient(135deg, #00516E, #0097E0);
+            color: white;
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .section-content {
+            padding: 1.5rem;
+        }
+        
+        .ddt-item {
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: #f8f9fa;
+        }
+        
+        .ddt-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .ddt-number {
+            font-weight: bold;
+            color: #00516E;
+            font-size: 1.1em;
+        }
+        
+        .ddt-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        
+        .status-printed {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-not-printed {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .btn-action {
+            margin: 0 0.25rem;
+            padding: 0.375rem 0.75rem;
+            font-size: 0.875rem;
+        }
+        
+        .form-floating {
+            margin-bottom: 1rem;
+        }
+        
+        .modal-body {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .order-item {
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .order-item:hover {
+            background: #f0f8ff;
+            border-color: #0097E0;
+        }
+        
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .order-number {
+            font-weight: bold;
+            color: #00516E;
+        }
+        
+        .order-customer {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            margin-top: 1rem;
+        }
+        
+        .collapsible-content {
+            display: none;
+        }
+        
+        .collapsible-content.show {
+            display: block;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 1em;
+            }
+            
+            .ddt-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .order-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .btn-action {
+                margin-bottom: 0.5rem;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include 'partials/navbar.html' %}
+
+    <div class="container-fluid">
+        <h1 class="mb-4">
+            <i class="fas fa-file-invoice"></i> Gestione DDT
+        </h1>
+
+        <!-- Sezione Genera DDT -->
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection('generate-section')">
+                <span><i class="fas fa-plus-circle"></i> Genera Nuovo DDT</span>
+                <i class="fas fa-chevron-down" id="generate-section-icon"></i>
+            </div>
+            <div class="section-content collapsible-content" id="generate-section-content">
+                <p class="text-muted mb-3">Seleziona un ordine completato per generare il DDT:</p>
+                
+                {% if orders_without_ddt %}
+                    <div class="row">
+                        {% for order in orders_without_ddt %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="order-item" onclick="openDDTModal('{{ order.order_number }}', '{{ order.customer_name }}')">
+                                <div class="order-header">
+                                    <span class="order-number">{{ order.order_number }}</span>
+                                    <small class="text-muted">{{ order.order_date.strftime('%d/%m/%Y') }}</small>
+                                </div>
+                                <div class="order-customer">{{ order.customer_name }}</div>
+                                <small class="text-success">
+                                    <i class="fas fa-check-circle"></i> Completato
+                                </small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        Nessun ordine completato disponibile per la generazione DDT.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Sezione DDT Esistenti -->
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection('existing-section')">
+                <span><i class="fas fa-list"></i> DDT Esistenti ({{ ddts|length }})</span>
+                <i class="fas fa-chevron-down" id="existing-section-icon"></i>
+            </div>
+            <div class="section-content collapsible-content show" id="existing-section-content">
+                {% if ddts %}
+                    {% for ddt in ddts %}
+                    <div class="ddt-item">
+                        <div class="ddt-header">
+                            <div>
+                                <span class="ddt-number">{{ ddt.ddt_number }}</span>
+                                <span class="ddt-status {% if ddt.is_printed %}status-printed{% else %}status-not-printed{% endif %}">
+                                    {% if ddt.is_printed %}
+                                        <i class="fas fa-print"></i> Stampato
+                                    {% else %}
+                                        <i class="fas fa-clock"></i> Non Stampato
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="ddt-actions">
+                                <button class="btn btn-sm btn-outline-info btn-action" onclick="viewDDTDetails('{{ ddt.ddt_number }}')">
+                                    <i class="fas fa-eye"></i> Dettagli
+                                </button>
+                                <a href="/ddt/{{ ddt.ddt_number }}/pdf" class="btn btn-sm btn-success btn-action" target="_blank">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger btn-action" onclick="confirmDeleteDDT('{{ ddt.ddt_number }}')">
+                                    <i class="fas fa-trash"></i> Elimina
+                                </button>
+                            </div>
+                        </div>
+                        <div class="ddt-info">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <strong>Ordine:</strong> {{ ddt.order_number }}<br>
+                                    <strong>Cliente:</strong> {{ ddt.customer_name }}
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Data Emissione:</strong> {{ ddt.issue_date.strftime('%d/%m/%Y') }}<br>
+                                    <strong>Causale:</strong> {{ ddt.transport_reason }}
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>N. Colli:</strong> {{ ddt.total_packages }}<br>
+                                    {% if ddt.total_weight %}
+                                        <strong>Peso:</strong> {{ ddt.total_weight }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        Nessun DDT presente nel sistema.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Genera DDT -->
+    <div class="modal fade" id="generateDDTModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-file-invoice"></i> Genera DDT
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="ddtForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <input type="text" class="form-control" id="orderNumber" readonly>
+                                    <label for="orderNumber">Numero Ordine</label>
+                                </div>
+                                <div class="form-floating">
+                                    <input type="text" class="form-control" id="customerName" required>
+                                    <label for="customerName">Nome Cliente</label>
+                                </div>
+                                <div class="form-floating">
+                                    <input type="text" class="form-control" id="customerAddress">
+                                    <label for="customerAddress">Indirizzo</label>
+                                </div>
+                                <div class="form-floating">
+                                    <input type="text" class="form-control" id="customerCity">
+                                    <label for="customerCity">Città</label>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="form-floating">
+                                            <input type="text" class="form-control" id="customerCap">
+                                            <label for="customerCap">CAP</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="form-floating">
+                                            <input type="text" class="form-control" id="customerProvince" maxlength="2">
+                                            <label for="customerProvince">Provincia</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <input type="text" class="form-control" id="transporterName">
+                                    <label for="transporterName">Nome Trasportatore</label>
+                                </div>
+                                <div class="form-floating">
+                                    <select class="form-select" id="transportReason">
+                                        <option value="Vendita">Vendita</option>
+                                        <option value="Conto Lavorazione">Conto Lavorazione</option>
+                                        <option value="Riparazione">Riparazione</option>
+                                        <option value="Comodato">Comodato</option>
+                                        <option value="Reso">Reso</option>
+                                    </select>
+                                    <label for="transportReason">Causale Trasporto</label>
+                                </div>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="form-floating">
+                                            <input type="number" class="form-control" id="totalPackages" value="1" min="1">
+                                            <label for="totalPackages">N. Colli</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="form-floating">
+                                            <input type="text" class="form-control" id="totalWeight" placeholder="es. 25.5 kg">
+                                            <label for="totalWeight">Peso Totale</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-floating">
+                                    <textarea class="form-control" id="transporterNotes" style="height: 80px"></textarea>
+                                    <label for="transporterNotes">Note Trasportatore</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-floating">
+                            <textarea class="form-control" id="notes" style="height: 60px"></textarea>
+                            <label for="notes">Note Aggiuntive</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="button" class="btn btn-success" onclick="generateDDT()">
+                        <i class="fas fa-file-plus"></i> Genera DDT
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Dettagli DDT -->
+    <div class="modal fade" id="ddtDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-file-invoice"></i> Dettagli DDT
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="ddtDetailsContent">
+                    <!-- Contenuto caricato dinamicamente -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/navbar.js"></script>
+    <script>
+        // Gestione parametri URL per pre-compilazione
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderParam = urlParams.get('order');
+            const customerParam = urlParams.get('customer');
+            
+            if (orderParam && customerParam) {
+                // Pre-apri e pre-compila il modal DDT
+                setTimeout(() => {
+                    openDDTModal(orderParam, customerParam);
+                }, 500);
+            }
+        });
+
+        function toggleSection(sectionId) {
+            const content = document.getElementById(sectionId + '-content');
+            const icon = document.getElementById(sectionId + '-icon');
+            
+            if (content.classList.contains('show')) {
+                content.classList.remove('show');
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            } else {
+                content.classList.add('show');
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            }
+        }
+
+        function openDDTModal(orderNumber, customerName) {
+            document.getElementById('orderNumber').value = orderNumber;
+            document.getElementById('customerName').value = customerName;
+            
+            // Reset altri campi
+            document.getElementById('customerAddress').value = '';
+            document.getElementById('customerCity').value = '';
+            document.getElementById('customerCap').value = '';
+            document.getElementById('customerProvince').value = '';
+            document.getElementById('transporterName').value = '';
+            document.getElementById('transportReason').value = 'Vendita';
+            document.getElementById('totalPackages').value = '1';
+            document.getElementById('totalWeight').value = '';
+            document.getElementById('transporterNotes').value = '';
+            document.getElementById('notes').value = '';
+            
+            new bootstrap.Modal(document.getElementById('generateDDTModal')).show();
+        }
+
+        async function generateDDT() {
+            try {
+                const formData = {
+                    order_number: document.getElementById('orderNumber').value,
+                    customer_name: document.getElementById('customerName').value,
+                    customer_address: document.getElementById('customerAddress').value || null,
+                    customer_city: document.getElementById('customerCity').value || null,
+                    customer_cap: document.getElementById('customerCap').value || null,
+                    customer_province: document.getElementById('customerProvince').value || null,
+                    transporter_name: document.getElementById('transporterName').value || null,
+                    transporter_notes: document.getElementById('transporterNotes').value || null,
+                    transport_reason: document.getElementById('transportReason').value,
+                    total_packages: parseInt(document.getElementById('totalPackages').value),
+                    total_weight: document.getElementById('totalWeight').value || null,
+                    notes: document.getElementById('notes').value || null
+                };
+
+                const response = await fetch('/ddt/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert(`DDT ${result.ddt_number} generato con successo!`);
+                    bootstrap.Modal.getInstance(document.getElementById('generateDDTModal')).hide();
+                    location.reload();
+                } else {
+                    alert('Errore: ' + result.detail);
+                }
+            } catch (error) {
+                console.error('Errore:', error);
+                alert('Errore durante la generazione del DDT');
+            }
+        }
+
+        async function viewDDTDetails(ddtNumber) {
+            try {
+                const response = await fetch(`/ddt/${ddtNumber}`);
+                const ddt = await response.json();
+
+                if (response.ok) {
+                    let detailsHtml = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Informazioni DDT</h6>
+                                <table class="table table-sm">
+                                    <tr><td><strong>Numero DDT:</strong></td><td>${ddt.ddt_number}</td></tr>
+                                    <tr><td><strong>Ordine:</strong></td><td>${ddt.order_number}</td></tr>
+                                    <tr><td><strong>Cliente:</strong></td><td>${ddt.customer_name}</td></tr>
+                                    <tr><td><strong>Data Emissione:</strong></td><td>${new Date(ddt.issue_date).toLocaleDateString()}</td></tr>
+                                    <tr><td><strong>Causale:</strong></td><td>${ddt.transport_reason}</td></tr>
+                                    <tr><td><strong>N. Colli:</strong></td><td>${ddt.total_packages}</td></tr>
+                                    ${ddt.total_weight ? `<tr><td><strong>Peso:</strong></td><td>${ddt.total_weight}</td></tr>` : ''}
+                                    ${ddt.transporter_name ? `<tr><td><strong>Trasportatore:</strong></td><td>${ddt.transporter_name}</td></tr>` : ''}
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                ${ddt.customer_address ? `<h6>Indirizzo Destinatario</h6><p>${ddt.customer_address}<br>` : ''}
+                                ${ddt.customer_city || ddt.customer_cap || ddt.customer_province ? 
+                                    `${ddt.customer_cap || ''} ${ddt.customer_city || ''} ${ddt.customer_province ? '(' + ddt.customer_province + ')' : ''}</p>` : ''}
+                                ${ddt.notes ? `<h6>Note</h6><p>${ddt.notes}</p>` : ''}
+                                ${ddt.transporter_notes ? `<h6>Note Trasportatore</h6><p>${ddt.transporter_notes}</p>` : ''}
+                            </div>
+                        </div>
+                        <h6>Prodotti</h6>
+                        <div class="table-container">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Codice</th>
+                                        <th>Descrizione</th>
+                                        <th>Quantità</th>
+                                        <th>U.M.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    let totalQty = 0;
+                    ddt.lines.forEach(line => {
+                        detailsHtml += `
+                            <tr>
+                                <td>${line.product_sku}</td>
+                                <td>${line.product_description}</td>
+                                <td>${line.quantity}</td>
+                                <td>${line.unit_measure}</td>
+                            </tr>
+                        `;
+                        totalQty += line.quantity;
+                    });
+
+                    detailsHtml += `
+                                    <tr class="table-dark">
+                                        <td colspan="2"><strong>TOTALE</strong></td>
+                                        <td><strong>${totalQty}</strong></td>
+                                        <td></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                    document.getElementById('ddtDetailsContent').innerHTML = detailsHtml;
+                    new bootstrap.Modal(document.getElementById('ddtDetailsModal')).show();
+                } else {
+                    alert('Errore nel caricamento dettagli DDT');
+                }
+            } catch (error) {
+                console.error('Errore:', error);
+                alert('Errore nel caricamento dettagli DDT');
+            }
+        }
+
+        async function confirmDeleteDDT(ddtNumber) {
+            if (confirm(`Sei sicuro di voler eliminare il DDT ${ddtNumber}?`)) {
+                try {
+                    const response = await fetch(`/ddt/${ddtNumber}`, {
+                        method: 'DELETE'
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        alert(result.message);
+                        location.reload();
+                    } else {
+                        alert('Errore: ' + result.detail);
+                    }
+                } catch (error) {
+                    console.error('Errore:', error);
+                    alert('Errore durante l\'eliminazione del DDT');
+                }
+            }
+        }
+
+        // Auto-maiuscolo per provincia
+        document.getElementById('customerProvince').addEventListener('input', function(e) {
+            e.target.value = e.target.value.toUpperCase();
+        });
+    </script>
+</body>
+</html>

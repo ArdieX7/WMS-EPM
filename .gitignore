@@ -1,4 +1,5 @@
 venv/
+venv_new/
 __pycache__/
 *.pyc
 *.log
