@@ -3,77 +3,244 @@
 <head>
     <title>Gestione Magazzino - WMS EPM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/no-flash.css">
     <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/mobile-navbar.css">
     <link rel="stylesheet" href="/static/css/warehouse.css">
     <link rel="stylesheet" href="/static/css/collapsible.css">
     <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/footer.css">
 </head>
 <body>
     {% include 'partials/navbar.html' %}
+    
+    <!-- Loader permessi (visibile finché non si verificano i permessi) -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
 
-    <h1>Gestione Magazzino</h1>
+    <!-- Contenuto protetto (nascosto finché non si verificano i permessi) -->
+    <div class="protected-content">
+    <!-- Mobile content wrapper -->
+    <div class="mobile-content">
+        <h1>Gestione Magazzino</h1>
 
-    <div class="collapsible-container">
-        <details>
-            <summary>Aggiungi Nuova Ubicazione</summary>
-            <div class="details-content">
-                <form action="/warehouse/add-location" method="post">
-                    <label for="location-name">Nome Ubicazione:</label><br>
-                    <input type="text" id="location-name" name="location_name" required><br><br>
-                    <button type="submit">Aggiungi Ubicazione</button>
-                </form>
+    <!-- Pulsanti azione moderni -->
+    <div class="action-buttons" data-permission="warehouse_management_section">
+        <button class="action-btn" onclick="openOverlay('add-location-overlay')">📍 Aggiungi Ubicazione</button>
+        <button class="action-btn" onclick="openOverlay('bulk-locations-overlay')">🏗️ Gestione Massiva</button>
+        <button class="action-btn" onclick="openOverlay('availability-overlay')">🔓 Gestione Disponibilità</button>
+    </div>
+
+    <!-- Overlay Aggiungi Ubicazione -->
+    <div id="add-location-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>📍 Aggiungi Nuova Ubicazione</h3>
+                <button class="overlay-close" onclick="closeOverlay('add-location-overlay')">&times;</button>
             </div>
-        </details>
+            <form action="/warehouse/add-location" method="post">
+                <div class="form-group">
+                    <label for="location-name">Nome Ubicazione:</label>
+                    <input type="text" id="location-name" name="location_name" required placeholder="Es. 1A1P1">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeOverlay('add-location-overlay')">Annulla</button>
+                    <button type="submit" class="btn-primary">📍 Aggiungi Ubicazione</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        <details>
-            <summary>Genera Ubicazioni Massivamente</summary>
-            <div class="details-content">
-                <form action="/warehouse/generate-locations" method="post">
-                    <label for="row_start">File (range):</label><br>
-                    <input type="number" id="row_start" name="row_start" min="1" placeholder="Da" required style="width: 70px;">
-                    <input type="number" id="row_end" name="row_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
+    <!-- Overlay Gestione Massiva con Tab -->
+    <div id="bulk-locations-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>🏗️ Gestione Massiva Ubicazioni</h3>
+                <button class="overlay-close" onclick="closeOverlay('bulk-locations-overlay')">&times;</button>
+            </div>
+            
+            <!-- Sistema Tab -->
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" onclick="switchWarehouseTab('generate-tab')">➕ Genera Ubicazioni</button>
+                    <button class="tab-btn" onclick="switchWarehouseTab('delete-tab')">🗑️ Cancella Ubicazioni</button>
+                </div>
+                
+                <!-- Tab Genera Ubicazioni -->
+                <div id="generate-tab" class="tab-content active">
+                    <form action="/warehouse/generate-locations" method="post">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="row_start">File (range):</label>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="number" id="row_start" name="row_start" min="1" placeholder="Da" required style="width: 80px;">
+                                    <span>-</span>
+                                    <input type="number" id="row_end" name="row_end" min="1" placeholder="A" required style="width: 80px;">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="bay_start">Campate (es. 1-8 per A-H):</label>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="number" id="bay_start" name="bay_start" min="1" placeholder="Da" required style="width: 80px;">
+                                    <span>-</span>
+                                    <input type="number" id="bay_end" name="bay_end" min="1" placeholder="A" required style="width: 80px;">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="level_start">Piani (range):</label>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="number" id="level_start" name="level_start" min="1" placeholder="Da" required style="width: 80px;">
+                                    <span>-</span>
+                                    <input type="number" id="level_end" name="level_end" min="1" placeholder="A" required style="width: 80px;">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="position_start">Posizione (range):</label>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="number" id="position_start" name="position_start" min="1" placeholder="Da" required style="width: 80px;">
+                                    <span>-</span>
+                                    <input type="number" id="position_end" name="position_end" min="1" placeholder="A" required style="width: 80px;">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('bulk-locations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary">➕ Genera Ubicazioni</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Tab Cancella Ubicazioni -->
+                <div id="delete-tab" class="tab-content">
+                    <form id="delete-locations-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="del_row_start">File (range):</label>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="number" id="del_row_start" name="row_start" min="1" placeholder="Da" required style="width: 80px;">
+                                    <span>-</span>
+                                    <input type="number" id="del_row_end" name="row_end" min="1" placeholder="A" required style="width: 80px;">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="del_bay_start">Campate (es. 1-8 per A-H):</label>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="number" id="del_bay_start" name="bay_start" min="1" placeholder="Da" required style="width: 80px;">
+                                    <span>-</span>
+                                    <input type="number" id="del_bay_end" name="bay_end" min="1" placeholder="A" required style="width: 80px;">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="del_level_start">Piani (range):</label>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="number" id="del_level_start" name="level_start" min="1" placeholder="Da" required style="width: 80px;">
+                                    <span>-</span>
+                                    <input type="number" id="del_level_end" name="level_end" min="1" placeholder="A" required style="width: 80px;">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="del_position_start">Posizione (range):</label>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="number" id="del_position_start" name="position_start" min="1" placeholder="Da" required style="width: 80px;">
+                                    <span>-</span>
+                                    <input type="number" id="del_position_end" name="position_end" min="1" placeholder="A" required style="width: 80px;">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('bulk-locations-overlay')">Annulla</button>
+                            <button type="button" class="btn-warning" onclick="previewDelete()">🔍 Anteprima Cancellazione</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+        
+    <!-- Overlay Gestione Disponibilità -->
+    <div id="availability-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>🔓 Gestione Disponibilità Ubicazioni</h3>
+                <button class="overlay-close" onclick="closeOverlay('availability-overlay')">&times;</button>
+            </div>
+            
+            <div style="padding: 1.5rem;">
+                <div style="background-color: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #0097E0;">
+                    <strong>ℹ️ Informazioni:</strong><br>
+                    Rendi disponibili o non disponibili le ubicazioni in un range specificato. Le ubicazioni non disponibili appariranno grigie sulla mappa.
+                </div>
+                
+                <form id="availability-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="avail_row_start">File (range):</label>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <input type="number" id="avail_row_start" name="row_start" min="1" placeholder="Da" required style="width: 80px;">
+                                <span>-</span>
+                                <input type="number" id="avail_row_end" name="row_end" min="1" placeholder="A" required style="width: 80px;">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="avail_bay_start">Campate (es. 1-8 per A-H):</label>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <input type="number" id="avail_bay_start" name="bay_start" min="1" placeholder="Da" required style="width: 80px;">
+                                <span>-</span>
+                                <input type="number" id="avail_bay_end" name="bay_end" min="1" placeholder="A" required style="width: 80px;">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="avail_level_start">Piani (range):</label>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <input type="number" id="avail_level_start" name="level_start" min="1" placeholder="Da" required style="width: 80px;">
+                                <span>-</span>
+                                <input type="number" id="avail_level_end" name="level_end" min="1" placeholder="A" required style="width: 80px;">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="avail_position_start">Posizione (range):</label>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <input type="number" id="avail_position_start" name="position_start" min="1" placeholder="Da" required style="width: 80px;">
+                                <span>-</span>
+                                <input type="number" id="avail_position_end" name="position_end" min="1" placeholder="A" required style="width: 80px;">
+                            </div>
+                        </div>
+                    </div>
                     
-                    <label for="bay_start">Campate (range numerico, es. 1-8 per A-H):</label><br>
-                    <input type="number" id="bay_start" name="bay_start" min="1" placeholder="Da" required style="width: 70px;">
-                    <input type="number" id="bay_end" name="bay_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
-
-                    <label for="level_start">Piani (range):</label><br>
-                    <input type="number" id="level_start" name="level_start" min="1" placeholder="Da" required style="width: 70px;">
-                    <input type="number" id="level_end" name="level_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
-
-                    <label for="position_start">Posizione (range):</label><br>
-                    <input type="number" id="position_start" name="position_start" min="1" placeholder="Da" required style="width: 70px;">
-                    <input type="number" id="position_end" name="position_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
-
-                    <button type="submit">Genera Ubicazioni</button>
-                </form>
-            </div>
-        </details>
-
-        <details>
-            <summary>Cancella Ubicazioni Massivamente</summary>
-            <div class="details-content">
-                <form id="delete-locations-form">
-                    <label for="del_row_start">File (range):</label><br>
-                    <input type="number" id="del_row_start" name="row_start" min="1" placeholder="Da" required style="width: 70px;">
-                    <input type="number" id="del_row_end" name="row_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
+                    <div class="form-group">
+                        <label><strong>Azione da eseguire:</strong></label>
+                        <div style="display: flex; gap: 2rem; margin-top: 0.5rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="radio" name="availability_action" value="unavailable" checked> 
+                                🔒 Rendi Non Disponibili
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="radio" name="availability_action" value="available"> 
+                                🔓 Rendi Disponibili
+                            </label>
+                        </div>
+                    </div>
                     
-                    <label for="del_bay_start">Campate (range numerico, es. 1-8 per A-H):</label><br>
-                    <input type="number" id="del_bay_start" name="bay_start" min="1" placeholder="Da" required style="width: 70px;">
-                    <input type="number" id="del_bay_end" name="bay_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
-
-                    <label for="del_level_start">Piani (range):</label><br>
-                    <input type="number" id="del_level_start" name="level_start" min="1" placeholder="Da" required style="width: 70px;">
-                    <input type="number" id="del_level_end" name="level_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
-
-                    <label for="del_position_start">Posizione (range):</label><br>
-                    <input type="number" id="del_position_start" name="position_start" min="1" placeholder="Da" required style="width: 70px;">
-                    <input type="number" id="del_position_end" name="position_end" min="1" placeholder="A" required style="width: 70px;"><br><br>
-
-                    <button type="button" onclick="previewDelete()">Cancella Ubicazioni</button>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="closeOverlay('availability-overlay')">Annulla</button>
+                        <button type="button" class="btn-warning" onclick="previewAvailabilityChange()">🔍 Anteprima Modifica</button>
+                        <button type="button" class="btn-primary" onclick="applyAvailabilityChange()" id="apply-availability-btn" style="display:none;">✅ Applica Modifica</button>
+                    </div>
                 </form>
+                
+                <div id="availability-preview" style="margin-top: 15px; display: none;">
+                    <!-- Contenuto dinamico dell'anteprima -->
+                </div>
             </div>
-        </details>
+        </div>
     </div>
 
     <!-- Modal for delete confirmation -->
@@ -87,13 +254,30 @@
         </div>
     </div>
 
-    <h2>Mappa Magazzino</h2>
-    <div class="table-container location-grid-container">
+    <div class="warehouse-header">
+        <h2>Mappa Magazzino</h2>
+        
+        <!-- Toggle Visualizzazione -->
+        <div class="view-toggle">
+            <label class="toggle-switch">
+                <input type="checkbox" id="view-toggle-checkbox" checked onchange="toggleWarehouseView()">
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">📋 Visualizzazione 2D</span>
+        </div>
+    </div>
+    
+    <!-- Scroll orizzontale posizionato in cima -->
+    <div class="scroll-indicator">
+        <div class="scroll-bar-top" id="topScrollBar"></div>
+    </div>
+    <!-- Visualizzazione Originale (Lista) -->
+    <div class="table-container location-grid-container" id="locationGrid" style="display: none;">
         {% for row_number, locations in locations_by_row.items() %}
         <div class="location-row">
             <h4>Fila {{ row_number }}</h4>
             {% for loc in locations %}
-            <div class="location-cell {{ 'location-occupied' if loc.is_occupied else 'location-free' }}">
+            <div class="location-cell {{ 'location-occupied' if loc.is_occupied else ('location-unavailable' if not loc.is_available else 'location-free') }}">
                 {{ loc.name }}
                 {% if loc.tooltip %}
                 <span class="tooltiptext">{{ loc.tooltip }}</span>
@@ -104,8 +288,223 @@
         {% endfor %}
     </div>
 
+    <!-- Visualizzazione 2D (Warehouse Layout) -->
+    <div class="warehouse-2d-container" id="warehouse2D">
+        <!-- Contenuto generato dinamicamente via JavaScript -->
+    </div>
+
     <script>
         let locationsToDelete = [];
+        let warehouseData = [];
+        let current2DView = true; // Inizia con visualizzazione 2D attiva
+        let updateTopScrollBar; // Funzione globale per aggiornare scroll superiore
+
+        // Funzione per il toggle della visualizzazione
+        function toggleWarehouseView() {
+            const checkbox = document.getElementById('view-toggle-checkbox');
+            const originalGrid = document.getElementById('locationGrid');
+            const warehouse2D = document.getElementById('warehouse2D');
+            
+            current2DView = checkbox.checked;
+            
+            if (current2DView) {
+                // Mostra visualizzazione 2D
+                originalGrid.style.display = 'none';
+                warehouse2D.style.display = 'block';
+                generate2DWarehouseView();
+            } else {
+                // Mostra visualizzazione originale
+                originalGrid.style.display = 'block';
+                warehouse2D.style.display = 'none';
+            }
+            
+            // Aggiorna lo scroll superiore per la visualizzazione attiva
+            setTimeout(updateTopScrollBar, 100);
+        }
+
+        // Funzione per parsing delle ubicazioni
+        function parseLocation(locationName) {
+            // Formato: 1A2P3 = Fila 1, Campata A, Piano 2, Posizione 3
+            const match = locationName.match(/^(\d+)([A-Z])(\d+)P(\d+)$/);
+            if (!match) return null;
+            
+            return {
+                row: parseInt(match[1]),
+                bay: match[2],
+                level: parseInt(match[3]),
+                position: parseInt(match[4]),
+                original: locationName
+            };
+        }
+
+        // Funzione per generare la visualizzazione 2D
+        function generate2DWarehouseView() {
+            console.log('🏗️ Generazione visualizzazione 2D warehouse...');
+            
+            // Raccogliere tutti i dati delle ubicazioni dalla visualizzazione corrente
+            warehouseData = [];
+            const locationCells = document.querySelectorAll('#locationGrid .location-cell');
+            
+            console.log(`📋 Elementi .location-cell trovati nel DOM: ${locationCells.length}`);
+            
+            locationCells.forEach((cell, index) => {
+                // Estrarre SOLO il nome ubicazione (prima riga, senza tooltip)
+                const fullText = cell.textContent.trim();
+                const locationName = fullText.split('\n')[0].trim();
+                const parsed = parseLocation(locationName);
+                const tooltip = cell.querySelector('.tooltiptext')?.textContent || '';
+                
+                console.log(`📍 Ubicazione ${index + 1}: '${locationName}' (estratto da: '${fullText.substring(0,50)}...')`);
+                console.log(`   Parsed:`, parsed);
+                console.log(`   Classi CSS: '${cell.className}'`);
+                console.log(`   Tooltip: '${tooltip || 'nessun tooltip'}'`);
+                
+                // Determina lo stato basandosi sulle classi CSS
+                let isOccupied = cell.className.includes('location-occupied');
+                let isFree = cell.className.includes('location-free');
+                let isUnavailable = cell.className.includes('location-unavailable');
+                
+                console.log(`   STATO: Occupato=${isOccupied}, Libero=${isFree}, Non disponibile=${isUnavailable}`);
+                
+                // SOLO ubicazioni con parsing valido
+                if (parsed) {
+                    warehouseData.push({
+                        ...parsed,
+                        element: cell,
+                        className: cell.className,
+                        tooltip: tooltip,
+                        exists: true
+                    });
+                    console.log(`✅ AGGIUNTA all'array`);
+                } else {
+                    console.log(`❌ Formato ubicazione non riconosciuto: '${locationName}' - SALTATA`);
+                }
+                console.log(`---`);
+            });
+            
+            console.log(`📦 Ubicazioni elaborate: ${warehouseData.length}`);
+            console.log(`📦 Dettagli ubicazioni:`, warehouseData);
+            
+            // Raggruppare solo le ubicazioni esistenti (NO generazione di griglia completa)
+            const existingGrid = groupExistingLocations(warehouseData);
+            console.log(`🏗️ Raggruppamento ubicazioni esistenti: ${Object.keys(existingGrid).length} file`);
+            console.log(`🏗️ Griglia completa:`, existingGrid);
+            
+            // Generare HTML per la visualizzazione 2D
+            const warehouse2D = document.getElementById('warehouse2D');
+            warehouse2D.innerHTML = render2DWarehouse(existingGrid);
+            
+            // Aggiorna lo scroll superiore dopo aver generato il contenuto
+            if (updateTopScrollBar) {
+                setTimeout(updateTopScrollBar, 50);
+            }
+        }
+
+        // Funzione per raggruppare solo le ubicazioni esistenti
+        function groupExistingLocations(existingData) {
+            const grid = {};
+            
+            existingData.forEach(location => {
+                const { row, bay, level } = location;
+                
+                // Inizializza struttura se non esiste
+                if (!grid[row]) {
+                    grid[row] = {};
+                }
+                if (!grid[row][bay]) {
+                    grid[row][bay] = {};
+                }
+                if (!grid[row][bay][level]) {
+                    grid[row][bay][level] = [];
+                }
+                
+                // Aggiungi l'ubicazione esistente
+                grid[row][bay][level].push(location);
+            });
+            
+            // Ordina le posizioni all'interno di ogni livello
+            Object.keys(grid).forEach(row => {
+                Object.keys(grid[row]).forEach(bay => {
+                    Object.keys(grid[row][bay]).forEach(level => {
+                        grid[row][bay][level].sort((a, b) => a.position - b.position);
+                    });
+                });
+            });
+            
+            return grid;
+        }
+
+
+        // Funzione per renderizzare la visualizzazione 2D
+        function render2DWarehouse(groupedData) {
+            let html = '<div class="warehouse-2d-grid">';
+            
+            // Ordinare le file
+            const sortedRows = Object.keys(groupedData).sort((a, b) => parseInt(a) - parseInt(b));
+            
+            sortedRows.forEach(row => {
+                html += `<div class="warehouse-row-section">`;
+                html += `<div class="warehouse-row-label">FILA ${row}</div>`;
+                html += `<div class="warehouse-bays-container">`;
+                
+                // Ordinare le campate (A, B, C, etc.)
+                const sortedBays = Object.keys(groupedData[row]).sort();
+                
+                sortedBays.forEach(bay => {
+                    html += `<div class="warehouse-bay">`;
+                    html += `<div class="bay-label">Campata ${bay}</div>`;
+                    html += `<div class="bay-levels">`;
+                    
+                    // Ordinare i piani dal più alto al più basso (4, 3, 2, 1)
+                    const sortedLevels = Object.keys(groupedData[row][bay]).sort((a, b) => parseInt(b) - parseInt(a));
+                    
+                    sortedLevels.forEach(level => {
+                        html += `<div class="bay-level">`;
+                        html += `<div class="level-label">P${level}</div>`;
+                        html += `<div class="level-positions">`;
+                        
+                        // Posizioni ordinate orizzontalmente
+                        groupedData[row][bay][level].forEach(location => {
+                            // Mappa le classi originali a quelle 2D mantenendo lo stato
+                            let cellClass = 'location-2d-cell';
+                            if (location.className.includes('location-occupied')) {
+                                cellClass += ' location-occupied';
+                            } else if (location.className.includes('location-unavailable')) {
+                                cellClass += ' location-unavailable';
+                            } else if (location.className.includes('location-free')) {
+                                cellClass += ' location-free';
+                            }
+                            
+                            // Solo SKU e quantità nel tooltip, non il nome ubicazione che è già visibile
+                            const tooltipText = location.tooltip && location.tooltip.trim() 
+                                ? location.tooltip 
+                                : '';
+                            
+                            html += `<div class="${cellClass}" data-location="${location.original}">`;
+                            html += `<span class="location-name">${location.original}</span>`;
+                            // Tooltip solo se ha contenuto reale
+                            if (tooltipText) {
+                                html += `<div class="location-2d-tooltip">${tooltipText}</div>`;
+                            }
+                            html += `</div>`;
+                        });
+                        
+                        html += `</div>`; // level-positions
+                        html += `</div>`; // bay-level
+                    });
+                    
+                    html += `</div>`; // bay-levels
+                    html += `</div>`; // warehouse-bay
+                });
+                
+                html += `</div>`; // warehouse-bays-container
+                html += `</div>`; // warehouse-row-section
+            });
+            
+            html += '</div>'; // warehouse-2d-grid
+            
+            return html;
+        }
 
         async function previewDelete() {
             const form = document.getElementById('delete-locations-form');
@@ -170,7 +569,248 @@
         function closeModal() {
             document.getElementById('delete-confirmation-modal').style.display = 'none';
         }
+
+        // Funzioni per gestione disponibilità ubicazioni
+        async function previewAvailabilityChange() {
+            const form = document.getElementById('availability-form');
+            const formData = new FormData(form);
+            
+            const rangeData = {
+                row_start: parseInt(formData.get('row_start')),
+                row_end: parseInt(formData.get('row_end')),
+                bay_start: parseInt(formData.get('bay_start')),
+                bay_end: parseInt(formData.get('bay_end')),
+                level_start: parseInt(formData.get('level_start')),
+                level_end: parseInt(formData.get('level_end')),
+                position_start: parseInt(formData.get('position_start')),
+                position_end: parseInt(formData.get('position_end'))
+            };
+
+            try {
+                const response = await fetch('/warehouse/preview-availability-change', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(rangeData)
+                });
+
+                if (!response.ok) {
+                    alert('Errore durante l\'anteprima');
+                    return;
+                }
+
+                const result = await response.json();
+                const action = document.querySelector('input[name="availability_action"]:checked').value;
+                
+                displayAvailabilityPreview(result, action);
+                document.getElementById('apply-availability-btn').style.display = 'inline-block';
+            } catch (error) {
+                alert('Errore di connessione');
+                console.error(error);
+            }
+        }
+
+        function displayAvailabilityPreview(result, action) {
+            const previewDiv = document.getElementById('availability-preview');
+            const actionText = action === 'available' ? 'disponibili' : 'non disponibili';
+            const actionColor = action === 'available' ? '#28a745' : '#dc3545';
+            
+            let html = `<h4 style="color: ${actionColor};">Anteprima: ${result.existing_count} ubicazioni verranno rese ${actionText}</h4>`;
+            
+            if (result.available_locations.length > 0) {
+                html += `<h5>Attualmente Disponibili (${result.available_locations.length}):</h5>`;
+                html += '<div style="max-height: 100px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 4px;">';
+                html += result.available_locations.join(', ');
+                html += '</div>';
+            }
+            
+            if (result.unavailable_locations.length > 0) {
+                html += `<h5>Attualmente Non Disponibili (${result.unavailable_locations.length}):</h5>`;
+                html += '<div style="max-height: 100px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 4px;">';
+                html += result.unavailable_locations.join(', ');
+                html += '</div>';
+            }
+            
+            if (result.non_existing_locations.length > 0) {
+                html += `<h5>Ubicazioni Non Esistenti (${result.non_existing_locations.length}):</h5>`;
+                html += '<div style="max-height: 100px; overflow-y: auto; background: #fff3cd; padding: 10px; border-radius: 4px;">';
+                html += result.non_existing_locations.join(', ');
+                html += '</div>';
+            }
+            
+            previewDiv.innerHTML = html;
+            previewDiv.style.display = 'block';
+        }
+
+        async function applyAvailabilityChange() {
+            const form = document.getElementById('availability-form');
+            const formData = new FormData(form);
+            const action = document.querySelector('input[name="availability_action"]:checked').value;
+            
+            // Aggiungi il campo available al FormData
+            formData.append('available', action === 'available' ? 'true' : 'false');
+            
+            try {
+                const response = await fetch('/warehouse/set-locations-availability', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    alert(`Errore: ${errorData.detail}`);
+                    return;
+                }
+
+                const result = await response.json();
+                alert(result.message);
+                
+                // Ricarica la pagina per vedere i cambiamenti sulla mappa
+                window.location.reload();
+            } catch (error) {
+                alert('Errore di connessione');
+                console.error(error);
+            }
+        }
+
+        // Funzioni per gestire gli overlay moderni
+        function openOverlay(overlayId) {
+            document.getElementById(overlayId).style.display = 'block';
+        }
+
+        function closeOverlay(overlayId) {
+            document.getElementById(overlayId).style.display = 'none';
+        }
+
+        // Funzione per gestire i tab nell'overlay warehouse
+        function switchWarehouseTab(tabId) {
+            // Nasconde tutti i tab content
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Rimuove active da tutti i tab buttons
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            tabButtons.forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Mostra il tab selezionato
+            document.getElementById(tabId).classList.add('active');
+            
+            // Attiva il button corrispondente
+            event.target.classList.add('active');
+        }
+
+        // Chiusura overlay con ESC
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const overlays = document.querySelectorAll('.overlay');
+                overlays.forEach(overlay => {
+                    if (overlay.style.display === 'block') {
+                        overlay.style.display = 'none';
+                    }
+                });
+            }
+        });
+
+        // Chiusura overlay cliccando fuori dal contenuto
+        document.querySelectorAll('.overlay').forEach(overlay => {
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) {
+                    overlay.style.display = 'none';
+                }
+            });
+        });
+
+        // Inizializzazione pagina e sincronizzazione scroll
+        document.addEventListener('DOMContentLoaded', function() {
+            // Avvia automaticamente la visualizzazione 2D
+            generate2DWarehouseView();
+            
+            const topScrollBar = document.getElementById('topScrollBar');
+            const locationGrid = document.getElementById('locationGrid');
+            const warehouse2D = document.getElementById('warehouse2D');
+            const scrollIndicator = document.querySelector('.scroll-indicator');
+            
+            // Imposta la larghezza della barra scroll superiore
+            updateTopScrollBar = function() {
+                const activeContainer = current2DView ? warehouse2D : locationGrid;
+                if (activeContainer.scrollWidth > 0) {
+                    topScrollBar.scrollWidth = activeContainer.scrollWidth;
+                    topScrollBar.style.overflowX = 'auto';
+                    topScrollBar.innerHTML = '<div style="width: ' + activeContainer.scrollWidth + 'px; height: 1px;"></div>';
+                }
+            }
+            
+            // Sincronizza scroll da barra superiore alle mappe
+            topScrollBar.addEventListener('scroll', function() {
+                if (current2DView) {
+                    warehouse2D.scrollLeft = topScrollBar.scrollLeft;
+                } else {
+                    locationGrid.scrollLeft = topScrollBar.scrollLeft;
+                }
+            });
+            
+            // Sincronizza scroll da mappa originale a barra superiore
+            locationGrid.addEventListener('scroll', function() {
+                if (!current2DView) {
+                    topScrollBar.scrollLeft = locationGrid.scrollLeft;
+                }
+            });
+            
+            // Sincronizza scroll da mappa 2D a barra superiore
+            warehouse2D.addEventListener('scroll', function() {
+                if (current2DView) {
+                    topScrollBar.scrollLeft = warehouse2D.scrollLeft;
+                }
+            });
+            
+            // Aggiorna quando la pagina si carica (con ritardo per assicurarsi che il contenuto sia renderizzato)
+            setTimeout(updateTopScrollBar, 200);
+            
+            // Aggiorna se il contenuto cambia
+            window.addEventListener('resize', function() {
+                setTimeout(updateTopScrollBar, 50);
+            });
+
+            // Gestisce l'evidenziazione della barra scroll durante lo scroll verticale
+            let scrollTimeout;
+            window.addEventListener('scroll', function() {
+                if (scrollIndicator) {
+                    // Aggiunge classe "scrolled" quando si scorre verso il basso
+                    if (window.scrollY > 50) {
+                        scrollIndicator.classList.add('scrolled');
+                    } else {
+                        scrollIndicator.classList.remove('scrolled');
+                    }
+                    
+                    // Rimuove temporaneamente la classe per un effetto "flash" durante lo scroll
+                    clearTimeout(scrollTimeout);
+                    scrollIndicator.style.transform = 'scale(1.02)';
+                    scrollTimeout = setTimeout(() => {
+                        scrollIndicator.style.transform = 'scale(1)';
+                    }, 150);
+                }
+            });
+        });
+    </script>
+    </div> <!-- Fine mobile-content -->
+
+    </div> <!-- Fine protected-content -->
+    
+    <!-- Scripts moderni di autenticazione -->
+    <script src="/static/js/modern-auth.js"></script>
+    <script>
+        // Protezione pagina con nuovo sistema
+        document.addEventListener('DOMContentLoaded', function() {
+            window.requirePermission('warehouse_view');
+        });
     </script>
     <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/mobile-navbar.js"></script>
+{% include 'partials/footer.html' %}
+    
+
 </body>
 </html>

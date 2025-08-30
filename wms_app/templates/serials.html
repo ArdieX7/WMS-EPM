@@ -4,13 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestione Seriali Prodotto - WMS</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/navbar.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/responsive.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/serials.css') }}">
+    <link rel="stylesheet" href="/static/css/no-flash.css">
+    <link rel="stylesheet" href="/static/css/enhanced-upload.css">
+    <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/mobile-navbar.css">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/serials.css">
+    <link rel="stylesheet" href="/static/css/collapsible.css">
+    <link rel="stylesheet" href="/static/css/templates.css">
+    <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/footer.css">
 </head>
 <body>
     {% include 'partials/navbar.html' %}
+    
+    <!-- Loader permessi -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
+
+    <!-- Contenuto protetto -->
+    <div class="protected-content">
+    <!-- Mobile content wrapper -->
+    <div class="mobile-content">
+    
+    <!-- Loader permessi (visibile finché non si verificano i permessi) -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
     
     <div class="container">
         <div class="header">
@@ -18,83 +41,50 @@
             <p>Upload, validazione e controllo qualità seriali associati agli ordini</p>
         </div>
 
-        <!-- Sezione Upload File -->
-        <div class="section">
-            <h2 class="section-title" onclick="toggleSection('upload-section')">
-                📁 Carica File Seriali
-                <span class="toggle-icon">▼</span>
-            </h2>
-            <div id="upload-section" class="section-content">
-                <!-- Sezione formato file collassabile -->
-                <div class="format-help">
-                    <button type="button" class="format-toggle-btn" onclick="toggleFormatInfo()">
-                        ℹ️ Info Formato File <span id="format-toggle-icon">▶</span>
+        <!-- Layout sezioni in stile inventory -->
+        <div class="serials-sections">
+            <!-- Sezione Gestione File Seriali - Solo per utenti con permessi di gestione -->
+            <div class="serials-section" data-permission="serials_manage">
+                <h2 class="serials-section-title">📁 Gestione File Seriali</h2>
+                <p style="margin-bottom: 1.5rem; color: #6c757d;">Carica file seriali per assegnazione automatica ai prodotti degli ordini</p>
+                <div class="serials-action-buttons">
+                    <button class="serials-action-btn" onclick="openSerialUploadOverlay()" data-permission="serials_manage">
+                        📤 Carica File Seriali
                     </button>
-                    <div id="format-info" class="format-info-collapsible" style="display: none;">
-                        <div class="format-info">
-                            <h3>📋 Formato File Richiesto</h3>
-                            <p><strong>Formato:</strong> Ogni elemento su una riga separata</p>
-                            <p><strong>Esempio:</strong></p>
-                            <pre><code>1234
-9788838668001
-SN001
-9788838668001
-SN002
-5678
-9788838668002
-SN100</code></pre>
-                            <ul>
-                                <li>Numero ordine: 1-10 cifre numeriche (una riga)</li>
-                                <li>EAN code: deve esistere in anagrafica prodotti (una riga)</li>
-                                <li>Seriale: qualsiasi stringa alfanumerica (una riga)</li>
-                                <li>Ogni elemento è su una riga separata (a capo)</li>
-                                <li>I seriali sono associati all'ultimo EAN sparato</li>
-                                <li>Tutti gli EAN e seriali sono associati all'ultimo numero ordine sparato</li>
-                            </ul>
-                        </div>
-                    </div>
+                    <button class="serials-action-btn secondary" onclick="exportAllSerialsExcel()" data-permission="serials_view">
+                        📈 Esporta Tutti Excel
+                    </button>
                 </div>
-
-                <!-- Form upload migliorato -->
-                <div class="upload-form-container">
-                    <form id="uploadForm" enctype="multipart/form-data" class="upload-form">
-                        <div class="form-group-large">
-                            <label for="serialFile" class="form-label-large">📁 Seleziona File Seriali (.txt, .csv)</label>
-                            <input type="file" id="serialFile" name="file" accept=".txt,.csv" required class="file-input-large">
-                        </div>
-                        <div class="form-group-large">
-                            <label for="uploadedBy" class="form-label-large">👤 Caricato da</label>
-                            <input type="text" id="uploadedBy" name="uploaded_by" value="utente" required class="text-input-large">
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-upload">📤 Carica e Analizza File</button>
-                    </form>
-                </div>
-
-                <div id="uploadResult" class="result-container" style="display: none;"></div>
             </div>
         </div>
 
-        <!-- Sezione Lista Ordini -->
-        <div class="section">
-            <h2 class="section-title" onclick="toggleSection('orders-section')">
-                📋 Ordini con Seriali Caricati
-                <span class="toggle-icon">▼</span>
-            </h2>
-            <div id="orders-section" class="section-content">
-                <div class="controls">
-                    <button onclick="refreshOrdersList()" class="btn btn-secondary">🔄 Aggiorna Lista</button>
+        <!-- Sezione Lista Ordini con stile inventory - Visibile a tutti -->
+        <div class="serials-sections">
+            <div class="serials-section" data-permission="serials_view">
+                <h2 class="serials-section-title">📋 Ordini con Seriali Caricati</h2>
+                
+                <!-- Controlli ricerca e azioni -->
+                <div class="serials-action-buttons" style="margin-bottom: 1.5rem; align-items: center; gap: 1rem;">
+                    <input type="text" id="search-order" placeholder="🔍 Cerca numero ordine..." 
+                           style="padding: 0.5rem; border: 2px solid #dee2e6; border-radius: 6px; font-size: 1rem; min-width: 250px;">
+                    <button onclick="refreshOrdersList()" class="serials-action-btn secondary">🔄 Aggiorna Lista</button>
+                    <button onclick="clearSearch()" class="serials-action-btn secondary">✖ Pulisci Ricerca</button>
                 </div>
 
                 <div class="table-container">
                     <table id="ordersTable">
                         <thead>
                             <tr>
-                                <th>Numero Ordine</th>
+                                <th onclick="sortTable('order_number')" style="cursor: pointer; user-select: none;">
+                                    Numero Ordine <span id="sort-order-icon">↕️</span>
+                                </th>
                                 <th>Stato Ordine</th>
                                 <th>Prodotti Attesi</th>
                                 <th>Seriali Trovati</th>
                                 <th>Stato Validazione</th>
-                                <th>Ultima Modifica</th>
+                                <th onclick="sortTable('last_modified')" style="cursor: pointer; user-select: none;">
+                                    Ultima Modifica <span id="sort-date-icon">↕️</span>
+                                </th>
                                 <th>Azioni</th>
                             </tr>
                         </thead>
@@ -105,7 +95,12 @@ SN100</code></pre>
                                 <td>
                                     {% if order.order_exists %}
                                         <span class="status-badge status-{{ order.order_status }}">
-                                            {{ order.order_status | title }}
+                                            {% if order.order_status == 'pending' %}In Attesa
+                                            {% elif order.order_status == 'processing' %}In Lavorazione
+                                            {% elif order.order_status == 'completed' %}Completato
+                                            {% elif order.order_status == 'cancelled' %}Annullato
+                                            {% else %}{{ order.order_status | title }}
+                                            {% endif %}
                                         </span>
                                     {% else %}
                                         <span class="status-badge status-not-found">Non Trovato</span>
@@ -118,11 +113,16 @@ SN100</code></pre>
                                 </td>
                                 <td>
                                     {% if order.validation_summary %}
-                                        <span class="status-badge status-{{ order.validation_summary.overall_status }}">
-                                            {{ order.validation_summary.overall_status | title }}
+                                        <span class="status-badge validation-{{ order.validation_summary.overall_status }}">
+                                            {% if order.validation_summary.overall_status == 'valid' %}✓ Valido
+                                            {% elif order.validation_summary.overall_status == 'invalid' %}✗ Non Valido
+                                            {% elif order.validation_summary.overall_status == 'partial' %}⚠ Parziale
+                                            {% elif order.validation_summary.overall_status == 'pending' %}⏳ Da Validare
+                                            {% else %}{{ order.validation_summary.overall_status | title }}
+                                            {% endif %}
                                         </span>
                                     {% else %}
-                                        <span class="status-badge status-pending">Non Validato</span>
+                                        <span class="status-badge validation-pending">⏳ Da Validare</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -145,6 +145,14 @@ SN100</code></pre>
                                             class="btn btn-small btn-success" title="Genera PDF">
                                         📄 PDF
                                     </button>
+                                    <button onclick="generateOrderCSV('{{ order.order_number }}')" 
+                                            class="btn btn-small btn-primary" title="Esporta CSV">
+                                        📊 CSV
+                                    </button>
+                                    <button onclick="generateOrderExcel('{{ order.order_number }}')" 
+                                            class="btn btn-small btn-info" title="Esporta Excel">
+                                        📈 Excel
+                                    </button>
                                     <button onclick="deleteOrderSerials('{{ order.order_number }}')" 
                                             class="btn btn-small btn-danger" title="Elimina Seriali">
                                         🗑️ Elimina
@@ -154,6 +162,157 @@ SN100</code></pre>
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- Overlay Upload Seriali -->
+        <div id="serial-upload-overlay" class="overlay" style="display: none;">
+            <div class="overlay-content">
+                <div class="overlay-header">
+                    <h2>🏷️ Carica File Seriali</h2>
+                    <button class="close-btn" onclick="closeSerialUploadOverlay()">&times;</button>
+                </div>
+                <div class="overlay-body">
+                    <!-- Form upload -->
+                    <div class="upload-section">
+                        <form id="serial-upload-form" class="upload-form">
+                            <!-- Enhanced Upload Component -->
+                            <div class="enhanced-upload-container" id="serial-file-upload"></div>
+                            
+                            <!-- Backup: Original file input (hidden) -->
+                            <input type="file" id="serial-file-input" accept=".txt,.csv" style="display: none;">
+                            <div class="form-group">
+                                <label for="uploaded-by-input">👤 Caricato da</label>
+                                <input type="text" id="uploaded-by-input" value="utente" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-upload">
+                                📤 Analizza File
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Info formato file (collassabile) -->
+                    <div class="collapsible-container" style="margin-top: 2rem;">
+                        <details>
+                            <summary style="cursor: pointer; padding: 0.5rem; background: #00468b; border-radius: 6px; margin-bottom: 1rem;">
+                                📋 Formato File Richiesto
+                            </summary>
+                            <div class="format-info-card">
+                                <p><strong>Formato:</strong> Ogni elemento su una riga separata</p>
+                                <div class="format-example">
+                                    <pre><code>1234
+9788838668001
+SN001
+9788838668001
+SN002
+5678
+9788838668002
+SN100</code></pre>
+                                </div>
+                                <ul class="format-rules">
+                                    <li>Numero ordine: 1-10 cifre numeriche</li>
+                                    <li>EAN code: deve esistere in anagrafica prodotti</li>
+                                    <li>Seriale: qualsiasi stringa alfanumerica</li>
+                                    <li>I seriali sono associati all'ultimo EAN sparato</li>
+                                </ul>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overlay Recap Seriali -->
+        <div id="serial-recap-overlay" class="overlay" style="display: none;">
+            <div class="overlay-content recap-overlay">
+                <div class="overlay-header">
+                    <h2>📋 Recap Operazioni Seriali</h2>
+                    <button class="close-btn" onclick="closeSerialRecapOverlay()">&times;</button>
+                </div>
+                <div class="overlay-body">
+                    <!-- Statistiche -->
+                    <div class="recap-stats" style="display: none;">
+                        <div class="stat-card">
+                            <div class="stat-number" id="serial-recap-total">0</div>
+                            <div class="stat-label">Totale</div>
+                        </div>
+                        <div class="stat-card ok">
+                            <div class="stat-number" id="serial-recap-ok">0</div>
+                            <div class="stat-label">Validi</div>
+                        </div>
+                        <div class="stat-card warning">
+                            <div class="stat-number" id="serial-recap-warnings">0</div>
+                            <div class="stat-label">Warning</div>
+                        </div>
+                        <div class="stat-card error">
+                            <div class="stat-number" id="serial-recap-errors">0</div>
+                            <div class="stat-label">Errori</div>
+                        </div>
+                    </div>
+
+                    <!-- Errori -->
+                    <div id="serial-recap-errors-section" class="recap-section" style="display: none;">
+                        <h4>❌ Errori</h4>
+                        <div id="serial-recap-errors-list" class="error-list"></div>
+                    </div>
+
+                    <!-- Warning -->
+                    <div id="serial-recap-warnings-section" class="recap-section" style="display: none;">
+                        <h4>⚠️ Warning</h4>
+                        <div id="serial-recap-warnings-list" class="warning-list"></div>
+                    </div>
+
+                    <!-- Riepilogo ordini -->
+                    <div id="serial-recap-orders-section" class="recap-section">
+                        <h4>📦 Riepilogo Ordini</h4>
+                        <div id="serial-recap-orders-list" class="orders-summary"></div>
+                    </div>
+
+                    <!-- Tabella operazioni -->
+                    <div class="recap-table-section">
+                        <div class="recap-table-header">
+                            <h4>🏷️ Dettaglio Seriali</h4>
+                            <button id="toggle-errors-only" class="btn btn-small btn-secondary" onclick="toggleShowOnlyErrors()">
+                                🔍 Mostra Solo Errori
+                            </button>
+                        </div>
+                        <div class="table-container">
+                            <table class="recap-table">
+                                <thead>
+                                    <tr>
+                                        <th>Riga</th>
+                                        <th>Ordine</th>
+                                        <th>EAN</th>
+                                        <th>Seriale</th>
+                                        <th>SKU</th>
+                                        <th>Stato</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="serial-recap-table-body">
+                                    <!-- Popolato via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Pulsanti azioni -->
+                    <div class="recap-actions bottom-actions">
+                        <button class="btn btn-secondary" onclick="closeSerialRecapOverlay()">
+                            ❌ Annulla
+                        </button>
+                        <button class="btn btn-info" onclick="addNewSerialRow()">
+                            ➕ Aggiungi Riga
+                        </button>
+                        <button class="btn btn-warning" onclick="revalidateAllOperations()">
+                            🔄 Rivalidate Tutto
+                        </button>
+                        <button id="serial-recap-execute-btn" class="btn btn-primary" onclick="executeSerialOperations()">
+                            ✅ Esegui Operazioni
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -191,7 +350,24 @@ SN100</code></pre>
         </div>
     </div>
 
-    <script src="{{ url_for('static', path='/js/navbar.js') }}"></script>
-    <script src="{{ url_for('static', path='/js/serials.js') }}"></script>
+    <!-- Scripts in ordine ottimizzato per caricamento rapido -->
+            </div> <!-- Fine mobile-content -->
+
+            </div> <!-- Fine protected-content -->
+    
+    <script src="/static/js/modern-auth.js"></script>
+    <script>
+        // Protezione pagina con nuovo sistema
+        document.addEventListener('DOMContentLoaded', function() {
+            window.requirePermission('serials_view');
+        });
+    </script>
+    <script src="/static/js/enhanced-upload.js"></script>
+    <script src="/static/js/serials.js"></script>
+    <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/mobile-navbar.js"></script>
+{% include 'partials/footer.html' %}
+    
+
 </body>
 </html>

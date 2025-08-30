@@ -16,6 +16,7 @@ class Order(Base):
     is_cancelled = Column(Boolean, default=False)  # Per ordini annullati
     archived_date = Column(DateTime, nullable=True)  # Data archiviazione
     cancelled_date = Column(DateTime, nullable=True)  # Data annullamento
+    ddt_number = Column(String, nullable=True)  # Numero DDT dell'ordine evaso
 
     lines = relationship("OrderLine", back_populates="order")
 

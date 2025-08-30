@@ -2,74 +2,206 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Benvenuto in WMS EPM</title>
+    <title>Dashboard WMS EPM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/no-flash.css">
     <link rel="stylesheet" href="/static/css/navbar.css">
-    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/mobile-navbar.css">
+    <link rel="stylesheet" href="/static/css/home.css">
+    <link rel="stylesheet" href="/static/css/collapsible.css">
+    <link rel="stylesheet" href="/static/css/templates.css">
     <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/footer.css">
 <body>
     {% include 'partials/navbar.html' %}
 
-    <div class="container text-center mt-5">
-        <div class="welcome-header">
-            <h1 class="display-4">Benvenuto nel WMS EPM</h1>
-            <p class="lead">Il tuo sistema di gestione del magazzino centralizzato.</p>
+    <div class="home-container">
+        <!-- Hero Section -->
+        <div class="hero-section">
+            <h1 class="hero-title">WMS EPM Dashboard</h1>
+            <p class="hero-subtitle">Sistema di Gestione Magazzino - Controllo Centralizzato</p>
+            <div class="system-status">
+                <span class="status-dot"></span>
+                <span>Sistema Operativo</span>
+            </div>
         </div>
 
-        <div class="row mt-5 justify-content-center">
-            <div class="col-md-4 col-lg-3 mb-4">
-                <a href="/warehouse/manage" class="card-link">
-                    <div class="card h-100 text-center shadow-sm feature-card">
-                        <div class="card-body">
-                            <h5 class="card-title">Gestione Magazzino</h5>
-                            <p class="card-text">Crea e visualizza le ubicazioni del magazzino.</p>
-                        </div>
-                    </div>
-                </a>
+        <!-- Statistics Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-icon">📦</span>
+                <div class="stat-number" id="total-pieces">0</div>
+                <div class="stat-label">Pezzi in Magazzino</div>
+                <div class="stat-change change-positive">
+                    <span>📊</span> Giacenza totale
+                </div>
             </div>
-            <div class="col-md-4 col-lg-3 mb-4">
-                <a href="/products-page" class="card-link">
-                    <div class="card h-100 text-center shadow-sm feature-card">
-                        <div class="card-body">
-                            <h5 class="card-title">Gestione Prodotti</h5>
-                            <p class="card-text">Visualizza, aggiungi e gestisci i prodotti e i loro codici EAN.</p>
-                        </div>
-                    </div>
-                </a>
+            <div class="stat-card">
+                <span class="stat-icon">📦</span>
+                <div class="stat-number" id="total-pieces-ground">0</div>
+                <div class="stat-label">Pezzi a Terra</div>
+                <div class="stat-change change-neutral">
+                    <span>🏭</span> Stoccaggio temporaneo
+                </div>
             </div>
-            <div class="col-md-4 col-lg-3 mb-4">
-                <a href="/inventory/manage" class="card-link">
-                    <div class="card h-100 text-center shadow-sm feature-card">
-                        <div class="card-body">
-                            <h5 class="card-title">Controllo Inventario</h5>
-                            <p class="card-text">Controlla e aggiorna le giacenze del magazzino.</p>
-                        </div>
-                    </div>
-                </a>
+            <div class="stat-card">
+                <span class="stat-icon">📋</span>
+                <div class="stat-number" id="pending-orders">0</div>
+                <div class="stat-label">Ordini da Completare</div>
+                <div class="stat-change change-warning">
+                    <span>⚠</span> Da processare
+                </div>
             </div>
-            <div class="col-md-4 col-lg-3 mb-4">
-                <a href="/orders/manage" class="card-link">
-                    <div class="card h-100 text-center shadow-sm feature-card">
-                        <div class="card-body">
-                            <h5 class="card-title">Gestione Ordini</h5>
-                            <p class="card-text">Visualizza gli ordini e gestisci il processo di picking.</p>
-                        </div>
-                    </div>
-                </a>
+            <div class="stat-card">
+                <span class="stat-icon">🏷️</span>
+                <div class="stat-number" id="missing-serials">0</div>
+                <div class="stat-label">Seriali Mancanti</div>
+                <div class="stat-change change-warning">
+                    <span>📝</span> Da completare
+                </div>
             </div>
-            <div class="col-md-4 col-lg-3 mb-4">
-                <a href="/analysis/dashboard" class="card-link">
-                    <div class="card h-100 text-center shadow-sm feature-card">
-                        <div class="card-body">
-                            <h5 class="card-title">Analisi Dati</h5>
-                            <p class="card-text">Accedi alla dashboard con i KPI e le analisi del magazzino.</p>
+        </div>
+
+        <!-- Sezione Utilizzo Magazzino -->
+        <div class="warehouse-usage-section">
+            <h2 class="section-title">
+                <span>📊</span> Utilizzo Magazzino
+            </h2>
+            <div class="warehouse-usage-content">
+                <div class="usage-info">
+                    <div class="usage-stats">
+                        <div class="usage-metric">
+                            <span class="metric-number" id="used-locations">0</span>
+                            <span class="metric-label">Ubicazioni Utilizzate</span>
+                        </div>
+                        <div class="usage-divider">/</div>
+                        <div class="usage-metric">
+                            <span class="metric-number" id="locations-total">0</span>
+                            <span class="metric-label">Totali Disponibili</span>
                         </div>
                     </div>
+                    <div class="usage-description">
+                        <p>Monitoraggio in tempo reale dell'occupazione delle ubicazioni del magazzino</p>
+                    </div>
+                </div>
+                <div class="warehouse-chart-container">
+                    <div class="chart-wrapper">
+                        <div class="pie-chart-large" id="locations-pie-chart">
+                            <div class="pie-segment used" id="pie-used"></div>
+                            <div class="pie-segment free" id="pie-free"></div>
+                        </div>
+                        <div class="chart-center-large">
+                            <span class="percentage-large" id="usage-percentage">0%</span>
+                            <small>Utilizzo</small>
+                        </div>
+                    </div>
+                    <div class="chart-legend-large">
+                        <div class="legend-item-large">
+                            <span class="legend-color-large used"></span>
+                            <div class="legend-details">
+                                <span class="legend-title">Utilizzate</span>
+                                <span class="legend-count" id="legend-used">0</span>
+                            </div>
+                        </div>
+                        <div class="legend-item-large">
+                            <span class="legend-color-large free"></span>
+                            <div class="legend-details">
+                                <span class="legend-title">Libere</span>
+                                <span class="legend-count" id="legend-free">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <h2 class="section-title">
+                <span>⚡</span> Azioni Rapide
+            </h2>
+            <div class="actions-grid">
+                <a href="/inventory/manage" class="action-card" data-permission="inventory_manage">
+                    <span class="action-icon">📊</span>
+                    <div class="action-title">Controllo Inventario</div>
+                    <div class="action-desc">Aggiorna giacenze e quantità</div>
+                </a>
+                <a href="/orders/manage" class="action-card" data-permission="orders_manage">
+                    <span class="action-icon">📋</span>
+                    <div class="action-title">Gestione Ordini</div>
+                    <div class="action-desc">Processa ordini e picking</div>
+                </a>
+                <a href="/warehouse/manage" class="action-card" data-permission="warehouse_view">
+                    <span class="action-icon">🏭</span>
+                    <div class="action-title">Mappa Magazzino</div>
+                    <div class="action-desc">Visualizza ubicazioni</div>
+                </a>
+                <a href="/products-page" class="action-card" data-permission="products_manage">
+                    <span class="action-icon">📦</span>
+                    <div class="action-title">Gestione Prodotti</div>
+                    <div class="action-desc">Anagrafica prodotti</div>
+                </a>
+                <a href="/serials/manage" class="action-card" data-permission="serials_manage">
+                    <span class="action-icon">🏷️</span>
+                    <div class="action-title">Gestione Seriali</div>
+                    <div class="action-desc">Tracciabilità prodotti</div>
+                </a>
+                <a href="/reservations/dashboard" class="action-card" data-permission="reservations_view">
+                    <span class="action-icon">🔒</span>
+                    <div class="action-title">Prenotazioni</div>
+                    <div class="action-desc">Gestione prenotazioni</div>
+                </a>
+                <a href="/ddt/manage" class="action-card" data-permission="ddt_manage">
+                    <span class="action-icon">📄</span>
+                    <div class="action-title">Gestione DDT</div>
+                    <div class="action-desc">Documenti di trasporto</div>
                 </a>
             </div>
         </div>
+
+
+        <!-- Recent Activity -->
+        <div class="recent-activity">
+            <h2 class="section-title">
+                <span>📈</span> Attività Recente
+            </h2>
+            <ul class="activity-list" id="activity-list">
+                <li class="activity-item">
+                    <div class="activity-icon activity-success">✅</div>
+                    <div class="activity-content">
+                        <div class="activity-title">Sistema avviato correttamente</div>
+                        <div class="activity-desc">Tutte le funzionalità sono operative</div>
+                        <div class="activity-time">Oggi alle 09:30</div>
+                    </div>
+                </li>
+                <li class="activity-item">
+                    <div class="activity-icon activity-info">📦</div>
+                    <div class="activity-content">
+                        <div class="activity-title">Inventario aggiornato</div>
+                        <div class="activity-desc">Sincronizzazione completata con successo</div>
+                        <div class="activity-time">Ieri alle 18:45</div>
+                    </div>
+                </li>
+                <li class="activity-item">
+                    <div class="activity-icon activity-warning">⚠️</div>
+                    <div class="activity-content">
+                        <div class="activity-title">Manutenzione programmata</div>
+                        <div class="activity-desc">Sistema sarà offline domenica dalle 02:00 alle 04:00</div>
+                        <div class="activity-time">3 giorni fa</div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div> <!-- Fine mobile-content -->
+
     </div>
 
+        <script src="/static/js/modern-auth.js"></script>
+    <script src="/static/js/home.js"></script>
+
+    {% include 'partials/footer.html' %}
+    
     <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/mobile-navbar.js"></script>
 </body>
 </html>

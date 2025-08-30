@@ -9,6 +9,7 @@ import io
 from wms_app import models, schemas
 from wms_app.models.ddt import DDT, DDTLine
 from wms_app.database import database, get_db
+from wms_app.routers.auth import require_permission
 
 # Importazioni per PDF
 try:
@@ -364,6 +365,20 @@ def get_ddt(ddt_number: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="DDT non trovato")
     
     return ddt
+
+@router.get("/check-order/{order_number}")
+def check_ddt_for_order(order_number: str, db: Session = Depends(get_db)):
+    """Controlla se un ordine ha un DDT collegato"""
+    ddt = db.query(DDT).filter(DDT.order_number == order_number).first()
+    
+    if ddt:
+        return {
+            "has_ddt": True,
+            "ddt_number": ddt.ddt_number,
+            "ddt_id": ddt.id
+        }
+    else:
+        return {"has_ddt": False}
 
 @router.delete("/{ddt_number:path}")
 def delete_ddt(ddt_number: str, db: Session = Depends(get_db)):

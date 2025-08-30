@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Optional
 from datetime import datetime
 
@@ -34,7 +34,9 @@ class Order(OrderBase):
     is_cancelled: bool = False
     archived_date: Optional[datetime] = None
     cancelled_date: Optional[datetime] = None
+    ddt_number: Optional[str] = None
     lines: List[OrderLine] = []
+    total_weight: Optional[float] = 0.0  # Peso totale calcolato
 
     class Config:
         from_attributes = True
@@ -48,6 +50,10 @@ class PickedItem(BaseModel):
     location_name: str
     product_sku: str
     quantity: int
+    
+    @validator('location_name')
+    def location_name_to_uppercase(cls, v):
+        return v.upper() if v else v
 
 class PickConfirmation(BaseModel):
     order_id: int
@@ -56,6 +62,7 @@ class PickConfirmation(BaseModel):
 # Schema per l'Evasione
 class FulfillmentRequest(BaseModel):
     order_id: int
+    ddt_number: Optional[str] = None
 
 # --- Nuovi Schemi per i Suggerimenti di Picking ---
 class PickingSuggestionItem(BaseModel):

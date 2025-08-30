@@ -60,3 +60,7 @@ class DDTGenerateRequest(BaseModel):
     total_packages: int = 1
     total_weight: Optional[str] = None
     notes: Optional[str] = None
+
+class DDTResponse(BaseModel):
+    ddt: DDT
+    message: str

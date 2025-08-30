@@ -106,3 +106,30 @@ SN100"""
         "I seriali sono associati all'ultimo EAN sparato",
         "Tutti gli EAN e seriali sono associati all'ultimo numero ordine sparato"
     ]
+
+class SerialRecapItem(BaseModel):
+    """Item del recap per verifica seriali"""
+    line: int
+    order_number: str
+    ean_code: str
+    serial_number: str
+    sku: str
+    status: str  # 'ok', 'warning', 'error'
+
+class SerialParseResult(BaseModel):
+    """Risultato del parsing con recap modificabile"""
+    success: bool
+    message: str
+    file_name: Optional[str] = None
+    total_lines_processed: int
+    recap_items: List[SerialRecapItem] = []
+    errors: List[str] = []
+    warnings: List[str] = []
+    stats: Dict[str, int] = {}  # total, ok, warnings, errors
+    orders_summary: Dict[str, Dict] = {}  # order_number: {customer, serials_count, etc}
+
+class SerialCommitRequest(BaseModel):
+    """Richiesta per commit delle operazioni seriali"""
+    file_name: str
+    recap_items: List[SerialRecapItem]
+    uploaded_by: Optional[str] = "file_user"

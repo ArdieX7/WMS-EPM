@@ -3,57 +3,165 @@
 <head>
     <title>Analisi Dati - WMS EPM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/no-flash.css">
     <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/mobile-navbar.css">
     <link rel="stylesheet" href="/static/css/analysis.css">
     <link rel="stylesheet" href="/static/css/collapsible.css">
     <link rel="stylesheet" href="/static/css/responsive.css">
-    <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/footer.css">
 </head>
 <body>
     {% include 'partials/navbar.html' %}
+    
+    <!-- Loader permessi -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
+
+    <!-- Contenuto protetto -->
+    <div class="protected-content">
+    <!-- Mobile content wrapper -->
+    <div class="mobile-content">
+    
+    <!-- Loader permessi (visibile finché non si verificano i permessi) -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
 
     <h1>Dashboard Analisi Magazzino</h1>
 
-    <div id="kpi-container" class="kpi-container">
-        <!-- I KPI verranno caricati qui -->
+    <!-- Dashboard KPI Ultra-Compatta (Principale) -->
+    <div class="dashboard-ultra-compact" data-permission="analysis_dashboard">
+        <div class="ultra-compact-grid">
+            <!-- Sezione Giacenze -->
+            <div class="mini-section" data-permission="analysis_stock_metrics">
+                <h4 class="mini-section-title">📦 Giacenze</h4>
+                <div class="mini-cards-row">
+                    <div class="mini-kpi-card primary-card" id="ultra-total-stock">
+                        <div class="mini-value">0</div>
+                        <div class="mini-label">Totale Mag.</div>
+                    </div>
+                    <div class="mini-kpi-card" id="ultra-shelves-stock">
+                        <div class="mini-value">0</div>
+                        <div class="mini-label">Scaffali</div>
+                    </div>
+                    <div class="mini-kpi-card" id="ultra-ground-stock">
+                        <div class="mini-value">0</div>
+                        <div class="mini-label">Terra</div>
+                    </div>
+                    <div class="mini-kpi-card" id="ultra-outgoing-stock">
+                        <div class="mini-value">0</div>
+                        <div class="mini-label">Uscita</div>
+                    </div>
+                    <div class="mini-kpi-card critical-card" id="ultra-critical-stock" onclick="showCriticalStockModal()">
+                        <div class="mini-value">0</div>
+                        <div class="mini-label">⚠️ Critici</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sezione Ubicazioni -->
+            <div class="mini-section" data-permission="analysis_location_metrics">
+                <h4 class="mini-section-title">📍 Ubicazioni</h4>
+                <div class="mini-cards-row">
+                    <div class="mini-kpi-card primary-card" id="ultra-total-locations">
+                        <div class="mini-value">0</div>
+                        <div class="mini-label">Totali</div>
+                    </div>
+                    <div class="mini-kpi-card" id="ultra-occupied-locations">
+                        <div class="mini-value">0</div>
+                        <div class="mini-label">Occupate</div>
+                    </div>
+                    <div class="mini-kpi-card" id="ultra-free-locations">
+                        <div class="mini-value">0</div>
+                        <div class="mini-label">Libere</div>
+                    </div>
+                    <div class="mini-kpi-card" id="ultra-ground-locations">
+                        <div class="mini-value">0</div>
+                        <div class="mini-label">Piano Terra</div>
+                    </div>
+                    <div class="mini-kpi-card pallet-card" id="ultra-total-pallets" onclick="showPalletDetailsModal()">
+                        <div class="mini-value">0</div>
+                        <div class="mini-label">🚛 Pallet Totali</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sezione Inventario -->
+            <div class="mini-section" data-permission="analysis_inventory_metrics">
+                <h4 class="mini-section-title">💰 Inventario</h4>
+                <div class="mini-cards-row">
+                    <div class="mini-kpi-card primary-card wide-card" id="ultra-inventory-value">
+                        <div class="mini-value">€ 0</div>
+                        <div class="mini-label">Valore Totale</div>
+                    </div>
+                    <div class="mini-kpi-card" id="ultra-unique-skus">
+                        <div class="mini-value">0</div>
+                        <div class="mini-label">SKU Univoci</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="collapsible-container">
-        <details>
-            <summary>Ricerca Prodotto per Ubicazione</summary>
-            <div class="details-content">
-                <form id="product-location-form">
-                    <label for="product-sku">Inserisci SKU Prodotto:</label>
-                    <input type="text" id="product-sku" list="product-skus" required>
-                    <datalist id="product-skus"></datalist>
-                    <button type="submit">Cerca</button>
+    <!-- Sezioni di ricerca modernizzate -->
+    <div class="search-sections">
+        <!-- Ricerca per Ubicazione -->
+        <div class="search-section" data-permission="analysis_location_by_sku">
+            <h2 class="section-title">📍 Ricerca Prodotto per Ubicazione</h2>
+            <div class="search-controls-horizontal">
+                <form id="product-location-form" class="search-form">
+                    <div class="form-group-inline">
+                        <label for="product-sku">SKU Prodotto:</label>
+                        <input type="text" id="product-sku" list="product-skus" placeholder="Inserisci SKU..." required>
+                        <datalist id="product-skus"></datalist>
+                        <button type="submit" class="btn-primary">🔍 Cerca</button>
+                    </div>
                 </form>
             </div>
-        </details>
+        </div>
 
-        <details>
-            <summary>Ricerca Prodotti per Fila</summary>
-            <div class="details-content">
-                <form id="products-by-row-form">
-                    <label for="row-number">Inserisci Numero Fila:</label>
-                    <input type="number" id="row-number" required>
-                    <button type="submit">Cerca</button>
+        <!-- Ricerca per Fila -->
+        <div class="search-section" data-permission="analysis_location_by_row">
+            <h2 class="section-title">📋 Ricerca Prodotti per Fila</h2>
+            <div class="search-controls-horizontal">
+                <form id="products-by-row-form" class="search-form">
+                    <div class="form-group-inline">
+                        <label for="row-number">Numero Fila:</label>
+                        <input type="number" id="row-number" placeholder="Es. 1, 2, 3..." required>
+                        <button type="submit" class="btn-primary">🔍 Cerca</button>
+                    </div>
                 </form>
             </div>
-        </details>
+        </div>
     </div>
 
-    <div class="table-container" style="margin-top: 2em;">
-        <h2>Giacenza per Prodotto</h2>
+    <div class="table-container">
+        <div class="analysis-header">
+            <div class="title-and-search">
+                <h2>Giacenza per Prodotto</h2>
+                <div class="search-controls">
+                    <div class="search-field">
+                        <label for="search-sku-table">Cerca SKU:</label>
+                        <input type="text" id="search-sku-table" placeholder="Filtra per SKU...">
+                    </div>
+                    <button id="export-total-stock-csv" class="btn-export">📊 Esporta CSV</button>
+                    <button id="reset-sort-btn" class="reset-sort-inline-btn">⟲ Reset Ordinamento</button>
+                </div>
+            </div>
+        </div>
         <table id="total-stock-table">
             <thead>
                 <tr>
-                    <th>SKU</th>
-                    <th>Descrizione</th>
-                    <th>Giacenza Scaffalata</th>
-                    <th>Giacenza a Terra</th>
-                    <th>Giacenza in Uscita</th>
-                    <th>Giacenza Totale</th>
+                    <th class="sortable" data-column="sku">SKU <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="description">Descrizione <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="scaffalata">Giacenza Scaffalata <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="terra">Giacenza a Terra <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="uscita">Giacenza in Uscita <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="totale">Giacenza Totale <span class="sort-arrow"></span></th>
                 </tr>
             </thead>
             <tbody>
@@ -62,27 +170,183 @@
         </table>
     </div>
 
-    <!-- Modale per i risultati della ricerca SKU -->
-    <div id="product-location-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <h2 id="modal-title"></h2>
-            <div id="modal-body"></div>
-            <button id="export-csv-button">Esporta in CSV</button>
+    <!-- Modal per i risultati della ricerca SKU -->
+    <div id="product-location-modal" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3 id="modal-title">Risultati Ricerca</h3>
+                <div class="header-actions">
+                    <div class="modal-export-buttons">
+                        <button id="export-location-csv" class="btn-export">📊 CSV</button>
+                        <button id="export-location-pdf" class="btn-export">📄 PDF</button>
+                    </div>
+                    <button class="overlay-close" onclick="closeModal('product-location-modal')">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body-content">
+                <div id="modal-body"></div>
+            </div>
         </div>
     </div>
 
-    <!-- Modale per i risultati della ricerca per Fila -->
-    <div id="products-by-row-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <h2 id="row-modal-title"></h2>
-            <div id="row-modal-body"></div>
-            <button id="export-pdf-button">Esporta in PDF</button>
+    <!-- Modal per i risultati della ricerca per Fila -->
+    <div id="products-by-row-modal" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3 id="row-modal-title">Risultati Ricerca</h3>
+                <div class="header-actions">
+                    <div class="modal-export-buttons">
+                        <button id="export-row-csv" class="btn-export">📊 CSV</button>
+                        <button id="export-row-pdf" class="btn-export">📄 PDF</button>
+                    </div>
+                    <button class="overlay-close" onclick="closeModal('products-by-row-modal')">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body-content">
+                <div id="row-modal-body"></div>
+            </div>
         </div>
     </div>
 
+    <!-- Modal per SKU Critici -->
+    <div id="critical-stock-modal" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>⚠️ SKU con Giacenza Critica (≤ 15 pezzi)</h3>
+                <div class="header-actions">
+                    <div class="modal-export-buttons">
+                        <button class="btn-export" id="export-critical-stock">📊 Esporta CSV</button>
+                    </div>
+                    <button class="overlay-close" onclick="closeModal('critical-stock-modal')">✖</button>
+                </div>
+            </div>
+            <div class="modal-body-content">
+                <div id="critical-stock-loading" style="text-align: center; padding: 2rem;">
+                    <p>Caricamento SKU critici...</p>
+                </div>
+                <div id="critical-stock-content" style="display: none;">
+                    <div style="margin-bottom: 1rem;">
+                        <p id="critical-stock-summary">Trovati <span id="critical-count">0</span> SKU con giacenza ≤ <span id="critical-threshold">15</span> pezzi</p>
+                    </div>
+                    <table id="critical-stock-table" class="styled-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 20%;">SKU</th>
+                                <th style="width: 15%;">Giacenza</th>
+                                <th style="width: 15%;">Scaffali</th>
+                                <th style="width: 15%;">Terra</th>
+                                <th style="width: 15%;">Uscita</th>
+                                <th style="width: 20%;">Ubicazione</th>
+                            </tr>
+                        </thead>
+                        <tbody id="critical-stock-table-body">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="critical-stock-error" style="display: none; text-align: center; padding: 2rem; color: var(--danger-color);">
+                    <p>Errore nel caricamento degli SKU critici.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal per Dettagli Pallet -->
+    <div id="pallet-details-modal" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>🚛 Dettagli Pallet Totali</h3>
+                <div class="header-actions">
+                    <div class="modal-export-buttons">
+                        <button class="btn-export" id="export-pallet-details">📊 Esporta CSV</button>
+                    </div>
+                    <button class="overlay-close" onclick="closeModal('pallet-details-modal')">✖</button>
+                </div>
+            </div>
+            <div class="modal-body-content">
+                <div id="pallet-loading" style="text-align: center; padding: 2rem;">
+                    <p>Caricamento dettagli pallet...</p>
+                </div>
+                <div id="pallet-content" style="display: none;">
+                    <!-- Summary Statistics -->
+                    <div id="pallet-summary" style="margin-bottom: 1rem; padding: 1rem; background-color: #f8f9fa; border-radius: 6px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; text-align: center;">
+                            <div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #0097E0;" id="summary-total-pallets">0</div>
+                                <div style="font-size: 0.9rem; color: #666;">Pallet Totali</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #28a745;" id="summary-pallets-shelves">0</div>
+                                <div style="font-size: 0.9rem; color: #666;">Pallet Scaffali</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #ffc107;" id="summary-pallets-ground">0</div>
+                                <div style="font-size: 0.9rem; color: #666;">Pallet Terra</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #6c757d;" id="summary-products-analyzed">0</div>
+                                <div style="font-size: 0.9rem; color: #666;">Prodotti</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Products Table -->
+                    <div style="margin-bottom: 1rem;">
+                        <input type="text" id="pallet-search" placeholder="🔍 Cerca per SKU..." 
+                               style="width: 100%; padding: 0.5rem; border: 2px solid #0097E0; border-radius: 6px; margin-bottom: 1rem;">
+                    </div>
+                    
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table id="pallet-details-table" class="styled-table">
+                            <thead style="position: sticky; top: 0; background: white;">
+                                <tr>
+                                    <th style="width: 20%; cursor: pointer;" onclick="sortPalletTable('sku')">
+                                        SKU <span class="sort-indicator" id="sort-sku">↕️</span>
+                                    </th>
+                                    <th style="width: 15%; cursor: pointer;" onclick="sortPalletTable('pallets_total')">
+                                        Tot. Pallet <span class="sort-indicator" id="sort-pallets_total">↕️</span>
+                                    </th>
+                                    <th style="width: 12%; cursor: pointer;" onclick="sortPalletTable('pallets_in_shelves')">
+                                        Scaffali <span class="sort-indicator" id="sort-pallets_in_shelves">↕️</span>
+                                    </th>
+                                    <th style="width: 12%; cursor: pointer;" onclick="sortPalletTable('pallets_on_ground')">
+                                        Terra <span class="sort-indicator" id="sort-pallets_on_ground">↕️</span>
+                                    </th>
+                                    <th style="width: 12%; cursor: pointer;" onclick="sortPalletTable('pallet_quantity')">
+                                        Qty x Plt <span class="sort-indicator" id="sort-pallet_quantity">↕️</span>
+                                    </th>
+                                    <th style="width: 12%;">Qty Scaffali</th>
+                                    <th style="width: 12%;">Qty Terra</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pallet-details-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="pallet-error" style="display: none; text-align: center; padding: 2rem; color: var(--danger-color);">
+                    <p>Errore nel caricamento dei dettagli pallet.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts in ordine ottimizzato per caricamento rapido -->
+            </div> <!-- Fine mobile-content -->
+
+            </div> <!-- Fine protected-content -->
+    
+    <script src="/static/js/modern-auth.js"></script>
+    <script>
+        // Protezione pagina con nuovo sistema
+        document.addEventListener('DOMContentLoaded', function() {
+            window.requirePermission('analysis_view');
+        });
+    </script>
     <script src="/static/js/analysis.js"></script>
     <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/mobile-navbar.js"></script>
+{% include 'partials/footer.html' %}
+    
+
 </body>
 </html>

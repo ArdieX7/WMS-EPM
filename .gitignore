@@ -1,7 +1,104 @@
+# Virtual Environments
 venv/
 venv_new/
+
+# Python
 __pycache__/
-*.pyc
-*.log
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+
+# Environment files
 .env
+.env.local
+.env.production
+.env.staging
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+wms_backup_*.db
+
+# Logs
+*.log
+server.log
+logs/
+
+# OS files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.json~
+*.sql~
+*.txt~
+
+# Test files
+test_*
+debug_*
+*_test.*
+*_debug.*
+
+# Archive and backup directories
+archive_files_to_review/
+backup*/
+old*/
+temp*/
+tmp*/
+
+# Generated files
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.gif
+pallet_update_log.json
+query_temp.sql
+
+# Development scripts (uncomment if needed)
+# migrate_*.py
+# setup_*.py
+# update_*.py
+# clean_*.py
+# check_*.py
+# seed_*.py
+# reset_*.*
+# install_*.py
+# generate_*.py
+# analyze_*.py
+
+# SSL certificates (sensitive)
+ssl_certs/*.key
+ssl_certs/*.pem
+
+# Docker
+.dockerignore
+
+# Node modules (if any)
+node_modules/
+npm-debug.log*
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml

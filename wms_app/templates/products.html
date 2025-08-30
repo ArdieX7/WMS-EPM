@@ -3,88 +3,235 @@
 <head>
     <title>Gestione Prodotti - WMS EPM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/no-flash.css">
+    <link rel="stylesheet" href="/static/css/enhanced-upload.css">
     <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/mobile-navbar.css">
     <link rel="stylesheet" href="/static/css/products.css">
     <link rel="stylesheet" href="/static/css/collapsible.css">
     <link rel="stylesheet" href="/static/css/templates.css">
     <link rel="stylesheet" href="/static/css/responsive.css">
-    <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/footer.css">
 </head>
 <body>
     {% include 'partials/navbar.html' %}
+    
+    <!-- Loader permessi -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
+
+    <!-- Contenuto protetto -->
+    <div class="protected-content">
+    <!-- Mobile content wrapper -->
+    <div class="mobile-content">
+    
+    <!-- Loader permessi (visibile finché non si verificano i permessi) -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
 
     <h1>Gestione Prodotti</h1>
 
-    <div class="collapsible-container">
-        <details>
-            <summary>Aggiungi Nuovo Prodotto</summary>
-            <div class="details-content">
-                <form id="create-product-form">
-                    <label for="sku">SKU:</label><br>
-                    <input type="text" id="sku" name="sku" required><br><br>
-                    
-                    <label for="description">Descrizione:</label><br>
-                    <input type="text" id="description" name="description"><br><br>
+    <div class="action-buttons" data-permission="products_management_section">
+        <button id="add-product-btn" class="action-btn" data-permission="products_manage">+ Aggiungi Nuovo Prodotto</button>
+        <button id="import-products-btn" class="action-btn" data-permission="products_manage">📁 Importa Prodotti/EAN</button>
+    </div>
 
-                    <label for="estimated_value">Valore Stimato (€):</label><br>
-                    <input type="number" id="estimated_value" name="estimated_value" step="0.01" value="0.00"><br><br>
-
-                    <label for="eans">Codici EAN (separati da virgola):</label><br>
-                    <input type="text" id="eans" name="eans"><br><br>
-
-                    <button type="submit">Aggiungi Prodotto</button>
-                </form>
+    <!-- Overlay Aggiungi Prodotto -->
+    <div id="add-product-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>Aggiungi Nuovo Prodotto</h3>
+                <button class="overlay-close" data-overlay="add-product-overlay">&times;</button>
             </div>
-        </details>
+            <form id="create-product-form">
+                <div class="form-group">
+                    <label for="sku">SKU:</label>
+                    <input type="text" id="sku" name="sku" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Descrizione:</label>
+                    <input type="text" id="description" name="description">
+                </div>
 
-        <details>
-            <summary>Importa Prodotti/EAN da File TXT</summary>
-            <div class="details-content">
-                <form id="import-products-ean-form">
+                <div class="form-group">
+                    <label for="estimated_value">Valore Stimato (€):</label>
+                    <input type="number" id="estimated_value" name="estimated_value" step="0.01" value="0.00">
+                </div>
+
+                <div class="form-group">
+                    <label for="weight">Peso (kg):</label>
+                    <input type="number" id="weight" name="weight" step="0.01" value="0.00" min="0">
+                </div>
+
+                <div class="form-group">
+                    <label for="pallet_quantity">Quantità per Pallet:</label>
+                    <input type="number" id="pallet_quantity" name="pallet_quantity" value="0" min="0">
+                </div>
+
+                <div class="form-group">
+                    <label for="eans">Codici EAN (separati da virgola):</label>
+                    <input type="text" id="eans" name="eans">
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Aggiungi Prodotto</button>
+                    <button type="button" class="btn-secondary" data-overlay="add-product-overlay">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Overlay Importa Prodotti -->
+    <div id="import-products-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>Importa Prodotti/EAN da File TXT</h3>
+                <button class="overlay-close" data-overlay="import-products-overlay">&times;</button>
+            </div>
+            <form id="import-products-ean-form">
+                <div class="form-group">
                     <p class="template-description">
-                        Il file TXT deve avere una riga per ogni SKU. Ogni riga deve contenere lo SKU, la descrizione, il valore stimato (opzionale) e uno o più EAN, tutti separati da virgola.
-                        <br>Esempio: <code>SKU123,Descrizione Prova,19.99,8001234567890,8001234567891</code>
+                        Il file TXT deve avere una riga per ogni SKU. Ogni riga deve contenere lo SKU, la descrizione, il valore stimato, il peso (kg), la quantità per pallet e uno o più EAN, tutti separati da virgola.
+                        <br>Esempio: <code>SKU123,Descrizione Prova,19.99,2.5,24,8001234567890,8001234567891</code>
                     </p>
                     <a href="/static/templates/template_products.txt" download="template_products.txt" class="btn-template">Scarica Template</a>
-                    <br><br>
-                    <label for="products-ean-file">Seleziona File TXT:</label><br>
-                    <input type="file" id="products-ean-file" accept=".txt" required><br><br>
-                    <button type="submit">Importa Prodotti/EAN</button>
-                </form>
+                </div>
+                
+                <!-- Enhanced Upload Component (solo drag & drop) -->
+                <div class="enhanced-upload-container" id="products-ean-upload"></div>
+                
+                <!-- Backup: Original file input (hidden) -->
+                <input type="file" id="products-ean-file" accept=".txt" style="display: none;">
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Importa Prodotti/EAN</button>
+                    <button type="button" class="btn-secondary" data-overlay="import-products-overlay">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Overlay Modifica Prodotto -->
+    <div id="edit-product-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>Modifica Prodotto</h3>
+                <button class="overlay-close" data-overlay="edit-product-overlay">&times;</button>
             </div>
-        </details>
+            <form id="edit-product-form">
+                <div class="form-group">
+                    <label for="edit-sku">SKU:</label>
+                    <input type="text" id="edit-sku" name="edit-sku" readonly style="background-color: #F2F2F2; cursor: not-allowed;">
+                </div>
+                
+                <div class="form-group">
+                    <label for="edit-description">Descrizione:</label>
+                    <input type="text" id="edit-description" name="edit-description">
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-estimated_value">Valore Stimato (€):</label>
+                    <input type="number" id="edit-estimated_value" name="edit-estimated_value" step="0.01">
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-weight">Peso (kg):</label>
+                    <input type="number" id="edit-weight" name="edit-weight" step="0.01" min="0">
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-pallet_quantity">Quantità per Pallet:</label>
+                    <input type="number" id="edit-pallet_quantity" name="edit-pallet_quantity" min="0">
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-eans">Codici EAN (separati da virgola):</label>
+                    <input type="text" id="edit-eans" name="edit-eans">
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Salva Modifiche</button>
+                    <button type="button" class="btn-secondary" data-overlay="edit-product-overlay">Annulla</button>
+                </div>
+            </form>
+        </div>
     </div>
 
-    <div id="edit-product-section" style="display:none;">
-        <h2>Modifica Prodotto</h2>
-        <form id="edit-product-form">
-            <label for="edit-sku">SKU:</label><br>
-            <input type="text" id="edit-sku" name="edit-sku" readonly><br><br>
+    <!-- Overlay Conferma Eliminazione -->
+    <div id="delete-product-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>⚠️ Conferma Eliminazione Prodotto</h3>
+                <button class="overlay-close" data-overlay="delete-product-overlay">&times;</button>
+            </div>
+            <div class="delete-confirmation-content">
+                <div class="warning-message">
+                    <p><strong>Attenzione!</strong> Stai per eliminare permanentemente il prodotto:</p>
+                    <div class="product-to-delete">
+                        <strong>SKU: </strong><span id="delete-product-sku"></span><br>
+                        <strong>Descrizione: </strong><span id="delete-product-description"></span>
+                    </div>
+                    <p class="warning-text">Questa operazione <strong>non può essere annullata</strong>.</p>
+                </div>
+                
+                <div id="delete-validation-status" class="validation-status">
+                    <p>Controllo dipendenze in corso...</p>
+                    <div class="loading-spinner">⏳</div>
+                </div>
+                
+                <div id="delete-dependencies-list" class="dependencies-list" style="display: none;">
+                    <h4>❌ Eliminazione bloccata per le seguenti dipendenze:</h4>
+                    <ul id="dependencies-items"></ul>
+                    <p class="help-text">Per eliminare questo prodotto, devi prima rimuovere tutte le dipendenze elencate.</p>
+                </div>
+                
+                <div id="delete-success-validation" class="success-validation" style="display: none;">
+                    <h4>✅ Il prodotto può essere eliminato in sicurezza</h4>
+                    <p>Non sono state trovate dipendenze che impediscono l'eliminazione.</p>
+                </div>
+            </div>
             
-            <label for="edit-description">Descrizione:</label><br>
-            <input type="text" id="edit-description" name="edit-description"><br><br>
-
-            <label for="edit-estimated_value">Valore Stimato (€):</label><br>
-            <input type="number" id="edit-estimated_value" name="edit-estimated_value" step="0.01"><br><br>
-
-            <label for="edit-eans">Codici EAN (separati da virgola):</label><br>
-            <input type="text" id="edit-eans" name="edit-eans"><br><br>
-
-            <button type="submit">Salva Modifiche</button>
-            <button type="button" id="cancel-edit-button">Annulla</button>
-        </form>
+            <div class="form-actions">
+                <button id="confirm-delete-btn" type="button" class="btn-danger" style="display: none;">🗑️ Elimina Definitivamente</button>
+                <button type="button" class="btn-secondary" data-overlay="delete-product-overlay">Annulla</button>
+            </div>
+        </div>
     </div>
 
-    <h2>Elenco Prodotti</h2>
+    <div class="products-header">
+        <div class="title-and-search">
+            <h2>Elenco Prodotti</h2>
+            <div class="search-controls">
+                <div class="search-field">
+                    <label for="search-sku">Cerca SKU:</label>
+                    <input type="text" id="search-sku" placeholder="Filtra per SKU...">
+                </div>
+                <div class="search-field">
+                    <label for="search-ean">Cerca EAN:</label>
+                    <div class="search-with-button">
+                        <input type="text" id="search-ean" placeholder="Filtra per EAN...">
+                        <button id="reset-sort-ean-btn" class="reset-sort-inline-btn">⟲ Reset Ordinamento</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="table-container">
         <table id="products-table">
             <thead>
                 <tr>
-                    <th>SKU</th>
-                    <th>Descrizione</th>
-                    <th>Valore Stimato</th>
-                    <th>Codici EAN</th>
-                    <th>Azioni</th>
+                    <th class="sortable" data-column="sku">SKU <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="description">Descrizione <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="estimated_value">Valore Stimato <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="eans">Codici EAN <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="weight">Peso <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="pallet_quantity">Qty x Plt <span class="sort-arrow"></span></th>
+                    <th style="width: 150px;">Azioni</th>
                 </tr>
             </thead>
             <tbody>
@@ -93,8 +240,26 @@
         </table>
     </div>
 
+    <!-- Scripts in ordine ottimizzato per caricamento rapido -->
+            </div> <!-- Fine mobile-content -->
+
+            </div> <!-- Fine protected-content -->
+    
+    <script src="/static/js/modern-auth.js"></script>
+    <script>
+        // Protezione pagina con nuovo sistema
+        document.addEventListener('DOMContentLoaded', function() {
+            window.requirePermission('products_view');
+        });
+    </script>
+    <script src="/static/js/enhanced-upload.js"></script>
     <script src="/static/js/products.js"></script>
     <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/mobile-navbar.js"></script>
+
+{% include 'partials/footer.html' %}
+    
+
 
 </body>
 </html>

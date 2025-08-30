@@ -1,4 +1,5 @@
 <!-- wms_app/templates/partials/navbar.html -->
+<!-- Desktop Navbar (existing) -->
 <div class="navbar-container">
     <div class="logo">
         <a href="/">WMS</a>
@@ -10,13 +11,107 @@
     </div>
     <nav id="navbar-links" class="navbar">
         <ul>
-            <li><a href="/products-page" class="{{ 'active' if request.url.path == '/products-page' else '' }}">Prodotti</a></li>
-            <li><a href="/inventory/manage" class="{{ 'active' if request.url.path == '/inventory/manage' else '' }}">Inventario</a></li>
-            <li><a href="/orders/manage" class="{{ 'active' if request.url.path == '/orders/manage' else '' }}">Ordini</a></li>
-            <li><a href="/warehouse/manage" class="{{ 'active' if request.url.path == '/warehouse/manage' else '' }}">Magazzino</a></li>
-            <li><a href="/reservations/dashboard" class="{{ 'active' if request.url.path == '/reservations/dashboard' else '' }}">Prenotazioni</a></li>
-            <li><a href="/serials/manage" class="{{ 'active' if request.url.path == '/serials/manage' else '' }}">Seriali</a></li>
-            <li><a href="/analysis/dashboard" class="{{ 'active' if request.url.path == '/analysis/dashboard' else '' }}">Analisi</a></li>
+            <li><a href="/products-page" class="{{ 'active' if request.url.path == '/products-page' else '' }}" data-permission="products_view">Prodotti</a></li>
+            <li><a href="/inventory/manage" class="{{ 'active' if request.url.path == '/inventory/manage' else '' }}" data-permission="inventory_view">Inventario</a></li>
+            <li><a href="/orders/manage" class="{{ 'active' if request.url.path == '/orders/manage' else '' }}" data-permission="orders_view">Ordini</a></li>
+            <li><a href="/warehouse/manage" class="{{ 'active' if request.url.path == '/warehouse/manage' else '' }}" data-permission="warehouse_view">Magazzino</a></li>
+            <li><a href="/reservations/dashboard" class="{{ 'active' if request.url.path == '/reservations/dashboard' else '' }}" data-permission="reservations_view">Prenotazioni</a></li>
+            <li><a href="/serials/manage" class="{{ 'active' if request.url.path == '/serials/manage' else '' }}" data-permission="serials_view">Seriali</a></li>
+            <li><a href="/ddt/manage" class="{{ 'active' if request.url.path == '/ddt/manage' else '' }}" data-permission="ddt_view">DDT</a></li>
+            <li><a href="/logs/dashboard" class="{{ 'active' if request.url.path == '/logs/dashboard' else '' }}" data-permission="logs_view">Log</a></li>
+            <li><a href="/analysis/dashboard" class="{{ 'active' if request.url.path == '/analysis/dashboard' else '' }}" data-permission="analysis_view">Analisi</a></li>
+            <li><a href="/admin/" class="{{ 'active' if request.url.path.startswith('/admin') else '' }}" data-permission="admin_users">🔧 Admin</a></li>
         </ul>
     </nav>
+    
+    <!-- Area utente (inserita dinamicamente da modern-auth.js) -->
+    <div class="user-area" id="user-area" style="display: none;">
+        <div class="user-info">
+            <span class="user-name" id="user-name-display"></span>
+            <span class="user-role" id="user-role-display"></span>
+        </div>
+        <button class="logout-btn" id="logout-button">
+            <span>Esci</span>
+        </button>
+    </div>
+    
+    <!-- Area login per utenti non autenticati -->
+    <div class="login-area" id="login-area">
+        <a href="/login" class="login-btn">Accedi</a>
+    </div>
+</div>
+
+<!-- Mobile Navbar (new) -->
+<div class="mobile-header">
+    <a href="/" class="mobile-logo">WMS</a>
+    <div class="mobile-user-area" id="mobile-user-area" style="display: none;">
+        <div class="mobile-user-info">
+            <span class="mobile-user-name" id="mobile-user-name-display"></span>
+            <span class="mobile-user-role" id="mobile-user-role-display"></span>
+        </div>
+        <button class="mobile-logout-btn" id="mobile-logout-button">Esci</button>
+    </div>
+    <div class="mobile-login-area" id="mobile-login-area">
+        <a href="/login" class="mobile-logout-btn">Accedi</a>
+    </div>
+</div>
+
+<!-- Bottom Navigation Bar -->
+<nav class="bottom-navbar">
+    <a href="/inventory/manage" class="nav-item {{ 'active' if request.url.path == '/inventory/manage' else '' }}" data-permission="inventory_view" data-page="inventory">
+        <div class="nav-icon icon-inventory"></div>
+        <div class="nav-label">Inventario</div>
+    </a>
+    <a href="/orders/manage" class="nav-item {{ 'active' if request.url.path == '/orders/manage' else '' }}" data-permission="orders_view" data-page="orders">
+        <div class="nav-icon icon-orders"></div>
+        <div class="nav-label">Ordini</div>
+    </a>
+    <a href="/warehouse/manage" class="nav-item {{ 'active' if request.url.path == '/warehouse/manage' else '' }}" data-permission="warehouse_view" data-page="warehouse">
+        <div class="nav-icon icon-warehouse"></div>
+        <div class="nav-label">Magazzino</div>
+    </a>
+    <a href="/serials/manage" class="nav-item {{ 'active' if request.url.path == '/serials/manage' else '' }}" data-permission="serials_view" data-page="serials">
+        <div class="nav-icon icon-serials"></div>
+        <div class="nav-label">Seriali</div>
+    </a>
+    <button class="nav-item altro-btn" id="altro-menu-btn" data-page="altro">
+        <div class="nav-icon icon-altro"></div>
+        <div class="nav-label">Altro</div>
+    </button>
+</nav>
+
+<!-- Altro Menu Overlay -->
+<div class="altro-menu-overlay" id="altro-menu-overlay">
+    <div class="altro-menu" id="altro-menu">
+        <div class="altro-menu-header">
+            <h3 class="altro-menu-title">Menu Completo</h3>
+            <button class="altro-menu-close" id="altro-menu-close">&times;</button>
+        </div>
+        <div class="altro-menu-items">
+            <a href="/products-page" class="altro-menu-item {{ 'active' if request.url.path == '/products-page' else '' }}" data-permission="products_view">
+                <div class="altro-menu-item-icon icon-products"></div>
+                <div class="altro-menu-item-label">Prodotti</div>
+            </a>
+            <a href="/reservations/dashboard" class="altro-menu-item {{ 'active' if request.url.path == '/reservations/dashboard' else '' }}" data-permission="reservations_view">
+                <div class="altro-menu-item-icon icon-reservations"></div>
+                <div class="altro-menu-item-label">Prenotazioni</div>
+            </a>
+            <a href="/ddt/manage" class="altro-menu-item {{ 'active' if request.url.path == '/ddt/manage' else '' }}" data-permission="ddt_view">
+                <div class="altro-menu-item-icon icon-ddt"></div>
+                <div class="altro-menu-item-label">DDT</div>
+            </a>
+            <a href="/logs/dashboard" class="altro-menu-item {{ 'active' if request.url.path == '/logs/dashboard' else '' }}" data-permission="logs_view">
+                <div class="altro-menu-item-icon icon-logs"></div>
+                <div class="altro-menu-item-label">Log Operazioni</div>
+            </a>
+            <a href="/analysis/dashboard" class="altro-menu-item {{ 'active' if request.url.path == '/analysis/dashboard' else '' }}" data-permission="analysis_view">
+                <div class="altro-menu-item-icon icon-analysis"></div>
+                <div class="altro-menu-item-label">Analisi</div>
+            </a>
+            <a href="/admin/" class="altro-menu-item {{ 'active' if request.url.path.startswith('/admin') else '' }}" data-permission="admin_users">
+                <div class="altro-menu-item-icon icon-admin"></div>
+                <div class="altro-menu-item-label">Amministrazione</div>
+            </a>
+        </div>
+    </div>
 </div>

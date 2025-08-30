@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, ForeignKey
+from sqlalchemy import Column, String, Integer, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from wms_app.database.database import Base
 
@@ -6,6 +6,7 @@ class Location(Base):
     __tablename__ = "locations"
 
     name = Column(String, primary_key=True, index=True)
+    available = Column(Boolean, default=True, nullable=False)  # True = disponibile, False = non disponibile
     # In futuro potremmo aggiungere dettagli come tipo_ubicazione (scaffale, terra), capacità, etc.
 
     inventory_items = relationship("Inventory", back_populates="location")

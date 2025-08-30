@@ -1,0 +1,191 @@
+/* 
+ * Anti-Flash CSS per WMS EPM
+ * Elimina il flash bianco durante l'autenticazione
+ */
+
+/* Nasconde inizialmente il body fino a che l'autenticazione è verificata */
+body:not(.auth-checked) {
+    opacity: 0;
+    visibility: hidden;
+    transition: none;
+}
+
+/* Mostra il corpo quando l'autenticazione è OK */
+body.auth-checked {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.2s ease-in-out;
+}
+
+/* Loading state elegante */
+.auth-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #0097E0 0%, #00516E 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 1;
+    transition: opacity 0.3s ease-out;
+}
+
+.auth-loading-overlay.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.auth-loader {
+    text-align: center;
+    color: white;
+}
+
+.auth-loader .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(255, 255, 255, 0.2);
+    border-top: 4px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.auth-loader .message {
+    font-size: 1rem;
+    font-weight: 500;
+    margin: 0;
+}
+
+/* Stati per transizioni fluide */
+.page-entering {
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Error states */
+.auth-error {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #dc3545;
+    color: white;
+    padding: 1rem;
+    border-radius: 6px;
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+    .auth-loading-overlay {
+        padding: 2rem;
+    }
+    
+    .auth-loader .spinner {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .auth-loader .message {
+        font-size: 0.9rem;
+    }
+}
+
+/* Preloader nascosto di default */
+.auth-loading-overlay {
+    display: none;
+}
+
+.auth-loading-overlay.active {
+    display: flex;
+}
+
+/* === PROTEZIONE PERMESSI - SICUREZZA CRITICA === */
+/* STRATEGIA: NASCONDERE TUTTO DI DEFAULT, MOSTRARE SOLO SE AUTORIZZATO */
+
+/* REGOLA 1: Nasconde TUTTO il contenuto protetto di DEFAULT (massima sicurezza) */
+.protected-content {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
+
+/* REGOLA 2: Mostra contenuto SOLO quando esplicitamente autorizzato */
+body.permissions-checked .protected-content {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* REGOLA 3: Loader sempre visibile finché non autorizzato */
+.permission-loader {
+    display: flex !important;
+}
+
+/* REGOLA 4: Nasconde loader quando autorizzato */
+body.permissions-checked .permission-loader {
+    display: none !important;
+}
+
+/* REGOLA 5: Stili loader - z-index massimo per sicurezza */
+.permission-loader {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: linear-gradient(135deg, #0097E0 0%, #00516E 100%) !important;
+    color: white !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 999999 !important; /* Massima priorità */
+    flex-direction: column !important;
+    gap: 1rem !important;
+    font-family: system-ui, -apple-system, sans-serif !important;
+}
+
+.permission-loader .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(255, 255, 255, 0.2);
+    border-top: 4px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.permission-loader .message {
+    font-size: 1rem;
+    color: white;
+    text-align: center;
+}

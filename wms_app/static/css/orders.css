@@ -3,6 +3,498 @@ body {
     margin: 2em;
 }
 
+/* Pulsanti azione moderni */
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    padding: 0.75rem 1.5rem;
+    background-color: #0097E0;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.action-btn:hover {
+    background-color: #00516E;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 81, 110, 0.3);
+}
+
+/* Sistema overlay moderno */
+.overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    backdrop-filter: blur(3px);
+}
+
+.overlay-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    max-width: 800px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.overlay-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 2px solid #F2F2F2;
+    background-color: #00516E;
+    border-radius: 12px 12px 0 0;
+}
+
+.overlay-header h3 {
+    margin: 0;
+    color: white;
+    font-size: 1.4rem;
+}
+
+.overlay-close {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: white;
+    cursor: pointer;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.overlay-close:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    transform: rotate(90deg);
+}
+
+/* Form negli overlay */
+.overlay form {
+    padding: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #00516E;
+}
+
+.form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #0097E0;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none;
+    border-color: #00516E;
+    box-shadow: 0 0 0 3px rgba(0, 151, 224, 0.2);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid #F2F2F2;
+    flex-wrap: wrap;
+}
+
+.btn-primary {
+    background-color: #0097E0;
+    color: white;
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: fit-content;
+}
+
+.btn-primary:hover {
+    background-color: #00516E;
+    transform: translateY(-2px);
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: fit-content;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+    transform: translateY(-2px);
+}
+
+/* Stile specifico per bottone X (chiusura/annulla) */
+.btn-secondary:contains('✕') {
+    font-weight: bold;
+    font-size: 1.1em;
+    min-width: 40px;
+    padding: 0.6rem 0.8rem;
+}
+
+.btn-success {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+    transform: translateY(-2px);
+}
+
+/* Sistema Tab */
+.tab-container {
+    padding: 1.5rem;
+}
+
+.tab-buttons {
+    display: flex;
+    border-bottom: 2px solid #F2F2F2;
+    margin-bottom: 1.5rem;
+}
+
+.tab-btn {
+    padding: 0.75rem 1.5rem;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    color: #6c757d;
+    transition: all 0.3s ease;
+}
+
+.tab-btn:hover {
+    background-color: #F2F2F2;
+    color: #00516E;
+}
+
+.tab-btn.active {
+    color: #0097E0;
+    border-bottom-color: #0097E0;
+    background-color: #f8f9fa;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Template description */
+.template-description {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    border-left: 4px solid #0097E0;
+}
+
+.btn-template {
+    display: inline-block;
+    background-color: #00D4F5;
+    color: #00516E;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.btn-template:hover {
+    background-color: #0097E0;
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* Result containers */
+.result-container {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 6px;
+    background-color: #f8f9fa;
+    border-left: 4px solid #0097E0;
+}
+
+/* Auto import specific styles */
+.auto-import-section h4 {
+    color: #00516E;
+    margin-bottom: 1rem;
+}
+
+.status-container {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+}
+
+.auto-import-controls {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.help-text {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-top: 0.5rem;
+}
+
+/* Order lines */
+.order-line {
+    padding: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    background-color: #f8f9fa;
+}
+
+#add-line-button {
+    margin-bottom: 1rem;
+}
+
+/* Header con ricerca per tabelle ordini */
+.orders-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    padding: 0 1.5rem;
+}
+
+.title-and-search {
+    display: flex;
+    align-items: flex-end;
+    gap: 2rem;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.outgoing-stock-indicator {
+    margin-left: auto;
+    align-self: flex-start;
+}
+
+.orders-header h2 {
+    margin: 0;
+    color: #00516E;
+    font-size: 1.5rem;
+    white-space: nowrap;
+}
+
+.orders-header h3 {
+    margin: 0;
+    color: #00516E;
+    font-size: 1.3rem;
+    white-space: nowrap;
+}
+
+.search-controls {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.search-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.search-field label {
+    font-size: 1rem;
+    font-weight: bold;
+    color: #00516E;
+}
+
+.search-field input {
+    padding: 0.75rem 1rem;
+    border: 2px solid #0097E0;
+    border-radius: 6px;
+    font-size: 1rem;
+    width: 200px;
+    background-color: white;
+    transition: all 0.3s ease;
+}
+
+.search-field input:focus {
+    outline: none;
+    border-color: #00516E;
+    box-shadow: 0 0 0 3px rgba(0, 151, 224, 0.2);
+}
+
+/* Pulsante reset ordinamento */
+.reset-sort-inline-btn {
+    padding: 0.75rem 1rem;
+    background-color: #0097E0;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: fit-content;
+    align-self: flex-end;
+}
+
+.reset-sort-inline-btn:hover {
+    background-color: #00516E;
+    transform: scale(1.05);
+}
+
+/* Stili tabelle con ordinamento */
+.table-container table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    background-color: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.table-container th {
+    background-color: #F2F2F2;
+    color: #00516E;
+    font-weight: bold;
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 3px solid #0097E0;
+    position: relative;
+}
+
+.table-container td {
+    padding: 1rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.table-container tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* Headers ordinabili */
+.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.3s ease;
+}
+
+.sortable:hover {
+    background-color: #00D4F5;
+    color: #00516E;
+}
+
+.sort-arrow {
+    display: inline-block;
+    margin-left: 0.5rem;
+    font-size: 0.8rem;
+    opacity: 0.5;
+}
+
+.sortable.asc .sort-arrow::after {
+    content: "▲";
+    opacity: 1;
+}
+
+.sortable.desc .sort-arrow::after {
+    content: "▼";
+    opacity: 1;
+}
+
+/* Responsive per controlli ricerca */
+@media (max-width: 768px) {
+    .title-and-search {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .search-controls {
+        flex-direction: column;
+        gap: 1rem;
+        width: 100%;
+    }
+    
+    .search-field input {
+        width: 100%;
+    }
+    
+    .reset-sort-inline-btn {
+        width: 100%;
+    }
+}
+
 /* Stili per ordini annullati */
 .order-cancelled {
     background-color: #ffe6e6 !important;
@@ -27,63 +519,22 @@ h3 {
     color: #333;
 }
 
-/* Stili per il modale di validazione picking */
-.modal {
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0,0,0,0.5);
+/* Stili per il nuovo overlay di validazione picking */
+#picking-validation-overlay {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-.modal-content {
-    background-color: #fefefe;
-    margin: 5% auto;
-    padding: 0;
-    border: 1px solid #888;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 1200px;
-    max-height: 90vh;
-    overflow-y: auto;
+#picking-validation-overlay button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
 }
 
-.modal-header {
-    background-color: #f1f1f1;
-    padding: 15px 20px;
-    border-bottom: 1px solid #ddd;
-    border-radius: 8px 8px 0 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+#picking-validation-overlay button:active {
+    transform: translateY(0);
 }
 
-.modal-body {
-    padding: 20px;
-}
-
-.modal-footer {
-    background-color: #f1f1f1;
-    padding: 15px 20px;
-    border-top: 1px solid #ddd;
-    border-radius: 0 0 8px 8px;
-    text-align: right;
-}
-
-.close-button {
-    background: none;
-    border: none;
-    font-size: 24px;
-    font-weight: bold;
-    cursor: pointer;
-    color: #aaa;
-}
-
-.close-button:hover {
-    color: #000;
+#print-picking-overlay-button:hover {
+    background: rgba(255,255,255,0.3) !important;
 }
 
 .btn-success {
@@ -237,4 +688,647 @@ th {
 .error-message {
     color: red;
     font-weight: bold;
+}
+
+/* Stili Recap Overlay per Picking */
+.recap-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1001;
+    backdrop-filter: blur(3px);
+}
+
+.recap-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    max-width: 90%;
+    width: 1000px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.recap-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 2px solid #F2F2F2;
+    background-color: #00516E;
+    border-radius: 12px 12px 0 0;
+    flex-shrink: 0;
+}
+
+.recap-header h3 {
+    margin: 0;
+    color: white;
+    font-size: 1.4rem;
+}
+
+.recap-stats {
+    padding: 1rem 1.5rem;
+    background-color: #F2F2F2;
+    border-bottom: 1px solid #ddd;
+    flex-shrink: 0;
+}
+
+.recap-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    text-align: center;
+}
+
+.recap-stat {
+    padding: 0.5rem;
+    border-radius: 6px;
+    font-weight: bold;
+}
+
+.recap-stat.total {
+    background-color: #0097E0;
+    color: white;
+}
+
+.recap-stat.ok {
+    background-color: #28a745;
+    color: white;
+}
+
+.recap-stat.warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.recap-stat.error {
+    background-color: #dc3545;
+    color: white;
+}
+
+.recap-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.recap-section {
+    margin-bottom: 2rem;
+}
+
+.recap-section h4 {
+    margin: 0 0 1rem 0;
+    color: #00516E;
+    font-size: 1.2rem;
+}
+
+.recap-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.recap-table th,
+.recap-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #F2F2F2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.recap-table th {
+    font-size: 0.9rem;
+}
+
+.recap-table input {
+    min-width: 0;
+}
+
+.recap-table th {
+    background-color: #F2F2F2;
+    color: #00516E;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+}
+
+.recap-table tr.status-ok {
+    background-color: #d4edda;
+}
+
+.recap-table tr.status-warning {
+    background-color: #fff3cd;
+}
+
+.recap-table tr.status-error {
+    background-color: #f8d7da;
+}
+
+.recap-edit-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.recap-edit-btn, .recap-ignore-btn {
+    padding: 0.25rem 0.5rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.recap-edit-btn {
+    background-color: #0097E0;
+    color: white;
+}
+
+.recap-edit-btn:hover {
+    background-color: #00516E;
+}
+
+.recap-ignore-btn {
+    background-color: #dc3545;
+    color: white;
+}
+
+.recap-ignore-btn:hover {
+    background-color: #c82333;
+}
+
+.recap-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-top: 2px solid #F2F2F2;
+    background-color: #f8f9fa;
+    border-radius: 0 0 12px 12px;
+    flex-shrink: 0;
+}
+
+.order-summary-card {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.order-summary-header {
+    font-weight: bold;
+    color: #00516E;
+    margin-bottom: 0.5rem;
+}
+
+.order-summary-details {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.error-section, .warning-section {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.error-item, .warning-item {
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+    border-radius: 4px;
+    border-left: 4px solid;
+}
+
+.error-item {
+    background-color: #f8d7da;
+    border-left-color: #dc3545;
+    color: #721c24;
+}
+
+.warning-item {
+    background-color: #fff3cd;
+    border-left-color: #ffc107;
+    color: #856404;
+}
+
+/* === OTTIMIZZAZIONI MOBILE === */
+@media (max-width: 768px) {
+    /* Riduci margin per mobile */
+    body {
+        margin: 1em;
+    }
+    
+    /* Nascondi sezioni non necessarie per operatori magazzino */
+    .collapsible-container {
+        display: none !important;
+    }
+    
+    /* Ottimizza tabella ordini per mobile */
+    #orders-table {
+        font-size: 14px;
+        table-layout: fixed; /* Forza larghezze fisse */
+        width: 100%;
+    }
+    
+    /* Nascondi colonne non essenziali per mobile */
+    #orders-table th:nth-child(1), /* ID Ordine */
+    #orders-table td:nth-child(1) {
+        display: none;
+    }
+    
+    #orders-table th:nth-child(4), /* Data Ordine */
+    #orders-table td:nth-child(4) {
+        display: none;
+    }
+    
+    #orders-table th:nth-child(5), /* Stato */
+    #orders-table td:nth-child(5) {
+        display: none;
+    }
+    
+    #orders-table th:nth-child(6), /* DDT */
+    #orders-table td:nth-child(6) {
+        display: none;
+    }
+    
+    #orders-table th:nth-child(7), /* Peso */
+    #orders-table td:nth-child(7) {
+        display: none;
+    }
+    
+    #orders-table th:nth-child(8), /* Progresso Picking */
+    #orders-table td:nth-child(8) {
+        display: none;
+    }
+    
+    /* Larghezze fisse per le colonne visibili su mobile */
+    #orders-table th:nth-child(2), /* Numero Ordine */
+    #orders-table td:nth-child(2) {
+        width: 25% !important;
+        min-width: 80px;
+    }
+    
+    #orders-table th:nth-child(3), /* Cliente */
+    #orders-table td:nth-child(3) {
+        width: 45% !important;
+        word-wrap: break-word;
+        word-break: break-word;
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
+    
+    #orders-table th:nth-child(9), /* Azioni (Picking) */
+    #orders-table td:nth-child(9) {
+        width: 30% !important;
+        min-width: 100px;
+        text-align: center;
+    }
+    
+    /* Nascondi pulsanti non essenziali per operatori magazzino */
+    .fulfill-order-button,
+    .cancel-order-button,
+    .delete-order-button,
+    .archive-order-button,
+    .generate-ddt-button {
+        display: none !important;
+    }
+    
+    /* Ottimizza pulsante picking per mobile */
+    .view-order-button {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+        background: linear-gradient(135deg, #0097E0, #00516E) !important;
+        color: white !important;
+        border: none;
+        border-radius: 8px;
+        font-weight: bold;
+        text-align: center;
+    }
+    
+    /* Tabella responsiva per mobile */
+    #orders-table td {
+        padding: 12px 8px;
+        vertical-align: middle;
+    }
+    
+    /* Nascondi sezione ordini archiviati su mobile */
+    #archived-orders-section {
+        display: none !important;
+    }
+    
+    /* Ottimizza overlay picking per mobile */
+    #picking-validation-overlay {
+        padding: 5px !important;
+    }
+    
+    #picking-validation-overlay > div {
+        width: 98vw !important;
+        max-width: none !important;
+        margin: 0 !important;
+        height: 100vh !important;
+        max-height: none !important;
+        border-radius: 0 !important;
+        overflow-y: auto;
+    }
+    
+    /* Header più compatto per mobile */
+    #picking-validation-overlay > div > div:first-child {
+        padding: 15px !important;
+    }
+    
+    #picking-validation-title {
+        font-size: 18px !important;
+        margin: 0 !important;
+    }
+    
+    #picking-validation-subtitle {
+        font-size: 12px !important;
+    }
+    
+    /* Ottimizza contenuto picking per mobile */
+    #picking-validation-body {
+        padding: 10px !important;
+        height: calc(100vh - 140px);
+        overflow-y: auto;
+    }
+    
+    /* Footer più compatto */
+    #picking-validation-overlay > div > div:last-child {
+        padding: 10px 15px !important;
+    }
+    
+    #picking-validation-overlay > div > div:last-child button {
+        padding: 8px 15px !important;
+        font-size: 12px !important;
+    }
+    
+    /* Adatta pulsante picking in tempo reale per mobile */
+    #real-time-picking-button {
+        width: 100% !important;
+        min-width: auto !important;
+        font-size: 20px !important;
+        padding: 20px !important;
+        margin-bottom: 20px !important;
+    }
+    
+    /* Ottimizza interfaccia scanner per mobile */
+    #barcode-input {
+        font-size: 18px !important;
+        padding: 20px !important;
+        width: calc(100% - 40px) !important;
+        max-width: none !important;
+    }
+    
+    /* Stile per campo readonly (pistola scanner) */
+    #barcode-input[readonly] {
+        background: #e8f4f8 !important;
+        cursor: pointer !important;
+    }
+    
+    #barcode-input:not([readonly]) {
+        background: white !important;
+        cursor: text !important;
+    }
+    
+    /* Ridimensiona elementi per evitare scroll verticale in picking */
+    .mobile-picking-info {
+        padding: 15px !important;
+        margin-bottom: 10px !important;
+    }
+    
+    .mobile-picking-location {
+        font-size: 28px !important;
+        margin-bottom: 8px !important;
+    }
+    
+    .mobile-picking-sku {
+        font-size: 20px !important;
+        margin-bottom: 8px !important;
+    }
+    
+    .mobile-picking-quantity {
+        font-size: 22px !important;
+    }
+    
+    /* Compatta ulteriormente per viewport molto piccoli */
+    @media (max-height: 700px) {
+        .mobile-picking-info {
+            padding: 10px !important;
+            margin-bottom: 8px !important;
+        }
+        
+        .mobile-picking-location {
+            font-size: 24px !important;
+            margin-bottom: 5px !important;
+        }
+        
+        .mobile-picking-sku {
+            font-size: 18px !important;
+            margin-bottom: 5px !important;
+        }
+        
+        .mobile-picking-quantity {
+            font-size: 20px !important;
+        }
+        
+        #scanner-area {
+            padding: 15px !important;
+            margin-bottom: 10px !important;
+        }
+        
+        #scanner-status {
+            font-size: 16px !important;
+            margin-bottom: 10px !important;
+        }
+        
+        #barcode-input {
+            font-size: 16px !important;
+            padding: 10px !important;
+        }
+        
+        .mobile-control-buttons button {
+            padding: 10px !important;
+            font-size: 14px !important;
+        }
+    }
+    
+    /* Ottimizza pulsanti di controllo per mobile */
+    .mobile-control-buttons {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+    
+    .mobile-control-buttons button {
+        width: 100% !important;
+        padding: 15px !important;
+        font-size: 16px !important;
+    }
+    
+    /* Scanner area ottimizzata per mobile */
+    #scanner-area {
+        padding: 15px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    #scanner-status {
+        font-size: 18px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    #scanner-feedback {
+        font-size: 16px !important;
+        margin-top: 10px !important;
+    }
+    
+    /* Statistiche compatte per mobile */
+    .stats-mobile-compact {
+        display: flex !important;
+        justify-content: space-around !important;
+        margin-bottom: 15px !important;
+        padding: 10px !important;
+        background: #F2F2F2 !important;
+        border-radius: 8px !important;
+    }
+    
+    .stats-mobile-compact > div {
+        text-align: center !important;
+    }
+    
+    .stats-mobile-compact .stat-number {
+        font-size: 20px !important;
+        font-weight: bold !important;
+    }
+    
+    .stats-mobile-compact .stat-label {
+        font-size: 10px !important;
+    }
+    
+    /* Nascondere elementi non essenziali nell'overlay su mobile */
+    .mobile-hide {
+        display: none !important;
+    }
+    
+    /* Ottimizza scanner fotocamera per mobile */
+    #camera-scanner-area {
+        margin-bottom: 10px !important;
+        padding: 10px !important;
+    }
+    
+    #camera-preview {
+        max-width: 250px !important;
+        height: 150px !important;
+    }
+    
+    /* Pulsante scanner fotocamera */
+    #camera-scanner-button {
+        background: linear-gradient(135deg, #00D4F5, #0097E0) !important;
+    }
+}
+
+/* Larghezze colonne tabella ordini per desktop */
+@media (min-width: 769px) {
+    #orders-table {
+        table-layout: auto;
+        width: 100%;
+    }
+}   
+
+
+/* Larghezze colonne tabella ordini archiviati per desktop */
+@media (min-width: 769px) {
+    #archived-orders-table {
+        table-layout: fixed;
+        width: 100%;
+    }
+    
+    #archived-orders-table th:nth-child(1), /* ID Ordine */
+    #archived-orders-table td:nth-child(1) {
+        width: 6%;
+    }
+    
+    #archived-orders-table th:nth-child(2), /* N Ordine */
+    #archived-orders-table td:nth-child(2) {
+        width: 10%;
+    }
+    
+    #archived-orders-table th:nth-child(3), /* Cliente */
+    #archived-orders-table td:nth-child(3) {
+        width: 18%;
+    }
+    
+    #archived-orders-table th:nth-child(4), /* Data Ordine */
+    #archived-orders-table td:nth-child(4) {
+        width: 12%;
+    }
+    
+    #archived-orders-table th:nth-child(5), /* Data Archiviazione */
+    #archived-orders-table td:nth-child(5) {
+        width: 12%;
+    }
+    
+    #archived-orders-table th:nth-child(6), /* Stato */
+    #archived-orders-table td:nth-child(6) {
+        width: 10%;
+    }
+    
+    #archived-orders-table th:nth-child(7), /* DDT */
+    #archived-orders-table td:nth-child(7) {
+        width: 10%;
+    }
+    
+    #archived-orders-table th:nth-child(8), /* Peso */
+    #archived-orders-table td:nth-child(8) {
+        width: 8%;
+    }
+    
+    #archived-orders-table th:nth-child(9), /* Azioni */
+    #archived-orders-table td:nth-child(9) {
+        width: 22%;
+    }
+}
+
+/* Miglioramenti per i pulsanti delle azioni */
+#orders-table td:nth-child(9),
+#archived-orders-table td:nth-child(9) {
+    white-space: nowrap;
+    overflow: hidden;
+    padding: 0.5rem !important;
+}
+
+#orders-table td:nth-child(9) button,
+#archived-orders-table td:nth-child(9) button {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+    margin: 0.1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* Migliore gestione del testo nelle colonne strette */
+#orders-table td:nth-child(2),
+#orders-table td:nth-child(6),
+#archived-orders-table td:nth-child(2),
+#archived-orders-table td:nth-child(7) {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+    padding: 0.5rem !important;
 }

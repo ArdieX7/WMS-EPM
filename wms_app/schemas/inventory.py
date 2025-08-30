@@ -68,6 +68,25 @@ class StockParseResult(BaseModel):
 class StockCommitRequest(BaseModel):
     items: List[InventoryComparisonItem] # Ora inviamo l'intero oggetto di confronto
 
+# --- Schema per Consigli di Consolidamento ---
+class ConsolidationSuggestion(BaseModel):
+    sku: str
+    description: str
+    pallet_quantity: int
+    from_location: str
+    from_quantity: int
+    to_location: str
+    to_quantity: int
+    combined_quantity: int
+    efficiency_gain: str
+
+class ConsolidationSuggestionsResponse(BaseModel):
+    suggestions: List[ConsolidationSuggestion]
+    total_suggestions: int
+    locations_saveable: int
+    products_analyzed: int
+    products_with_palletization: int
+
 
 # Importazione posticipata per evitare dipendenze circolari
 from .products import Product

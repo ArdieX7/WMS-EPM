@@ -3,96 +3,258 @@
 <head>
     <title>Gestione Ordini - WMS EPM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/no-flash.css">
+    <link rel="stylesheet" href="/static/css/enhanced-upload.css">
     <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/mobile-navbar.css">
     <link rel="stylesheet" href="/static/css/orders.css">
     <link rel="stylesheet" href="/static/css/collapsible.css">
     <link rel="stylesheet" href="/static/css/templates.css">
     <link rel="stylesheet" href="/static/css/responsive.css">
-    <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/footer.css">
 </head>
 <body>
     {% include 'partials/navbar.html' %}
+    
+    <!-- Loader permessi -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
+
+    <!-- Contenuto protetto -->
+    <div class="protected-content">
+    <!-- Mobile content wrapper -->
+    <div class="mobile-content">
+    
+    <!-- Loader permessi (visibile finché non si verificano i permessi) -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
 
     <h1>Gestione Ordini</h1>
 
-    <div class="collapsible-container">
-        <details>
-            <summary>Importa Ordini da File TXT</summary>
-            <div class="details-content">
-                <form id="import-orders-form">
-                    <p class="template-description">
-                        Il file TXT deve avere una riga per ogni riga d'ordine. Ogni riga deve contenere Numero Ordine, Cliente, SKU e Quantità, separati da virgole.
-                        <br>Esempio: <code>ORDINE_123,CLIENTE_ROSSI,SKU123,5</code>
-                    </p>
-                    <a href="/static/templates/template_orders.txt" download="template_orders.txt" class="btn-template">Scarica Template</a>
-                    <br><br>
-                    <label for="orders-file">Seleziona file TXT:</label><br>
-                    <input type="file" id="orders-file" accept=".txt" required><br><br>
-                    <button type="submit">Importa Ordini</button>
-                </form>
-                <div id="import-orders-result" style="margin-top: 1em;"></div>
-            </div>
-        </details>
-
-        <details>
-            <summary>Crea Nuovo Ordine</summary>
-            <div class="details-content">
-                <form id="create-order-form">
-                    <label for="order-number">Numero Ordine:</label><br>
-                    <input type="text" id="order-number" required><br><br>
-
-                    <label for="customer-name">Nome Cliente:</label><br>
-                    <input type="text" id="customer-name" required><br><br>
-
-                    <h3>Righe Ordine</h3>
-                    <div id="order-lines-container">
-                        <div class="order-line">
-                            <label for="line-product-sku-0">SKU Prodotto:</label>
-                            <input type="text" id="line-product-sku-0" list="product-skus" required>
-                            <label for="line-quantity-0">Quantità Richiesta:</label>
-                            <input type="number" id="line-quantity-0" required><br><br>
-                        </div>
-                    </div>
-                    <button type="button" id="add-line-button">Aggiungi Riga</button><br><br>
-
-                    <button type="submit">Crea Ordine</button>
-                </form>
-            </div>
-        </details>
-        
-        <details>
-            <summary>Prelievo da File TXT (Pistola Scanner)</summary>
-            <div class="details-content">
-                <form id="import-picking-form">
-                    <p class="template-description">
-                        <strong>Formato pistola scanner:</strong><br>
-                        - <strong>Riga 1:</strong> Numero Ordine<br>
-                        - <strong>Riga 2:</strong> Ubicazione<br>
-                        - <strong>Righe successive:</strong> EAN/SKU ripetuti (quantità = ripetizioni) oppure EAN/SKU_quantità<br>
-                        - Il pattern si ripete per più ordini<br>
-                        <br>Esempio: <code>1888</code> → <code>15A1P2</code> → <code>9512012430306</code> (ripetuto 5 volte) oppure <code>SND-12SFU-OD_10</code>
-                    </p>
-                    <a href="/static/templates/template_picking.txt" download="template_picking.txt" class="btn-template">Scarica Template</a>
-                    <br><br>
-                    <label for="picking-file">Seleziona file TXT:</label><br>
-                    <input type="file" id="picking-file" accept=".txt" required><br><br>
-                    <button type="submit">Esegui Prelievo</button>
-                </form>
-                <div id="import-picking-result" style="margin-top: 1em;"></div>
-            </div>
-        </details>
+    <!-- Pulsanti azione moderni -->
+    <div class="action-buttons" data-permission="orders_management_section">
+        <button class="action-btn" onclick="openOverlay('import-orders-overlay')">📁 Import Ordini</button>
+        <button class="action-btn" onclick="openOverlay('create-order-overlay')">➕ Crea Nuovo Ordine</button>
+        <button class="action-btn" onclick="openOverlay('picking-file-overlay')">📋 Prelievo da File</button>
     </div>
 
-    <h2>Elenco Ordini</h2>
+    <!-- Overlay Import Ordini Unificato -->
+    <div id="import-orders-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>Import Ordini</h3>
+                <button class="overlay-close" onclick="closeOverlay('import-orders-overlay')">&times;</button>
+            </div>
+            
+            <!-- Sistema Tab -->
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" onclick="switchOrdersTab('import-file-tab')">📄 Da File TXT</button>
+                    <button class="tab-btn" onclick="switchOrdersTab('import-excel-tab')">📊 Da File Excel</button>
+                    <button class="tab-btn" onclick="switchOrdersTab('import-auto-tab')">🚀 Automatico da Cartella</button>
+                </div>
+                
+                <!-- Tab Import da File -->
+                <div id="import-file-tab" class="tab-content active">
+                    <form id="import-orders-form">
+                        
+                        <!-- Enhanced Upload Component (solo drag & drop) -->
+                        <div class="enhanced-upload-container" id="orders-file-upload"></div>
+                        
+                        <!-- Backup: Original file input (hidden) -->
+                        <input type="file" id="orders-file" accept=".txt" style="display: none;">
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('import-orders-overlay')">✕</button>
+                            <button type="submit" class="btn-primary">📁 Importa</button>
+                        </div>
+
+                        <div class="template-description">
+                            Il file TXT deve avere una riga per ogni riga d'ordine. Ogni riga deve contenere Numero Ordine, Cliente, SKU e Quantità, separati da virgole.
+                            <br>Esempio: <code>ORDINE_123,CLIENTE_ROSSI,SKU123,5</code>
+                        </div>
+                        <a href="/static/templates/template_orders.txt" download="template_orders.txt" class="btn-template">📄 Scarica Template</a>
+                    </form>
+                </div>
+                
+                <!-- Tab Import da Excel -->
+                <div id="import-excel-tab" class="tab-content">
+                    <form id="import-excel-form">
+                        
+                        <!-- Enhanced Upload Component per Excel -->
+                        <div class="enhanced-upload-container" id="excel-file-upload"></div>
+                        
+                        <!-- Backup: Original file input (hidden) -->
+                        <input type="file" id="excel-file" accept=".xlsx" style="display: none;">
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('import-orders-overlay')">✕</button>
+                            <button type="submit" class="btn-primary">📊 Importa</button>
+                        </div>
+
+                        <div class="template-description">
+                            Il file Excel deve avere le seguenti colonne con esattamente questi nomi negli header:
+                            <br><strong>CODICE ORDINE MASTER</strong> = Numero Ordine
+                            <br><strong>RAGIONE SOCIALE DESTINATARIO</strong> = Nome Cliente  
+                            <br><strong>CODICE PADRE PRODOTTO</strong> = SKU Prodotto
+                            <br><strong>Q PRODOTTO</strong> = Quantità
+                            <br>Le colonne possono essere in qualsiasi posizione. SKU duplicati nello stesso ordine vengono consolidati automaticamente.
+                            <br><strong>Nota:</strong> Gli ordini vengono creati immediatamente dopo l'upload (come per i file TXT).
+                        </div>
+                        <a href="/static/templates/template_orders_excel.xlsx" download="template_orders_excel.xlsx" class="btn-template">📊 Scarica Template Excel</a>
+                    </form>
+                </div>
+                
+                <!-- Tab Import Automatico -->
+                <div id="import-auto-tab" class="tab-content">
+                    <div class="auto-import-section">
+                        <h4>Configurazione Cartella</h4>
+                        <div id="folder-config-status" class="status-container">
+                            <p>Caricamento configurazione...</p>
+                        </div>
+                        
+                        <form id="configure-folder-form">
+                            <div class="form-group">
+                                <label for="folder-path">Percorso Cartella Google Drive:</label>
+                                <input type="text" id="folder-path" placeholder="es. C:\Users\Nome\Google Drive\Ordini" required>
+                                <div class="help-text">La cartella deve contenere file TXT o CSV con ordini. Verranno create automaticamente le sottocartelle "processati" e "errori".</div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">⚙️ Configura Cartella</button>
+                            </div>
+                        </form>
+                        
+                        <h4>Import Automatico</h4>
+                        <div class="auto-import-controls">
+                            <button id="run-auto-import" class="btn-success">🚀 Importa Tutti i File</button>
+                            <button id="refresh-config" class="btn-secondary">🔄 Aggiorna Stato</button>
+                        </div>
+                        
+                        <div id="auto-import-result" class="result-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay Crea Nuovo Ordine -->
+    <div id="create-order-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>Crea Nuovo Ordine</h3>
+                <button class="overlay-close" onclick="closeOverlay('create-order-overlay')">&times;</button>
+            </div>
+            <form id="create-order-form">
+                <div class="form-group">
+                    <label for="order-number">Numero Ordine:</label>
+                    <input type="text" id="order-number" required>
+                </div>
+                <div class="form-group">
+                    <label for="customer-name">Nome Cliente:</label>
+                    <input type="text" id="customer-name" required>
+                </div>
+                
+                <h4>Righe Ordine</h4>
+                <div id="order-lines-container">
+                    <div class="order-line">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="line-product-sku-0">SKU Prodotto:</label>
+                                <input type="text" id="line-product-sku-0" list="product-skus" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="line-quantity-0">Quantità Richiesta:</label>
+                                <input type="number" id="line-quantity-0" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" id="add-line-button" class="btn-secondary">➕ Aggiungi Riga</button>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeOverlay('create-order-overlay')">✕</button>
+                    <button type="submit" class="btn-primary">➕ Crea</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Overlay Prelievo da File -->
+    <div id="picking-file-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>Prelievo da File TXT (Pistola Scanner)</h3>
+                <button class="overlay-close" onclick="closeOverlay('picking-file-overlay')">&times;</button>
+            </div>
+            <form id="import-picking-form">
+                <div class="template-description">
+                    <strong>Formato pistola scanner:</strong><br>
+                    - <strong>Riga 1:</strong> Numero Ordine<br>
+                    - <strong>Riga 2:</strong> Ubicazione<br>
+                    - <strong>Righe successive:</strong> EAN/SKU ripetuti (quantità = ripetizioni) oppure EAN/SKU_quantità<br>
+                    - Il pattern si ripete per più ordini<br>
+                    <br>Esempio: <code>1888</code> → <code>15A1P2</code> → <code>9512012430306</code> (ripetuto 5 volte) oppure <code>SND-12SFU-OD_10</code>
+                </div>
+                <a href="/static/templates/template_picking.txt" download="template_picking.txt" class="btn-template">📄 Scarica Template</a>
+                <!-- Enhanced Upload Component -->
+                <div class="enhanced-upload-container" id="picking-file-upload"></div>
+                
+                <!-- Backup: Original file input (hidden) -->
+                <input type="file" id="picking-file" accept=".txt" style="display: none;">
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeOverlay('picking-file-overlay')">✕</button>
+                    <button type="submit" class="btn-primary">📋 Esegui</button>
+                </div>
+            </form>
+            <div id="import-picking-result" class="result-container"></div>
+        </div>
+    </div>
+
+    <!-- Tabella ordini con ricerca e ordinamento -->
     <div class="table-container">
+        <div class="orders-header">
+            <div class="title-and-search" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h2>Elenco Ordini</h2>
+                    <div class="search-controls">
+                    <div class="search-field">
+                        <label for="search-order-number">Cerca per Numero Ordine:</label>
+                        <input type="text" id="search-order-number" placeholder="Inserisci numero ordine...">
+                    </div>
+                    <div class="search-field">
+                        <label for="search-customer">Cerca per Cliente:</label>
+                        <input type="text" id="search-customer" placeholder="Inserisci cliente...">
+                    </div>
+                    <div class="search-field">
+                        <label for="search-date">Cerca per Data:</label>
+                        <input type="date" id="search-date">
+                    </div>
+                    <div class="search-field">
+                        <label for="search-ddt">Cerca per DDT:</label>
+                        <input type="text" id="search-ddt" placeholder="Inserisci numero DDT...">
+                    </div>
+                        <button id="reset-orders-sort-btn" class="reset-sort-inline-btn" title="Reset Ordinamento">🔄</button>
+                    </div>
+                </div>
+                <div class="outgoing-stock-indicator" style="display: flex; align-items: center;">
+                    <span style="background-color: #FF5913; color: white; padding: 0.5rem 1rem; border-radius: 8px; font-weight: bold; font-size: 1rem; box-shadow: 0 2px 8px rgba(255, 89, 19, 0.3); margin-top: 60px;">
+                        📤 In uscita: <span id="total-outgoing-stock">...</span>
+                    </span>
+                </div>
+            </div>
+        </div>
         <table id="orders-table">
             <thead>
                 <tr>
-                    <th>ID Ordine</th>
-                    <th>Numero Ordine</th>
-                    <th>Cliente</th>
-                    <th>Data Ordine</th>
-                    <th>Stato</th>
+                    <th class="sortable" data-column="id">ID <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="order_number">N Ordine <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="customer_name">Cliente <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="order_date">Data Ordine <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="status">Stato <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="ddt_number">DDT <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="total_weight">Peso <span class="sort-arrow"></span></th>
                     <th>Progresso Picking</th>
                     <th>Azioni</th>
                 </tr>
@@ -110,15 +272,41 @@
             <div class="details-content">
                 <div id="archived-orders-container">
                     <div class="table-container">
+                        <div class="orders-header">
+                            <div class="title-and-search">
+                                <h3>Ordini Archiviati</h3>
+                                <div class="search-controls">
+                                    <div class="search-field">
+                                        <label for="search-archived-order-number">Cerca per Numero Ordine:</label>
+                                        <input type="text" id="search-archived-order-number" placeholder="Inserisci numero ordine...">
+                                    </div>
+                                    <div class="search-field">
+                                        <label for="search-archived-customer">Cerca per Cliente:</label>
+                                        <input type="text" id="search-archived-customer" placeholder="Inserisci cliente...">
+                                    </div>
+                                    <div class="search-field">
+                                        <label for="search-archived-date">Cerca per Data:</label>
+                                        <input type="date" id="search-archived-date">
+                                    </div>
+                                    <div class="search-field">
+                                        <label for="search-archived-ddt">Cerca per DDT:</label>
+                                        <input type="text" id="search-archived-ddt" placeholder="Inserisci numero DDT...">
+                                    </div>
+                                    <button id="reset-archived-sort-btn" class="reset-sort-inline-btn">🔄 Reset Ordinamento</button>
+                                </div>
+                            </div>
+                        </div>
                         <table id="archived-orders-table">
                             <thead>
                                 <tr>
-                                    <th>ID Ordine</th>
-                                    <th>Numero Ordine</th>
-                                    <th>Cliente</th>
-                                    <th>Data Ordine</th>
-                                    <th>Data Archiviazione</th>
-                                    <th>Stato</th>
+                                    <th class="sortable" data-column="id">ID Ordine <span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-column="order_number">N Ordine <span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-column="customer_name">Cliente <span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-column="order_date">Data Ordine <span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-column="archived_at">Data Archiviazione <span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-column="status">Stato <span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-column="ddt_number">DDT <span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-column="total_weight">Peso <span class="sort-arrow"></span></th>
                                     <th>Azioni</th>
                                 </tr>
                             </thead>
@@ -137,25 +325,392 @@
 
     <datalist id="product-skus"></datalist>
 
-    <!-- Modale per recap validazione picking -->
-    <div id="picking-validation-modal" class="modal" style="display: none;">
-        <div class="modal-content" style="max-width: 80%; max-height: 80%; overflow-y: auto;">
-            <div class="modal-header">
-                <h3 id="validation-modal-title">Recap Validazione Picking</h3>
-                <button class="close-button" onclick="closeValidationModal()">×</button>
+    <!-- Overlay Moderno per Validazione Picking -->
+    <div id="picking-validation-overlay" style="
+        display: none; 
+        position: fixed; 
+        top: 0; 
+        left: 0; 
+        width: 100vw; 
+        height: 100vh; 
+        background-color: rgba(0,0,0,0.7); 
+        z-index: 9999; 
+        justify-content: center; 
+        align-items: center;
+    ">
+        <div style="
+            background: white; 
+            border-radius: 12px; 
+            max-width: 900px; 
+            max-height: 85vh; 
+            overflow-y: auto; 
+            margin: 20px; 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            position: relative;
+        ">
+            <!-- Header con titolo e pulsante stampa -->
+            <div style="
+                background: linear-gradient(135deg, #00516E 0%, #0097E0 100%); 
+                color: white; 
+                padding: 25px; 
+                border-radius: 12px 12px 0 0; 
+                display: flex; 
+                justify-content: space-between; 
+                align-items: center;
+            ">
+                <div>
+                    <h3 id="picking-validation-title" style="margin: 0 0 5px 0; font-size: 24px; font-weight: 300;">📋 Validazione Picking</h3>
+                    <div id="picking-validation-subtitle" style="opacity: 0.9; font-size: 14px;">Controlla le operazioni prima di confermare</div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button id="print-picking-overlay-button" style="
+                        background: rgba(255,255,255,0.2); 
+                        color: white; 
+                        border: 1px solid rgba(255,255,255,0.3); 
+                        padding: 8px 15px; 
+                        border-radius: 6px; 
+                        cursor: pointer; 
+                        font-size: 14px;
+                        display: flex;
+                        align-items: center;
+                        gap: 5px;
+                    " title="Stampa Picking List">
+                        🖨️ Stampa
+                    </button>
+                    <button onclick="closePickingValidationOverlay()" style="
+                        background: none; 
+                        border: none; 
+                        color: white; 
+                        font-size: 28px; 
+                        cursor: pointer; 
+                        opacity: 0.8;
+                        line-height: 1;
+                    ">×</button>
+                </div>
             </div>
-            <div id="validation-modal-body" class="modal-body">
+            
+            <!-- Body con contenuto dinamico -->
+            <div id="picking-validation-body" style="padding: 25px;">
                 <!-- Contenuto dinamico -->
             </div>
-            <div class="modal-footer">
-                <button id="commit-all-button" onclick="commitPicking(false)" class="btn-success">Conferma Solo Operazioni Valide</button>
-                <button id="commit-force-button" onclick="commitPicking(true)" class="btn-warning">Forza Tutte le Operazioni Possibili</button>
-                <button onclick="closeValidationModal()" class="btn-secondary">Annulla</button>
+            
+            <!-- Footer con azioni -->
+            <div style="
+                padding: 20px 25px; 
+                border-top: 1px solid #dee2e6; 
+                background: #f8f9fa; 
+                border-radius: 0 0 12px 12px;
+                display: flex;
+                justify-content: flex-end;
+                gap: 10px;
+            ">
+                <button onclick="closePickingValidationOverlay()" style="
+                    background: #6c757d; 
+                    color: white; 
+                    border: none; 
+                    padding: 12px 20px; 
+                    border-radius: 6px; 
+                    cursor: pointer;
+                    font-size: 14px;
+                ">✕</button>
+                <button id="commit-force-button" onclick="commitPicking(true)" style="
+                    background: #FF5913; 
+                    color: white; 
+                    border: none; 
+                    padding: 12px 20px; 
+                    border-radius: 6px; 
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                ">Forza Operazioni Possibili</button>
+                <button id="commit-all-button" onclick="commitPicking(false)" style="
+                    background: #0097E0; 
+                    color: white; 
+                    border: none; 
+                    padding: 12px 20px; 
+                    border-radius: 6px; 
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                ">Conferma Operazioni Valide</button>
             </div>
         </div>
     </div>
 
-    <script src="/static/js/orders.js"></script>
+    <!-- Recap Overlay per Picking da File -->
+    <div id="picking-recap-overlay" class="recap-overlay">
+        <div class="recap-content">
+            <div class="recap-header">
+                <h3 id="picking-recap-title">📋 Riepilogo Prelievo da File</h3>
+                <button class="overlay-close" onclick="closePickingRecap()">&times;</button>
+            </div>
+            
+            <div class="recap-stats">
+                <div class="recap-stats-grid">
+                    <div class="recap-stat total">
+                        <div>Totale</div>
+                        <div id="picking-recap-total">0</div>
+                    </div>
+                    <div class="recap-stat ok">
+                        <div>OK</div>
+                        <div id="picking-recap-ok">0</div>
+                    </div>
+                    <div class="recap-stat warning">
+                        <div>Avvisi</div>
+                        <div id="picking-recap-warnings">0</div>
+                    </div>
+                    <div class="recap-stat error">
+                        <div>Errori</div>
+                        <div id="picking-recap-errors">0</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="recap-body">
+                <div id="picking-recap-orders-section" class="recap-section">
+                    <h4>📦 Riepilogo per Ordine</h4>
+                    <div id="picking-recap-orders-list"></div>
+                </div>
+                
+                <div id="picking-recap-errors-section" class="recap-section" style="display: none;">
+                    <h4>🚫 Errori da Correggere</h4>
+                    <div class="error-section">
+                        <div id="picking-recap-errors-list"></div>
+                    </div>
+                </div>
+                
+                <div id="picking-recap-warnings-section" class="recap-section" style="display: none;">
+                    <h4>⚠️ Avvisi</h4>
+                    <div class="warning-section">
+                        <div id="picking-recap-warnings-list"></div>
+                    </div>
+                </div>
+                
+                <div id="picking-recap-operations-section" class="recap-section">
+                    <h4>📋 Operazioni da Eseguire</h4>
+                    <table class="recap-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">Riga</th>
+                                <th style="width: 80px;">Ordine</th>
+                                <th style="width: 120px;">Cliente</th>
+                                <th style="width: 100px;">Ubicazione</th>
+                                <th style="width: 150px;">SKU</th>
+                                <th style="width: 80px;">Quantità</th>
+                                <th style="width: 80px;">Giacenza</th>
+                                <th style="width: 80px;">Rimanente</th>
+                                <th style="width: 120px;">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="picking-recap-operations-table">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="recap-actions">
+                <button class="btn-secondary" onclick="closePickingRecap()">✕</button>
+                <button id="picking-recap-execute-btn" class="btn-primary">Esegui</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay Dettagli Ordine Completato -->
+    <div id="completed-order-details-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3 id="completed-order-title">📋 Dettagli Ordine Completato</h3>
+                <button class="overlay-close" onclick="closeCompletedOrderDetails()">&times;</button>
+            </div>
+            
+            <div style="padding: 1.5rem;">
+                <div id="completed-order-info" class="form-group">
+                    <!-- Informazioni ordine verranno inserite qui -->
+                </div>
+                
+                <div class="form-group">
+                    <label><strong>📦 Righe Ordine</strong></label>
+                    <table class="recap-table mobile-order-details-table" style="margin-top: 0.5rem;">
+                        <thead>
+                            <tr>
+                                <th class="mobile-sku-col" style="width: 120px;">SKU Prodotto</th>
+                                <th class="mobile-req-col" style="width: 60px;">Richiesto</th>
+                                <th class="mobile-prev-col" style="width: 60px;">Prelevato</th>
+                                <th class="mobile-status-col" style="width: 40px;">Stato</th>
+                            </tr>
+                        </thead>
+                        <tbody id="completed-order-lines">
+                            <!-- Righe ordine verranno inserite qui -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="completed-order-status-message" style="border-radius: 6px; padding: 1rem; margin-top: 1rem;">
+                    <!-- Il contenuto verrà inserito dinamicamente -->
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button class="btn-secondary" onclick="closeCompletedOrderDetails()">Chiudi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay Import Recap -->
+    <div id="import-recap-overlay" style="
+        display: none; 
+        position: fixed; 
+        top: 0; 
+        left: 0; 
+        width: 100%; 
+        height: 100%; 
+        background-color: rgba(0,0,0,0.5); 
+        z-index: 1000; 
+        justify-content: center; 
+        align-items: center;
+    ">
+        <div style="
+            background: white; 
+            border-radius: 8px; 
+            max-width: 800px; 
+            max-height: 80vh; 
+            overflow-y: auto; 
+            margin: 20px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        ">
+            <div style="
+                padding: 20px; 
+                border-bottom: 1px solid #ddd; 
+                display: flex; 
+                justify-content: space-between; 
+                align-items: center;
+            ">
+                <h3 id="import-recap-title" style="margin: 0;">📊 Recap Import Automatico</h3>
+                <button onclick="closeImportRecapOverlay()" style="
+                    background: none; 
+                    border: none; 
+                    font-size: 24px; 
+                    cursor: pointer; 
+                    color: #666;
+                ">×</button>
+            </div>
+            <div id="import-recap-body" style="padding: 20px;">
+                <!-- Contenuto dinamico -->
+            </div>
+            <div style="
+                padding: 20px; 
+                border-top: 1px solid #ddd; 
+                text-align: right;
+            ">
+                <button onclick="closeImportRecapOverlay()" style="
+                    background-color: #007bff; 
+                    color: white; 
+                    border: none; 
+                    padding: 10px 20px; 
+                    border-radius: 5px; 
+                    cursor: pointer;
+                ">Chiudi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay Recap Excel Import -->
+    <div id="excel-recap-overlay" class="recap-overlay" style="display: none;">
+        <div class="recap-content">
+            <div class="recap-header">
+                <h3 id="excel-recap-title">📊 Riepilogo Import Excel</h3>
+                <button class="overlay-close" onclick="closeExcelRecap()">&times;</button>
+            </div>
+            
+            <div class="recap-stats">
+                <div class="recap-stats-grid">
+                    <div class="recap-stat total">
+                        <div>Totale Righe</div>
+                        <div id="excel-recap-total">0</div>
+                    </div>
+                    <div class="recap-stat total">
+                        <div>Ordini</div>
+                        <div id="excel-recap-orders">0</div>
+                    </div>
+                    <div class="recap-stat ok">
+                        <div>OK</div>
+                        <div id="excel-recap-ok">0</div>
+                    </div>
+                    <div class="recap-stat warning">
+                        <div>Avvisi</div>
+                        <div id="excel-recap-warnings">0</div>
+                    </div>
+                    <div class="recap-stat error">
+                        <div>Errori</div>
+                        <div id="excel-recap-errors">0</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="recap-body">
+                <div id="excel-recap-errors-section" class="recap-section" style="display: none;">
+                    <h4>🚫 Errori da Correggere</h4>
+                    <div class="error-section">
+                        <div id="excel-recap-errors-list"></div>
+                    </div>
+                </div>
+                
+                <div id="excel-recap-operations-section" class="recap-section">
+                    <h4>📊 Ordini da Creare/Aggiornare</h4>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                            <input type="checkbox" id="excel-show-only-errors" onchange="filterExcelRecapItems()">
+                            <span>Mostra solo errori/avvisi</span>
+                        </label>
+                    </div>
+                    <table class="recap-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">N°</th>
+                                <th style="width: 100px;">N. Ordine</th>
+                                <th style="width: 150px;">Cliente</th>
+                                <th style="width: 100px;">SKU</th>
+                                <th style="width: 200px;">Descrizione</th>
+                                <th style="width: 80px;">Quantità</th>
+                                <th style="width: 60px;">Stato</th>
+                                <th style="width: 120px;">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="excel-recap-operations-table">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="recap-actions">
+                <button class="btn-secondary" onclick="closeExcelRecap()">✕ Annulla</button>
+                <button id="excel-recap-execute-btn" class="btn-primary">✅ Conferma Creazione Ordini</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Libreria html5-qrcode per scanner barcode (più robusta) -->
+            </div> <!-- Fine mobile-content -->
+            </div> <!-- Fine protected-content -->
+    
+    <script src="/static/js/modern-auth.js"></script>
+    <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
+    
+    <!-- Libreria ZXing per confronto -->
+    <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+    
+    {% include 'partials/footer.html' %}
+    
+    <!-- Scripts in ordine ottimizzato per caricamento rapido -->
+    <script>
+        // Protezione pagina con nuovo sistema
+        document.addEventListener('DOMContentLoaded', function() {
+            window.requirePermission('orders_view');
+        });
+    </script>
+    <script src="/static/js/enhanced-upload.js"></script>
+    <script src="/static/js/orders.js?v=2025082719direct"></script>
     <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/mobile-navbar.js"></script>
 </body>
 </html>

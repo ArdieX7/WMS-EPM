@@ -24,6 +24,7 @@ class AnalysisKPIs(BaseModel):
     total_pieces_outgoing: int
     unique_skus_in_stock: int
     total_inventory_value: float
+    critical_stock_skus: int = 0  # SKU con giacenza <= 15 pezzi
 
 class AnalysisPageData(BaseModel):
     """Dati completi per la pagina di analisi."""
@@ -41,3 +42,26 @@ class ProductInRowItem(BaseModel):
     product_sku: str
     product_description: Optional[str]
     quantity: int
+
+class PalletSummary(BaseModel):
+    """Rappresenta il riassunto totale dei pallet nel magazzino."""
+    total_pallets: float
+    pallets_on_ground: float
+    pallets_in_shelves: float
+    products_analyzed: int
+
+class ProductPalletDetail(BaseModel):
+    """Rappresenta il dettaglio pallet per un singolo prodotto."""
+    sku: str
+    description: Optional[str]
+    pallet_quantity: int  # Quantità per pallet (configurata)
+    pallets_on_ground: float
+    pallets_in_shelves: float
+    pallets_total: float
+    quantity_on_ground: int  # Quantità effettiva a terra
+    quantity_in_shelves: int  # Quantità effettiva in scaffali
+
+class PalletDetails(BaseModel):
+    """Dati completi per il modal dei dettagli pallet."""
+    summary: PalletSummary
+    products: List[ProductPalletDetail]

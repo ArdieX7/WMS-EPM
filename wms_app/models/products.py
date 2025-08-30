@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, ForeignKey, Float
+from sqlalchemy import Column, String, ForeignKey, Float, Integer
 from sqlalchemy.orm import relationship
 from wms_app.database.database import Base
 
@@ -8,6 +8,8 @@ class Product(Base):
     sku = Column(String, primary_key=True, index=True)
     description = Column(String, index=True)
     estimated_value = Column(Float, default=0.0)
+    weight = Column(Float, default=0.0)  # Peso in kg
+    pallet_quantity = Column(Integer, default=0)  # Quantità per pallet
 
     eans = relationship("EanCode", back_populates="product")
     serials = relationship("ProductSerial", back_populates="product")

@@ -19,6 +19,8 @@ class ProductBase(BaseModel):
     sku: str
     description: Optional[str] = None
     estimated_value: Optional[float] = 0.0
+    weight: Optional[float] = 0.0  # Peso in kg
+    pallet_quantity: Optional[int] = 0  # Quantità per pallet
 
 class ProductCreate(ProductBase):
     eans: List[str] = []

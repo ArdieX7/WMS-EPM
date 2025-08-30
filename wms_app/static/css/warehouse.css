@@ -2,13 +2,387 @@
             font-family: sans-serif;
             margin: 2em;
         }
+
+        /* Header magazzino con toggle */
+        .warehouse-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .warehouse-header h2 {
+            margin: 0;
+        }
+
+        /* Toggle per visualizzazione 2D */
+        .view-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: #0097E0;
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+
+        .toggle-label {
+            font-weight: 500;
+            font-size: 1rem;
+            color: #333;
+        }
+
+        /* Pulsanti azione moderni */
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background-color: #0097E0;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            background-color: #00516E;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 81, 110, 0.3);
+        }
+
+        /* Sistema overlay moderno */
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            backdrop-filter: blur(3px);
+        }
+
+        .overlay-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .overlay-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem;
+            border-bottom: 2px solid #F2F2F2;
+            background-color: #00516E;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .overlay-header h3 {
+            margin: 0;
+            color: white;
+            font-size: 1.4rem;
+        }
+
+        .overlay-close {
+            background: none;
+            border: none;
+            font-size: 2rem;
+            color: white;
+            cursor: pointer;
+            padding: 0;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .overlay-close:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            transform: rotate(90deg);
+        }
+
+        /* Form negli overlay */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: #00516E;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #0097E0;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #00516E;
+            box-shadow: 0 0 0 3px rgba(0, 151, 224, 0.2);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 2px solid #F2F2F2;
+        }
+
+        .btn-primary {
+            background-color: #0097E0;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            background-color: #00516E;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-warning:hover {
+            background-color: #e0a800;
+            transform: translateY(-2px);
+        }
+
+        /* Sistema Tab */
+        .tab-container {
+            padding: 1.5rem;
+        }
+
+        .tab-buttons {
+            display: flex;
+            border-bottom: 2px solid #F2F2F2;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-btn {
+            padding: 0.75rem 1.5rem;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #6c757d;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn:hover {
+            background-color: #F2F2F2;
+            color: #00516E;
+        }
+
+        .tab-btn.active {
+            color: #0097E0;
+            border-bottom-color: #0097E0;
+            background-color: #f8f9fa;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Scroll indicator in cima alla mappa - STICKY per rimanere sempre visibile */
+        .scroll-indicator {
+            position: sticky;
+            top: 80px; /* Spazio per navbar fissa */
+            z-index: 100;
+            background-color: white;
+            padding: 10px;
+            margin-bottom: 15px;
+            margin-left: -10px;
+            margin-right: -10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        /* Evidenzia maggiormente quando la barra è "staccata" durante lo scroll */
+        .scroll-indicator.scrolled {
+            box-shadow: 0 4px 16px rgba(0, 151, 224, 0.3);
+            background-color: #f8f9fa;
+        }
+
+
+        .scroll-bar-top {
+            height: 15px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            background-color: #f1f1f1;
+            border-radius: 6px;
+            border: 2px solid #0097E0;
+            margin-bottom: 10px;
+        }
+
+        /* Stili scrollbar per la barra superiore */
+        .scroll-bar-top::-webkit-scrollbar {
+            height: 10px;
+        }
+
+        .scroll-bar-top::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 6px;
+        }
+
+        .scroll-bar-top::-webkit-scrollbar-thumb {
+            background: #0097E0;
+            border-radius: 6px;
+        }
+
+        .scroll-bar-top::-webkit-scrollbar-thumb:hover {
+            background: #00516E;
+        }
         .location-grid-container {
             overflow-x: auto;
             white-space: nowrap;
             background-color: #e9ecef;
-            padding: 10px;
-            border-radius: 8px;
+            padding: 20px;
+            border-radius: 12px;
             margin-top: 2em;
+            border: 2px solid #0097E0;
+            box-shadow: 0 4px 12px rgba(0, 151, 224, 0.1);
+            /* Migliora visibilità scrollbar */
+            scrollbar-width: thin;
+            scrollbar-color: #0097E0 #f1f1f1;
+        }
+        
+        /* Stili scrollbar per WebKit */
+        .location-grid-container::-webkit-scrollbar {
+            height: 12px;
+        }
+        
+        .location-grid-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 6px;
+        }
+        
+        .location-grid-container::-webkit-scrollbar-thumb {
+            background: #0097E0;
+            border-radius: 6px;
+            border: 2px solid #f1f1f1;
+        }
+        
+        .location-grid-container::-webkit-scrollbar-thumb:hover {
+            background: #00516E;
         }
         .location-row {
             display: inline-block;
@@ -39,6 +413,10 @@
         }
         .location-free {
             background-color: #28a745; /* Verde */
+        }
+        .location-unavailable {
+            background-color: #6c757d; /* Grigio */
+            cursor: not-allowed;
         }
 
 /* Tooltip personalizzato */
@@ -102,4 +480,244 @@
     color: black;
     text-decoration: none;
     cursor: pointer;
+}
+
+/* ===== VISUALIZZAZIONE 2D WAREHOUSE ===== */
+
+.warehouse-2d-container {
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    overflow-x: auto;
+    white-space: nowrap;
+    border: 2px solid #0097E0;
+    box-shadow: 0 4px 12px rgba(0, 151, 224, 0.1);
+    margin-top: 2em;
+    /* Migliora visibilità scrollbar per 2D */
+    scrollbar-width: thin;
+    scrollbar-color: #0097E0 #f1f1f1;
+}
+
+/* Stili scrollbar per WebKit per visualizzazione 2D */
+.warehouse-2d-container::-webkit-scrollbar {
+    height: 12px;
+}
+
+.warehouse-2d-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 6px;
+}
+
+.warehouse-2d-container::-webkit-scrollbar-thumb {
+    background: #0097E0;
+    border-radius: 6px;
+    border: 2px solid #f1f1f1;
+}
+
+.warehouse-2d-container::-webkit-scrollbar-thumb:hover {
+    background: #00516E;
+}
+
+.warehouse-2d-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    min-width: max-content;
+}
+
+.warehouse-row-section {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.warehouse-row-label {
+    background: #0097E0;
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 1.1rem;
+    min-width: 100px;
+    text-align: center;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.warehouse-bays-container {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: nowrap;
+}
+
+.warehouse-bay {
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    background: #fff;
+    min-width: 200px;
+}
+
+.bay-label {
+    background: #6c757d;
+    color: white;
+    padding: 0.5rem;
+    text-align: center;
+    font-weight: bold;
+    border-radius: 4px 4px 0 0;
+    font-size: 0.9rem;
+}
+
+.bay-levels {
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.bay-level {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 30px;
+}
+
+.level-label {
+    background: #e9ecef;
+    color: #495057;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.8rem;
+    min-width: 30px;
+    text-align: center;
+}
+
+.level-positions {
+    display: flex;
+    gap: 2px;
+    flex: 1;
+}
+
+/* Celle ubicazioni nella visualizzazione 2D */
+.location-2d-cell {
+    position: relative;
+    padding: 0.25rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-align: center;
+    min-width: 35px;
+    min-height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* Stati delle celle 2D (più specifiche per override) */
+.warehouse-2d-container .location-2d-cell.location-occupied {
+    background-color: #dc3545 !important;
+    border: 1px solid #dc3545 !important;
+    color: white !important;
+}
+
+.warehouse-2d-container .location-2d-cell.location-free {
+    background-color: #28a745 !important;
+    border: 1px solid #28a745 !important;
+    color: white !important;
+}
+
+.warehouse-2d-container .location-2d-cell.location-unavailable {
+    background-color: #6c757d !important;
+    border: 1px solid #6c757d !important;
+    color: white !important;
+}
+
+.location-2d-cell:hover {
+    transform: scale(1.1);
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.location-name {
+    font-size: 0.65rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+/* Tooltip per visualizzazione 2D */
+.location-2d-tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: white;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease;
+    z-index: 1000;
+    margin-bottom: 5px;
+    pointer-events: none;
+}
+
+.location-2d-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+}
+
+.location-2d-cell:hover .location-2d-tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Responsive design per visualizzazione 2D */
+@media (max-width: 768px) {
+    .warehouse-row-section {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    body {
+        margin: 0;
+    }
+
+    .warehouse-row-label {
+        writing-mode: initial;
+        text-orientation: initial;
+        height: auto;
+        min-width: initial;
+    }
+    
+    .warehouse-bays-container {
+        flex-wrap: wrap;
+    }
+    
+    .warehouse-bay {
+        min-width: 150px;
+    }
+    
+    .location-2d-cell {
+        min-width: 30px;
+        font-size: 0.6rem;
+    }
 }

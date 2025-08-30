@@ -15,7 +15,7 @@ body {
     position: fixed; /* Fissata in alto */
     top: 0;
     left: 0;
-    width: 100%;
+    right: 0;
     z-index: 1000;
     box-sizing: border-box;
 }
@@ -86,6 +86,48 @@ body {
     background-color: #F2F2F2;
 }
 
+/* User Info Styles */
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: auto;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    color: #F2F2F2;
+}
+
+.user-name {
+    font-weight: bold;
+    font-size: 0.95rem;
+}
+
+.user-role {
+    font-size: 0.8rem;
+    opacity: 0.8;
+    text-transform: capitalize;
+}
+
+.logout-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #F2F2F2;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+}
+
+.logout-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
 /* --- Stili Desktop --- */
 @media (min-width: 769px) {
     .menu-icon {
@@ -125,5 +167,98 @@ body {
         border-radius: 6px;
         font-size: 1.1rem;
         font-weight: 500;
+    }
+}
+
+/* === AREA UTENTE E LOGIN === */
+.user-area, .login-area {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: auto;
+}
+
+.user-area {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    color: #F2F2F2;
+    margin-right: 0.5rem;
+}
+
+.user-name {
+    font-weight: bold;
+    font-size: 0.95rem;
+}
+
+.user-role {
+    font-size: 0.8rem;
+    opacity: 0.8;
+    text-transform: capitalize;
+}
+
+.login-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #F2F2F2;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+}
+
+.login-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+/* Mobile User Area - Updated for new mobile navbar */
+@media (max-width: 768px) {
+    /* Hide traditional navbar components on mobile */
+    .navbar-container {
+        display: none;
+    }
+    
+    /* Mobile-first approach - these styles are overridden by mobile-navbar.css */
+    .user-area, .login-area {
+        position: fixed;
+        top: 60px;
+        right: 1rem;
+        z-index: 1001;
+        background: #00516E;
+        border: 1px solid #006a8d;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    
+    .user-area {
+        flex-direction: column;
+        align-items: center;
+        padding: 1rem;
+        min-width: 150px;
+    }
+    
+    .user-info {
+        align-items: center;
+        text-align: center;
+        margin-right: 0;
+        margin-bottom: 0.5rem;
+    }
+
+    .logout-btn {
+        width: 100%;
+    }
+    
+    /* Ensure mobile content has proper spacing */
+    body {
+        padding-top: 0;
+        padding-bottom: 80px; /* Space for bottom navbar */
     }
 }

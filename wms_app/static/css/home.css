@@ -1,0 +1,615 @@
+/* Home Page Styles - WMS EPM */
+
+/* Assicuriamoci che il body abbia il margin laterale come le altre pagine */
+body {
+    margin: 2em !important;
+    /* Non sovrascrivere margin-top, usa quello della navbar.css (padding-top: 60px) */
+}
+
+.home-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1rem 0 0 0; /* Solo padding top per distanziare dalla navbar */
+}
+
+/* Hero Section */
+.hero-section {
+    background: 
+        linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)),
+        url('/static/images/banner_wms.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    color: white;
+    padding: 3rem 2rem;
+    border-radius: 20px;
+    margin-bottom: 3rem;
+    box-shadow: 0 10px 30px rgba(0, 81, 110, 0.2);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-title {
+    font-size: 3rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+    position: relative;
+    z-index: 2;
+}
+
+.hero-subtitle {
+    font-size: 1.3rem;
+    opacity: 0.9;
+    margin-bottom: 2rem;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+    position: relative;
+    z-index: 2;
+}
+
+.system-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    backdrop-filter: blur(10px);
+    position: relative;
+    z-index: 2;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    background: #28a745;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    border-left: 5px solid #0097E0;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(45deg, transparent, rgba(0, 151, 224, 0.1));
+    border-radius: 0 15px 0 100%;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 151, 224, 0.15);
+}
+
+.stat-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #00516E;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.9rem;
+}
+
+.stat-change {
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.change-positive { color: #28a745; }
+.change-negative { color: #dc3545; }
+.change-neutral { color: #6c757d; }
+
+/* Sezione Utilizzo Magazzino */
+.warehouse-usage-section {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    margin-bottom: 3rem;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.warehouse-usage-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: center;
+}
+
+.usage-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.usage-stats {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.usage-metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.metric-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #00516E;
+    line-height: 1;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 0.5rem;
+}
+
+.usage-divider {
+    font-size: 2rem;
+    color: #0097E0;
+    font-weight: bold;
+}
+
+.usage-description {
+    color: #6c757d;
+    line-height: 1.6;
+}
+
+.warehouse-chart-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.chart-wrapper {
+    position: relative;
+}
+
+.pie-chart-large {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    position: relative;
+    background: conic-gradient(
+        #0097E0 0deg 0deg,
+        #f1f3f4 0deg 360deg
+    );
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(0, 151, 224, 0.2);
+}
+
+.chart-center-large {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border-radius: 50%;
+    width: 90px;
+    height: 90px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.percentage-large {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #00516E;
+    line-height: 1;
+}
+
+.chart-center-large small {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: 0.2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.chart-legend-large {
+    display: flex;
+    gap: 2rem;
+}
+
+.legend-item-large {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.legend-color-large {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.legend-color-large.used {
+    background: #0097E0;
+}
+
+.legend-color-large.free {
+    background: #f1f3f4;
+    border: 2px solid #ddd;
+}
+
+.legend-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.legend-title {
+    font-weight: bold;
+    color: #00516E;
+    font-size: 0.9rem;
+}
+
+.legend-count {
+    color: #6c757d;
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+/* Quick Actions */
+.quick-actions {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    margin-bottom: 3rem;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.section-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #00516E;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.action-card {
+    background: #f8f9fa;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    padding: 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.action-card:hover {
+    background: #0097E0;
+    color: white;
+    border-color: #00516E;
+    transform: translateY(-3px);
+    text-decoration: none;
+}
+
+.action-icon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.action-title {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.action-desc {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* Recent Activity */
+.recent-activity {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    margin-bottom: 3rem;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.activity-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.activity-success { background: #d4edda; color: #155724; }
+.activity-warning { background: #fff3cd; color: #856404; }
+.activity-info { background: #d1ecf1; color: #0c5460; }
+.activity-danger { background: #f8d7da; color: #721c24; }
+
+.activity-content {
+    flex: 1;
+}
+
+.activity-title {
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+    color: #00516E;
+}
+
+.activity-desc {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-bottom: 0.2rem;
+}
+
+.activity-time {
+    font-size: 0.8rem;
+    color: #adb5bd;
+}
+
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .actions-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .home-container {
+        padding: 1rem;
+    }
+    
+    .hero-title {
+        font-size: 2.2rem;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.1rem;
+    }
+    
+    .hero-section {
+        padding: 2.5rem 1.5rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    
+    .stat-card {
+        padding: 1.5rem;
+    }
+    
+    .stat-number {
+        font-size: 2rem;
+    }
+    
+    .actions-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .action-card {
+        padding: 1.2rem;
+    }
+    
+    .section-title {
+        font-size: 1.3rem;
+    }
+    
+    /* Responsive per sezione utilizzo magazzino */
+    .warehouse-usage-content {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    
+    .usage-stats {
+        justify-content: center;
+    }
+    
+    .metric-number {
+        font-size: 2rem;
+    }
+    
+    .pie-chart-large {
+        width: 120px;
+        height: 120px;
+    }
+    
+    .chart-center-large {
+        width: 70px;
+        height: 70px;
+    }
+    
+    .percentage-large {
+        font-size: 1.2rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .hero-title {
+        font-size: 1.8rem;
+    }
+    
+    .hero-subtitle {
+        font-size: 1rem;
+    }
+    
+    .hero-section {
+        padding: 2rem 1rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .stat-card {
+        padding: 1.2rem;
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 1.8rem;
+    }
+    
+    .actions-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .action-card {
+        padding: 1rem;
+    }
+    
+    .action-icon {
+        font-size: 1.8rem;
+    }
+    
+    .activity-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .activity-icon {
+        align-self: flex-start;
+    }
+    
+    .quick-actions,
+    .recent-activity {
+        padding: 1.5rem;
+    }
+    
+    /* Responsive per sezione utilizzo magazzino su mobile */
+    .warehouse-usage-section {
+        padding: 1.5rem;
+    }
+    
+    .usage-stats {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .usage-divider {
+        transform: rotate(90deg);
+    }
+    
+    .chart-legend-large {
+        flex-direction: column;
+        gap: 1rem;
+    }
+}
+
+/* Touch optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .action-card:hover,
+    .stat-card:hover {
+        transform: none;
+    }
+    
+    .action-card:active {
+        transform: scale(0.98);
+        background: #0097E0;
+        color: white;
+    }
+    
+    .overlay-close:hover {
+        transform: none;
+    }
+    
+    .btn:hover {
+        transform: none;
+    }
+}
+
+/* Dark mode media query for future use */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-color: #1a1a1a;
+        --text-color: #ffffff;
+        --card-bg: #2d2d2d;
+    }
+}

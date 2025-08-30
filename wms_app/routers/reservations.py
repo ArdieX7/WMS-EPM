@@ -5,6 +5,7 @@ from typing import List, Dict
 from datetime import datetime
 
 from wms_app.database import get_db
+from wms_app.routers.auth import require_permission
 from wms_app.services.reservation_service import ReservationService
 from wms_app.models.reservations import InventoryReservation
 from fastapi.templating import Jinja2Templates
@@ -17,7 +18,7 @@ router = APIRouter(
 )
 
 @router.get("/dashboard", response_class=HTMLResponse)
-async def get_reservations_dashboard(request: Request, db: Session = Depends(get_db)):
+async def get_reservations_dashboard(request: Request, db: Session = Depends(get_db)): 
     """Dashboard per gestire le prenotazioni di inventario"""
     
     # Ottieni statistiche prenotazioni

@@ -3,10 +3,14 @@
 <head>
     <title>Gestione Prenotazioni - WMS EPM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/no-flash.css">
     <link rel="stylesheet" href="/static/css/navbar.css">
-    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/mobile-navbar.css">
+    <link rel="stylesheet" href="/static/css/reservations.css">
     <link rel="stylesheet" href="/static/css/collapsible.css">
+    <link rel="stylesheet" href="/static/css/templates.css">
     <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/footer.css">
     <style>
         .stats-container {
             display: flex;
@@ -90,6 +94,23 @@
 </head>
 <body>
     {% include 'partials/navbar.html' %}
+    
+    <!-- Loader permessi -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
+
+    <!-- Contenuto protetto -->
+    <div class="protected-content">
+    <!-- Mobile content wrapper -->
+    <div class="mobile-content">
+    
+    <!-- Loader permessi (visibile finché non si verificano i permessi) -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
 
     <h1>🔒 Gestione Prenotazioni Inventario</h1>
 
@@ -185,6 +206,12 @@
         </table>
     </div>
 
+            </div> <!-- Fine mobile-content -->
+
+
+            </div> <!-- Fine protected-content -->
+    
+    <script src="/static/js/modern-auth.js"></script>
     <script>
         // Funzioni di cleanup
         async function cleanupExpired() {
@@ -266,6 +293,17 @@
             window.location.reload();
         }, 30000);
     </script>
+    <!-- Scripts in ordine ottimizzato per caricamento rapido -->
+    <script>
+        // Protezione pagina con nuovo sistema
+        document.addEventListener('DOMContentLoaded', function() {
+            window.requirePermission('reservations_view');
+        });
+    </script>
     <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/mobile-navbar.js"></script>
+{% include 'partials/footer.html' %}
+    
+
 </body>
 </html>

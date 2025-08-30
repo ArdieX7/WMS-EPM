@@ -1,0 +1,1030 @@
+/* =============================================
+   WMS Mobile Navbar - Bottom Navigation
+   ============================================= */
+
+/* Mobile Bottom Navbar */
+@media (max-width: 768px) {
+    /* Hide desktop navbar on mobile */
+    .navbar-container {
+        display: none !important;
+    }
+    
+    /* Reset body padding for mobile */
+    body {
+        padding-top: 0 !important;
+        padding-bottom: 80px; /* Space for bottom navbar */
+    }
+
+    /* Mobile Header */
+    .mobile-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background-color: #00516E;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 1rem;
+        z-index: 1001;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .mobile-logo {
+        color: #F2F2F2;
+        font-size: 1.5rem;
+        font-weight: bold;
+        text-decoration: none;
+    }
+
+    .mobile-user-area {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #F2F2F2;
+    }
+
+    .mobile-user-info {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        font-size: 0.8rem;
+    }
+
+    .mobile-user-name {
+        font-weight: bold;
+    }
+
+    .mobile-user-role {
+        opacity: 0.8;
+        font-size: 0.7rem;
+        text-transform: capitalize;
+    }
+
+    .mobile-logout-btn {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #F2F2F2;
+        padding: 0.3rem 0.6rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.3s ease;
+    }
+
+    .mobile-logout-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Content wrapper with top padding */
+    .mobile-content {
+        padding-top: 60px;
+        min-height: calc(100vh - 140px);
+    }
+
+    /* Bottom Navigation Bar */
+    .bottom-navbar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 80px;
+        background: #00516E;
+        border-top: 1px solid #006a8d;
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        z-index: 1000;
+        padding: 0 0.5rem;
+    }
+
+    .nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 0.5rem;
+        color: #F2F2F2;
+        text-decoration: none;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        position: relative;
+        min-width: 60px;
+        opacity: 0.7;
+        background: transparent;
+        border: none;
+        outline: none;
+        box-shadow: none;
+        cursor: pointer;
+    }
+
+    /* Remove all button styling for nav-item buttons */
+    .nav-item:focus,
+    .nav-item:hover,
+    .nav-item:active {
+        background: transparent;
+        border: none;
+        outline: none;
+        box-shadow: none;
+    }
+
+    .nav-item.active {
+        opacity: 1;
+        color: #00D4F5;
+    }
+
+    .nav-item.active::after {
+        content: '';
+        position: absolute;
+        bottom: -0.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 35px;
+        height: 4px;
+        background: #FF5913;
+        border-radius: 3px;
+    }
+
+    .nav-icon {
+        width: 24px;
+        height: 24px;
+        margin-bottom: 0.25rem;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Minimalist CSS Icons */
+    .icon-inventory {
+        width: 20px;
+        height: 16px;
+        border: 2px solid currentColor;
+        border-radius: 2px;
+        position: relative;
+    }
+    .icon-inventory::before {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        right: 3px;
+        height: 2px;
+        background: currentColor;
+    }
+    .icon-inventory::after {
+        content: '';
+        position: absolute;
+        top: 7px;
+        left: 3px;
+        right: 3px;
+        height: 2px;
+        background: currentColor;
+    }
+
+    .icon-orders {
+        width: 18px;
+        height: 20px;
+        border: 2px solid currentColor;
+        border-radius: 2px;
+        position: relative;
+    }
+    .icon-orders::before {
+        content: '';
+        position: absolute;
+        top: 4px;
+        left: 3px;
+        right: 3px;
+        height: 2px;
+        background: currentColor;
+    }
+    .icon-orders::after {
+        content: '';
+        position: absolute;
+        top: 8px;
+        left: 3px;
+        right: 3px;
+        height: 2px;
+        background: currentColor;
+    }
+
+    .icon-warehouse {
+        width: 20px;
+        height: 18px;
+        position: relative;
+    }
+    .icon-warehouse::before {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 12px;
+        border: 2px solid currentColor;
+        border-top: none;
+        border-radius: 0 0 2px 2px;
+    }
+    .icon-warehouse::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 10px solid transparent;
+        border-right: 10px solid transparent;
+        border-bottom: 8px solid currentColor;
+    }
+
+    .icon-serials {
+        width: 20px;
+        height: 20px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 14px;
+        border: 2px solid currentColor;
+        border-radius: 2px;
+    }
+    .icon-serials::before {
+        content: '#';
+    }
+
+    .icon-altro {
+        width: 20px;
+        height: 20px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent !important;
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+    .icon-altro::before {
+        content: '⋮';
+        font-size: 18px;
+        line-height: 1;
+        color: currentColor;
+        font-weight: bold;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    .nav-label {
+        font-size: 0.85rem;
+        font-weight: 500;
+        text-align: center;
+    }
+
+    /* Altro menu button special styling */
+    .nav-item.altro-btn {
+        position: relative;
+        background: transparent !important;
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+
+    .nav-item.altro-btn:focus,
+    .nav-item.altro-btn:hover {
+        background: transparent !important;
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }
+
+    .nav-item.altro-btn.has-active {
+        opacity: 1;
+        color: #00D4F5;
+        background: transparent !important;
+    }
+
+    .nav-item.altro-btn.has-active::after {
+        content: '';
+        position: absolute;
+        bottom: -0.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 35px;
+        height: 4px;
+        background: #FF5913;
+        border-radius: 3px;
+    }
+
+    /* Altro Menu Overlay */
+    .altro-menu-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 2000;
+        display: none;
+        backdrop-filter: blur(2px);
+    }
+
+    .altro-menu-overlay.active {
+        display: block;
+        animation: fadeInBackdrop 0.3s ease-out;
+    }
+
+    .altro-menu {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: #00516E;
+        border-top-left-radius: 20px;
+        border-top-right-radius: 20px;
+        padding: 1.5rem;
+        transform: translateY(100%);
+        transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+
+    .altro-menu.active {
+        transform: translateY(0);
+    }
+
+    .altro-menu-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #006a8d;
+    }
+
+    .altro-menu-title {
+        color: #F2F2F2;
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
+
+    .altro-menu-close {
+        background: none;
+        border: none;
+        color: #F2F2F2;
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 0.5rem;
+        border-radius: 50%;
+        transition: background 0.3s ease;
+    }
+
+    .altro-menu-close:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .altro-menu-items {
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .altro-menu-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        color: #F2F2F2;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        border: 1px solid transparent;
+    }
+
+    .altro-menu-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: #0097E0;
+        transform: translateX(4px);
+    }
+
+    .altro-menu-item.active {
+        background: #0097E0;
+        border-color: #00D4F5;
+    }
+
+    .altro-menu-item-icon {
+        width: 24px;
+        height: 24px;
+        margin-right: 1rem;
+        min-width: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+
+    /* Menu icons */
+    .icon-products {
+        width: 18px;
+        height: 18px;
+        border: 2px solid currentColor;
+        border-radius: 50%;
+        position: relative;
+    }
+    .icon-products::before {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        right: 2px;
+        bottom: 2px;
+        border: 1px solid currentColor;
+        border-radius: 50%;
+    }
+
+    .icon-reservations {
+        width: 18px;
+        height: 18px;
+        border: 2px solid currentColor;
+        border-radius: 2px;
+        position: relative;
+    }
+    .icon-reservations::before {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        right: 2px;
+        height: 2px;
+        background: currentColor;
+    }
+    .icon-reservations::after {
+        content: '';
+        position: absolute;
+        bottom: 2px;
+        left: 2px;
+        right: 2px;
+        height: 2px;
+        background: currentColor;
+    }
+
+    .icon-ddt {
+        width: 16px;
+        height: 20px;
+        border: 2px solid currentColor;
+        border-radius: 2px;
+        position: relative;
+    }
+    .icon-ddt::before {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        right: 3px;
+        height: 1px;
+        background: currentColor;
+    }
+    .icon-ddt::after {
+        content: '';
+        position: absolute;
+        top: 6px;
+        left: 3px;
+        width: 6px;
+        height: 1px;
+        background: currentColor;
+    }
+
+    .icon-logs {
+        width: 20px;
+        height: 16px;
+        position: relative;
+    }
+    .icon-logs::before {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 4px;
+        height: 12px;
+        background: currentColor;
+        border-radius: 1px;
+    }
+    .icon-logs::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 6px;
+        width: 4px;
+        height: 8px;
+        background: currentColor;
+        border-radius: 1px;
+        box-shadow: 6px 0 0 currentColor;
+    }
+
+    .icon-analysis {
+        width: 20px;
+        height: 16px;
+        position: relative;
+    }
+    .icon-analysis::before {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: currentColor;
+    }
+    .icon-analysis::after {
+        content: '';
+        position: absolute;
+        bottom: 2px;
+        left: 2px;
+        right: 2px;
+        top: 2px;
+        border: 2px solid currentColor;
+        border-bottom: none;
+        border-radius: 2px 2px 0 0;
+        background: linear-gradient(45deg, transparent 40%, currentColor 40%, currentColor 60%, transparent 60%);
+    }
+
+    .icon-admin {
+        width: 18px;
+        height: 18px;
+        position: relative;
+        border: 2px solid currentColor;
+        border-radius: 50%;
+    }
+    .icon-admin::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 6px;
+        height: 6px;
+        background: currentColor;
+        border-radius: 50%;
+    }
+
+    .altro-menu-item-label {
+        font-weight: 500;
+    }
+
+    /* Animations */
+    @keyframes fadeInBackdrop {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    /* Safe area support for devices with notches */
+    @supports (padding: max(0px)) {
+        .mobile-header {
+            padding-left: max(1rem, env(safe-area-inset-left));
+            padding-right: max(1rem, env(safe-area-inset-right));
+        }
+        
+        .bottom-navbar {
+            padding-left: max(0.5rem, env(safe-area-inset-left));
+            padding-right: max(0.5rem, env(safe-area-inset-right));
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        body {
+            padding-bottom: calc(80px + env(safe-area-inset-bottom));
+        }
+    }
+
+    /* Hide description column on mobile inventory table */
+    #inventory-table-content th:nth-child(3),
+    #inventory-table-content td:nth-child(3) {
+        display: none;
+    }
+
+    /* Adjust table layout for mobile */
+    .table-container {
+        margin: 0 0.5rem;
+        overflow-x: auto;
+        max-width: calc(100vw - 1rem);
+    }
+
+    #inventory-table-content {
+        font-size: 0.85rem;
+        min-width: 100%;
+    }
+
+    #inventory-table-content th,
+    #inventory-table-content td {
+        padding: 0.5rem 0.25rem;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Mobile responsive fixes for all pages */
+    body {
+        overflow-x: hidden;
+        max-width: 100vw;
+    }
+
+    .mobile-content {
+        max-width: 100vw;
+        overflow-x: hidden;
+        box-sizing: border-box;
+        padding: 3rem 0.5rem 0 0.5rem;
+    }
+
+    /* Compact sections for mobile */
+    .mobile-content h1 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+    }
+
+    .mobile-content h2 {
+        margin-bottom: 0.75rem;
+        font-size: 1.2rem;
+    }
+
+    .mobile-content .section-title {
+        margin-bottom: 0.5rem;
+        font-size: 1.1rem;
+    }
+
+    /* Compact inventory sections */
+    .inventory-sections {
+        gap: 0.75rem;
+    }
+
+    .inventory-section {
+        padding: 0.5rem 1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .action-buttons {
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .action-btn {
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+        margin: 0.25rem 0;
+    }
+
+    /* Fix wide elements that break layout */
+    .action-buttons,
+    .form-container,
+    .overlay-content,
+    .section-container {
+        max-width: calc(100vw - 1rem);
+        box-sizing: border-box;
+    }
+
+    /* Specific fixes for serials page */
+    .search-controls,
+    .inventory-header {
+        max-width: 100%;
+        overflow-x: hidden;
+        box-sizing: border-box;
+    }
+
+    .search-field input,
+    .form-group input,
+    .form-group select {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Prevent horizontal scroll on all tables */
+    table {
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    /* Make sure headers don't overflow */
+    h1, h2, h3 {
+        max-width: 100%;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+
+    /* ==============================================
+       ORDERS PAGE MOBILE OPTIMIZATIONS  
+       ============================================== */
+    
+    /* Hide action buttons on mobile (orders page) - SAFE VERSION */
+    .mobile-content .action-buttons[data-permission="orders_management_section"] {
+        display: none;
+    }
+
+    /* Fix 'Prodotti in uscita' text size */
+    .mobile-content .outgoing-stock-indicator span {
+        font-size: 0.8rem !important;
+        padding: 0.5rem 0.8rem !important;
+    }
+
+    /* Fix search controls layout with inline reset button */
+    .mobile-content .search-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: stretch;
+    }
+
+    .mobile-content .search-field {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .mobile-content .search-field input,
+    .mobile-content .search-field select {
+        width: 100%;
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    /* Mobile outgoing stock styles moved to media query below */
+    
+    /* Mobile reset button styles moved to media query below */
+
+    /* Change "Prodotti in uscita" to "In uscita" - handled by JS */
+
+    /* Compact action buttons in table */
+    .mobile-content .action-btn-small,
+    .mobile-content .btn-small,
+    .mobile-content .table-btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 80px;
+    }
+
+    /* Fix table layout for mobile */
+    .mobile-content .orders-table-container {
+        overflow-x: auto;
+        margin: 0 -0.5rem;
+        padding: 0 0.5rem;
+    }
+
+    .mobile-content .orders-table {
+        min-width: 100%;
+        font-size: 0.8rem;
+    }
+
+    .mobile-content .orders-table th,
+    .mobile-content .orders-table td {
+        padding: 0.5rem 0.25rem;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    /* Compact orders section */
+    .mobile-content .orders-section {
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Orders page mobile fixes - SAFE VERSION */
+    
+    @media (max-width: 768px) {
+        /* 1. Fix orders table columns width */
+        .mobile-content .orders-table,
+        .mobile-content #orders-table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        
+        .mobile-content .orders-table th,
+        .mobile-content .orders-table td,
+        .mobile-content #orders-table th,
+        .mobile-content #orders-table td {
+            padding: 0.25rem 0.125rem;
+            font-size: 0.75rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        /* Specific column widths for mobile */
+        .mobile-content .orders-table th:nth-child(1),
+        .mobile-content .orders-table td:nth-child(1) {
+            width: 15%; /* Ordine column */
+        }
+        
+        .mobile-content .orders-table th:nth-child(2),
+        .mobile-content .orders-table td:nth-child(2) {
+            width: 35%; /* Cliente column */
+        }
+        
+        .mobile-content .orders-table th:nth-child(3),
+        .mobile-content .orders-table td:nth-child(3) {
+            width: 25%; /* Azioni column */
+        }
+
+        /* 2. Fix orders header layout for mobile */
+        .mobile-content .orders-header {
+            margin-bottom: 1rem;
+        }
+        
+        .mobile-content .title-and-search {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .mobile-content .title-and-search h2 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+        
+        /* MOBILE: Hide reset button from search-controls */
+        .mobile-content .search-controls #reset-orders-sort-btn {
+            display: none !important;
+        }
+        
+        /* MOBILE: Create visual reset button inside outgoing-stock using ::before */
+        .mobile-content .outgoing-stock-indicator {
+            position: relative !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 0 !important;
+            flex-wrap: nowrap !important;
+            margin-bottom: 1rem;
+            width: 100% !important;
+            padding: 0 !important;
+        }
+        
+        .mobile-content .outgoing-stock-indicator::before {
+            content: '🔄' !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            width: 40px !important;
+            height: 40px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: #0097E0 !important;
+            color: white !important;
+            border-radius: 6px !important;
+            font-size: 1.2rem !important;
+            box-shadow: 0 2px 4px rgba(0,151,224,0.3) !important;
+            cursor: pointer !important;
+            z-index: 10 !important;
+        }
+        
+        .mobile-content .outgoing-stock-indicator span {
+            font-size: 0.8rem !important;
+            padding: 0.5rem 0.8rem !important;
+            flex: 0 0 auto !important;
+            margin: 0 !important;
+        }
+
+        /* 3. Enhanced order details overlay fix for mobile */
+        .mobile-content #order-details-container:not(:empty) {
+            position: fixed !important;
+            top: 60px !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 80px !important;
+            z-index: 1000 !important;
+            background: white !important;
+            overflow-y: auto !important;
+            padding: 1rem !important;
+            box-sizing: border-box !important;
+            max-width: 100vw !important;
+            max-height: calc(100vh - 140px) !important;
+        }
+        
+        /* Ensure all content inside details container fits - more restrictive */
+        .mobile-content #order-details-container:not(:empty) * {
+            max-width: calc(100vw - 2rem) !important;
+            box-sizing: border-box !important;
+        }
+        
+        .mobile-content #order-details-container:not(:empty) {
+            max-width: calc(100vw - 2rem) !important;
+            width: calc(100vw - 2rem) !important;
+        }
+        
+        /* Fix tables inside order details with optimized column widths */
+        .mobile-content #order-details-container:not(:empty) table {
+            width: 100% !important;
+            table-layout: fixed !important;
+            font-size: 0.8rem !important;
+        }
+        
+        .mobile-content #order-details-container:not(:empty) th,
+        .mobile-content #order-details-container:not(:empty) td {
+            padding: 0.25rem 0.125rem !important;
+            font-size: 0.7rem !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+        }
+        
+        /* MOBILE ORDER DETAILS TABLE - 90% overlay width */
+        .mobile-content .mobile-order-details-table {
+            width: 90% !important;
+            max-width: 90% !important;
+            table-layout: fixed !important;
+            font-size: 0.7rem !important;
+            margin: 0 auto !important;
+        }
+        
+        /* Column headers - percentage based */
+        .mobile-content .mobile-sku-col {
+            width: 43% !important; /* SKU gets most space */
+            font-size: 0.7rem !important;
+        }
+        
+        .mobile-content .mobile-req-col {
+            width: 22% !important; /* Richiesto */
+            font-size: 0.65rem !important;
+            text-align: center !important;
+        }
+        
+        .mobile-content .mobile-prev-col {
+            width: 22% !important; /* Prelevato */
+            font-size: 0.65rem !important;
+            text-align: center !important;
+        }
+        
+        .mobile-content .mobile-status-col {
+            width: 13% !important; /* Stato - smallest for icons */
+            text-align: center !important;
+            font-size: 0.7rem !important;
+        }
+        
+        /* Column data cells - same percentages */
+        .mobile-content .mobile-order-details-table tbody td:nth-child(1) {
+            width: 43% !important;
+            font-size: 0.7rem !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+        }
+        
+        .mobile-content .mobile-order-details-table tbody td:nth-child(2) {
+            width: 22% !important;
+            font-size: 0.65rem !important;
+            text-align: center !important;
+        }
+        
+        .mobile-content .mobile-order-details-table tbody td:nth-child(3) {
+            width: 22% !important;
+            font-size: 0.65rem !important;
+            text-align: center !important;
+        }
+        
+        .mobile-content .mobile-order-details-table tbody td:nth-child(4) {
+            width: 13% !important;
+            text-align: center !important;
+            font-size: 1rem !important;
+        }
+        
+        /* Hide empty details container */
+        .mobile-content #order-details-container:empty {
+            display: none;
+        }
+    }
+
+    /* Hide mobile elements on larger screens */
+    @media (min-width: 769px) {
+        .mobile-header,
+        .bottom-navbar,
+        .altro-menu-overlay {
+            display: none !important;
+        }
+        
+        .mobile-content {
+            padding-top: 0;
+        }
+        
+        body {
+            padding-bottom: 0 !important;
+        }
+
+        /* Show description column on desktop */
+        #inventory-table-content th:nth-child(3),
+        #inventory-table-content td:nth-child(3) {
+            display: table-cell !important;
+        }
+    }
+}
+
+/* Ensure mobile styles only apply on mobile */
+@media (min-width: 769px) {
+    .mobile-header,
+    .bottom-navbar,
+    .altro-menu-overlay {
+        display: none !important;
+    }
+}

@@ -3,193 +3,729 @@
 <head>
     <title>Gestione Inventario - WMS EPM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/no-flash.css">
+    <link rel="stylesheet" href="/static/css/enhanced-upload.css">
     <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/mobile-navbar.css">
     <link rel="stylesheet" href="/static/css/inventory.css">
     <link rel="stylesheet" href="/static/css/collapsible.css">
     <link rel="stylesheet" href="/static/css/templates.css">
     <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/footer.css">
 </head>
 <body>
     {% include 'partials/navbar.html' %}
+    
+    <!-- Loader permessi -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
+
+    <!-- Contenuto protetto -->
+    <div class="protected-content">
+    <!-- Mobile content wrapper -->
+    <div class="mobile-content">
+    
+    <!-- Loader permessi (visibile finché non si verificano i permessi) -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
 
     <h1>Gestione Inventario</h1>
 
-    <div class="collapsible-container">
-        <details>
-            <summary>Aggiorna Giacenza Manuale (Carico/Scarico)</summary>
-            <div class="details-content">
-                <form id="update-stock-form">
-                    <label for="product-sku">Prodotto (SKU):</label><br>
-                    <input type="text" id="product-sku" list="product-skus" required><br>
-                    <datalist id="product-skus"></datalist><br>
-
-                    <label for="location">Ubicazione:</label><br>
-                    <input type="text" id="location" required><br><br>
-
-                    <label for="quantity">Quantità:</label><br>
-                    <input type="number" id="quantity" required><br>
-                    <small>Usare un numero positivo per caricare, negativo per scaricare.</small><br><br>
-
-                    <button type="submit">Esegui Movimento</button>
-                </form>
+    <!-- Layout a 2 colonne per separare le funzioni -->
+    <div class="inventory-sections">
+        <!-- Sezione Movimenti Interni -->
+        <div class="inventory-section" data-permission="inventory_internal_movements">
+            <h2 class="section-title">📦 Movimenti Interni</h2>
+            <div class="action-buttons">
+                <button class="action-btn" onclick="openOverlay('manual-operations-overlay')" data-permission="inventory_manage">⚙️ Operazioni Manuali</button>
+                <button class="action-btn" onclick="openOverlay('file-operations-overlay')" data-permission="inventory_manage">📁 Operazioni da File</button>
+                <button class="action-btn danger" onclick="openOverlay('manage-data-overlay')" data-permission="inventory_manage">⚙️ Gestione Dati</button>
             </div>
-        </details>
+        </div>
 
-        <details>
-            <summary>Movimentazione Interna</summary>
-            <div class="details-content">
-                <form id="internal-move-form">
-                    <label for="move-product-sku">Prodotto (SKU):</label><br>
-                    <input type="text" id="move-product-sku" list="product-skus" required><br>
-
-                    <label for="from-location">Da Ubicazione:</label><br>
-                    <input type="text" id="from-location" required><br><br>
-
-                    <label for="to-location">A Ubicazione:</label><br>
-                    <input type="text" id="to-location" required><br><br>
-
-                    <label for="move-quantity">Quantità da Spostare:</label><br>
-                    <input type="number" id="move-quantity" value="0"><br>
-                    <small>Inserire 0 per spostare l'intera quantità.</small><br><br>
-
-                    <button type="submit">Sposta Merce</button>
-                </form>
+        <!-- Sezione Gestione Scarico Mezzi -->
+        <div class="inventory-section" data-permission="inventory_vehicle_unload">
+            <h2 class="section-title">🚛 Gestione Scarico Mezzi</h2>
+            <div class="action-buttons">
+                <button class="action-btn truck" onclick="openOverlay('unload-container-overlay')" data-permission="warehouse_manage">📦 Scarico Container</button>
+                <button class="action-btn relocate" onclick="openOverlay('ground-to-location-overlay')" data-permission="warehouse_manage">🏗️ Ubicazione da Terra</button>
             </div>
-        </details>
+        </div>
+    </div>
 
-        <details>
-            <summary>Carico Inventario da File (Aggiungi)</summary>
-            <div class="details-content">
-                <form id="add-stock-form">
-                    <p class="template-description">
-                        Il file TXT deve contenere l'ubicazione su una riga, seguita dagli EAN/SKU. Ogni riga può rappresentare una singola unità o una quantità specificata con il formato <b>EAN/SKU_quantità</b>.
-                        <br>Esempio per aggiungere 2 pz di SKU123 e 5 pz di SKU456 a FILA-01-A-01:
-                        <code>
-                            FILA-01-A-01<br>
-                            SKU123<br>
-                            SKU123<br>
-                            SKU456_5
-                        </code>
-                    </p>
-                    <a href="/static/templates/template_inventory_movement.txt" download="template_inventory_movement.txt" class="btn-template">Scarica Template</a>
-                    <br><br>
-                    <label for="add-stock-file">Seleziona File TXT:</label><br>
-                    <input type="file" id="add-stock-file" accept=".txt" required><br><br>
-                    <button type="submit">Carica Prodotti</button>
-                </form>
+    <!-- Overlay Unificato per Operazioni Manuali -->
+    <div id="manual-operations-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>Operazioni Manuali</h3>
+                <button class="overlay-close" onclick="closeOverlay('manual-operations-overlay')">&times;</button>
             </div>
-        </details>
-
-        <details>
-            <summary>Scarico Inventario da File (Sottrai)</summary>
-            <div class="details-content">
-                <form id="subtract-stock-form">
-                    <p class="template-description">
-                        Il file TXT deve contenere l'ubicazione su una riga, seguita dagli EAN/SKU. Ogni riga può rappresentare una singola unità o una quantità specificata con il formato <b>EAN/SKU_quantità</b>.
-                        <br>Esempio per scaricare 2 pz di SKU123 e 5 pz di SKU456 da FILA-01-A-01:
-                        <code>
-                            FILA-01-A-01<br>
-                            SKU123<br>
-                            SKU123<br>
-                            SKU456_5
-                        </code>
-                    </p>
-                    <a href="/static/templates/template_inventory_movement.txt" download="template_inventory_movement.txt" class="btn-template">Scarica Template</a>
-                    <br><br>
-                    <label for="subtract-stock-file">Seleziona File TXT:</label><br>
-                    <input type="file" id="subtract-stock-file" accept=".txt" required><br><br>
-                    <button type="submit">Scarica Prodotti</button>
-                </form>
+            
+            <!-- Sistema Tab -->
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" onclick="switchManualTab('add-stock-manual-tab')">➕ Carico</button>
+                    <button class="tab-btn" onclick="switchManualTab('subtract-stock-manual-tab')">➖ Scarico</button>
+                    <button class="tab-btn" onclick="switchManualTab('move-stock-manual-tab')">🔀 Spostamenti</button>
+                </div>
+                
+                <!-- Tab Carico -->
+                <div id="add-stock-manual-tab" class="tab-content active">
+                    <form id="add-stock-manual-form">
+                        <div class="form-group">
+                            <label for="add-product-sku">Prodotto (SKU):</label>
+                            <input type="text" id="add-product-sku" list="product-skus" required>
+                            <datalist id="product-skus"></datalist>
+                        </div>
+                        <div class="form-group">
+                            <label for="add-location">Ubicazione:</label>
+                            <input type="text" id="add-location" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="add-quantity">Quantità da Caricare:</label>
+                            <input type="number" id="add-quantity" min="1" required>
+                            <div class="help-text">Inserire solo numeri positivi.</div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('manual-operations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary">➕ Carica Prodotto</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Tab Scarico -->
+                <div id="subtract-stock-manual-tab" class="tab-content">
+                    <form id="subtract-stock-manual-form">
+                        <div class="form-group">
+                            <label for="subtract-product-sku">Prodotto (SKU):</label>
+                            <input type="text" id="subtract-product-sku" list="product-skus" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="subtract-location">Ubicazione:</label>
+                            <input type="text" id="subtract-location" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="subtract-quantity">Quantità da Scaricare:</label>
+                            <input type="number" id="subtract-quantity" min="1" required>
+                            <div class="help-text">Inserire solo numeri positivi.</div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('manual-operations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary">➖ Scarica Prodotto</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Tab Spostamenti -->
+                <div id="move-stock-manual-tab" class="tab-content">
+                    <form id="move-stock-manual-form">
+                        <div class="form-group">
+                            <label for="move-product-sku">Prodotto (SKU):</label>
+                            <input type="text" id="move-product-sku" list="product-skus" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="from-location">Da Ubicazione:</label>
+                            <input type="text" id="from-location" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="to-location">A Ubicazione:</label>
+                            <input type="text" id="to-location" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="move-quantity">Quantità da Spostare:</label>
+                            <input type="number" id="move-quantity" value="0">
+                            <div class="help-text">Inserire 0 per spostare l'intera quantità.</div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('manual-operations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary">🔀 Sposta Merce</button>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </details>
+        </div>
+    </div>
 
-        <details>
-            <summary>Riallineamento Inventario (Sostituisci)</summary>
-            <div class="details-content">
-                <form id="import-stock-form">
-                    <p class="template-description">
-                        Il file TXT deve avere l'ubicazione sulla prima riga, seguita da uno o più EAN/SKU, uno per riga. La giacenza verrà SOSTITUITA con il contenuto del file.
-                        <br>Esempio:
-                        <code>
-                            FILA-01-A-01<br>
-                            SKU123<br>
-                            8001234567890
-                        </code>
-                    </p>
-                    <a href="/static/templates/template_inventory.txt" download="template_inventory.txt" class="btn-template">Scarica Template</a>
-                    <br><br>
-                    <label for="stock-file">Seleziona File TXT:</label><br>
-                    <input type="file" id="stock-file" accept=".txt" required><br><br>
-                    <button type="submit">Analizza File</button>
-                </form>
+    <!-- Overlay Unificato per Operazioni da File -->
+    <div id="file-operations-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>Operazioni da File</h3>
+                <button class="overlay-close" onclick="closeOverlay('file-operations-overlay')">&times;</button>
             </div>
-        </details>
+            
+            <!-- Sistema Tab -->
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" onclick="switchTab('add-stock-tab')">➕ Carico</button>
+                    <button class="tab-btn" onclick="switchTab('subtract-stock-tab')">➖ Scarico</button>
+                    <button class="tab-btn" onclick="switchTab('realign-stock-tab')">🔄 Riallineamento</button>
+                    <button class="tab-btn" onclick="switchTab('movements-tab')">🔀 Spostamenti</button>
+                </div>
+                
+                <!-- Tab Carico - Enhanced Upload -->
+                <div id="add-stock-tab" class="tab-content active">
+                    <form id="add-stock-form">
+                        <!-- Enhanced Upload Component -->
+                        <div class="enhanced-upload-container" id="add-stock-upload"></div>
+                        
+                        <!-- Backup: Original file input (hidden by default) -->
+                        <input type="file" id="add-stock-file" accept=".txt" style="display: none;">
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('file-operations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary">➕ Carica Prodotti</button>
+                        </div>
+                        
+                        <!-- Sezione Istruzioni Collassabile -->
+                        <div class="collapsible-section">
+                            <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                                <span class="collapsible-icon">▶</span>
+                                <span class="collapsible-title">📋 Istruzioni Caricamento</span>
+                            </button>
+                            <div class="collapsible-content">
+                                <div class="template-description">
+                                    Il file TXT deve contenere l'ubicazione su una riga, seguita dagli EAN/SKU. Ogni riga può rappresentare una singola unità o una quantità specificata con il formato <b>EAN/SKU_quantità</b>.
+                                    <br>Esempio per aggiungere 2 pz di SKU123 e 5 pz di SKU456 a FILA-01-A-01:
+                                    <code>
+                                        FILA-01-A-01<br>
+                                        SKU123<br>
+                                        SKU123<br>
+                                        SKU456_5
+                                    </code>
+                                </div>
+                                <a href="/static/templates/template_inventory_movement.txt" download="template_inventory_movement.txt" class="btn-template">📄 Scarica Template</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Tab Scarico - Enhanced Upload -->
+                <div id="subtract-stock-tab" class="tab-content">
+                    <form id="subtract-stock-form">
+                        <!-- Enhanced Upload Component -->
+                        <div class="enhanced-upload-container" id="subtract-stock-upload"></div>
+                        
+                        <!-- Backup: Original file input (hidden by default) -->
+                        <input type="file" id="subtract-stock-file" accept=".txt" style="display: none;">
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('file-operations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary">➖ Scarica Prodotti</button>
+                        </div>
+                        
+                        <!-- Sezione Istruzioni Collassabile -->
+                        <div class="collapsible-section">
+                            <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                                <span class="collapsible-icon">▶</span>
+                                <span class="collapsible-title">📋 Istruzioni Caricamento</span>
+                            </button>
+                            <div class="collapsible-content">
+                                <div class="template-description">
+                                    Il file TXT deve contenere l'ubicazione su una riga, seguita dagli EAN/SKU. Ogni riga può rappresentare una singola unità o una quantità specificata con il formato <b>EAN/SKU_quantità</b>.
+                                    <br>Esempio per scaricare 2 pz di SKU123 e 5 pz di SKU456 da FILA-01-A-01:
+                                    <code>
+                                        FILA-01-A-01<br>
+                                        SKU123<br>
+                                        SKU123<br>
+                                        SKU456_5
+                                    </code>
+                                </div>
+                                <a href="/static/templates/template_inventory_movement.txt" download="template_inventory_movement.txt" class="btn-template">📄 Scarica Template</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Tab Riallineamento - Enhanced Upload -->
+                <div id="realign-stock-tab" class="tab-content">
+                    <form id="import-stock-form">
+                        <!-- Enhanced Upload Component -->
+                        <div class="enhanced-upload-container" id="realign-stock-upload"></div>
+                        
+                        <!-- Backup: Original file input (hidden by default) -->
+                        <input type="file" id="stock-file" accept=".txt" style="display: none;">
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('file-operations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary">🔄 Analizza File</button>
+                        </div>
+                        
+                        <!-- Sezione Istruzioni Collassabile -->
+                        <div class="collapsible-section">
+                            <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                                <span class="collapsible-icon">▶</span>
+                                <span class="collapsible-title">📋 Istruzioni Caricamento</span>
+                            </button>
+                            <div class="collapsible-content">
+                                <div class="template-description">
+                                    Il file TXT deve avere l'ubicazione sulla prima riga, seguita da uno o più EAN/SKU, uno per riga. La giacenza verrà <strong>SOSTITUITA</strong> con il contenuto del file.
+                                    <br>Esempio:
+                                    <code>
+                                        FILA-01-A-01<br>
+                                        SKU123<br>
+                                        8001234567890
+                                    </code>
+                                </div>
+                                <a href="/static/templates/template_inventory.txt" download="template_inventory.txt" class="btn-template">📄 Scarica Template</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Tab Spostamenti - Enhanced Upload -->
+                <div id="movements-tab" class="tab-content">
+                    <form id="movements-form">
+                        <!-- Enhanced Upload Component -->
+                        <div class="enhanced-upload-container" id="movements-upload"></div>
+                        
+                        <!-- Backup: Original file input (hidden by default) -->
+                        <input type="file" id="movements-file" accept=".txt" style="display: none;">
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('file-operations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary">🔀 Analizza Spostamenti</button>
+                        </div>
+                        
+                        <!-- Sezione Istruzioni Collassabile -->
+                        <div class="collapsible-section">
+                            <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                                <span class="collapsible-icon">▶</span>
+                                <span class="collapsible-title">📋 Istruzioni Caricamento</span>
+                            </button>
+                            <div class="collapsible-content">
+                                <div class="template-description">
+                                    Il file TXT deve contenere le ubicazioni alternate: <strong>origine</strong>, <strong>destinazione</strong>, <strong>origine</strong>, <strong>destinazione</strong>...
+                                    <br>Ogni riga contiene una sola ubicazione. Gli spostamenti vengono processati in <strong>ordine sequenziale</strong>.
+                                    <br>Esempio per spostare prodotti: da A01 a B01, poi da B01 a C01:
+                                    <code>
+                                        A01<br>
+                                        B01<br>
+                                        B01<br>
+                                        C01
+                                    </code>
+                                </div>
+                                <a href="/static/templates/template_movements.txt" download="template_movements.txt" class="btn-template">📄 Scarica Template</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        <details>
-            <summary>Gestione Dati Giacenze</summary>
-            <div class="details-content">
-                <div class="stock-data-actions">
-                    <button id="backup-stock-btn">Crea Backup Giacenze</button>
-                    
-                    <div class="restore-stock-container">
-                        <form id="restore-stock-form">
-                            <label for="restore-stock-file">Ripristina da Backup:</label>
-                            <input type="file" id="restore-stock-file" accept=".txt" required>
-                            <button type="submit">Carica e Ripristina</button>
-                        </form>
+    <!-- Overlay per Gestione Dati -->
+    <div id="manage-data-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>Gestione Dati Giacenze</h3>
+                <button class="overlay-close" onclick="closeOverlay('manage-data-overlay')">&times;</button>
+            </div>
+            <div style="padding: 1.5rem;">
+                <div class="form-group">
+                    <button id="backup-stock-btn" class="btn-primary" style="width: 100%;">💾 Crea Backup Giacenze</button>
+                </div>
+                
+                <form id="restore-stock-form">
+                    <div class="form-group">
+                        <label for="restore-stock-file">Ripristina da Backup:</label>
+                        <input type="file" id="restore-stock-file" accept=".txt" required>
                     </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn-primary" style="width: 100%;">📁 Carica e Ripristina</button>
+                    </div>
+                </form>
 
-                    <button id="delete-all-stock-btn" class="btn-danger">Elimina Tutte le Giacenze</button>
+                <div class="form-group">
+                    <button id="consolidate-terra-btn" class="btn-primary" style="width: 100%;" onclick="consolidateGroundInventory()">🔧 Consolida TERRA</button>
+                </div>
 
-                    <div class="delete-by-row-container">
-                        <form id="delete-by-row-form">
-                            <label for="row-prefix">Elimina Giacenze per Fila:</label>
-                            <input type="text" id="row-prefix" placeholder="Es. A01" required>
-                            <button type="submit" class="btn-danger">Elimina per Fila</button>
-                        </form>
+                <div class="form-group">
+                    <button id="delete-all-stock-btn" class="btn-danger" style="width: 100%;">🗑️ Elimina Tutte le Giacenze</button>
+                </div>
+
+                <form id="delete-by-row-form">
+                    <div class="form-group">
+                        <label for="row-prefix">Elimina Giacenze per Fila:</label>
+                        <input type="text" id="row-prefix" placeholder="Es. A01" required>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn-danger" style="width: 100%;">🗑️ Elimina per Fila</button>
+                    </div>
+                </form>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeOverlay('manage-data-overlay')">Chiudi</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay Scarico Container -->
+    <div id="unload-container-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>📦 Scarico Container a Terra</h3>
+                <button class="overlay-close" onclick="closeOverlay('unload-container-overlay')">&times;</button>
+            </div>
+            
+            <!-- Sistema Tab -->
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" onclick="switchUnloadTab('unload-manual-tab')">⚙️ Operazione Manuale</button>
+                    <button class="tab-btn" onclick="switchUnloadTab('unload-file-tab')">📁 Carico da File</button>
+                </div>
+                
+                <!-- Tab Operazione Manuale -->
+                <div id="unload-manual-tab" class="tab-content active">
+                    <form id="unload-manual-form">
+                        <div class="form-group">
+                            <label for="unload-product-sku">Prodotto (SKU):</label>
+                            <input type="text" id="unload-product-sku" list="product-skus" required>
+                            <datalist id="product-skus"></datalist>
+                        </div>
+                        <div class="form-group">
+                            <label for="unload-quantity">Quantità Scaricata:</label>
+                            <input type="number" id="unload-quantity" min="1" required>
+                            <div class="help-text">Quantità di prodotto scaricata dal container.</div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('unload-container-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary truck">📦 Scarica a Terra</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Tab Carico da File - Enhanced Upload -->
+                <div id="unload-file-tab" class="tab-content">
+                    <form id="unload-file-form" enctype="multipart/form-data">
+                        <!-- Enhanced Upload Component -->
+                        <div class="enhanced-upload-container" id="unload-file-upload"></div>
+                        
+                        <!-- Backup: Original file input (hidden by default) -->
+                        <input type="file" id="unload-file" name="file" accept=".txt" style="display: none;">
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('unload-container-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary truck">📁 Processa Scarico</button>
+                        </div>
+                        
+                        <!-- Sezione Istruzioni Collassabile -->
+                        <div class="collapsible-section">
+                            <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                                <span class="collapsible-icon">▶</span>
+                                <span class="collapsible-title">📋 Istruzioni Caricamento</span>
+                            </button>
+                            <div class="collapsible-content">
+                                <div style="background-color: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #0097E0;">
+                                    <strong>ℹ️ Formato File:</strong><br>
+                                    • <code>SKU</code> → 1 pezzo a terra<br>
+                                    • <code>SKU_QTY</code> → QTY pezzi a terra (es. ABC123_5 → 5 pezzi)<br>
+                                    • Un SKU per riga
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay Ubicazione da Terra -->
+    <div id="ground-to-location-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>🏗️ Ubicazione da Terra</h3>
+                <button class="overlay-close" onclick="closeOverlay('ground-to-location-overlay')">&times;</button>
+            </div>
+            
+            <!-- Sistema Tab -->
+            <div class="tab-container">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" onclick="switchRelocateTab('relocate-manual-tab')">⚙️ Operazione Manuale</button>
+                    <button class="tab-btn" onclick="switchRelocateTab('relocate-file-tab')">📁 Ubicazione da File</button>
+                </div>
+                
+                <!-- Tab Operazione Manuale -->
+                <div id="relocate-manual-tab" class="tab-content active">
+                    <form id="relocate-manual-form">
+                        <div class="form-group">
+                            <label for="relocate-product-sku">Prodotto (SKU):</label>
+                            <input type="text" id="relocate-product-sku" list="product-skus" required>
+                            <datalist id="product-skus"></datalist>
+                        </div>
+                        <div class="form-group">
+                            <label for="relocate-quantity">Quantità da Ubicare:</label>
+                            <input type="number" id="relocate-quantity" min="1" required>
+                            <div class="help-text">Quantità da spostare dalla TERRA.</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="relocate-location">Ubicazione di Destinazione:</label>
+                            <input type="text" id="relocate-location" placeholder="Es. A01P1P1" required>
+                            <div class="help-text">Ubicazione dove posizionare il prodotto.</div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('ground-to-location-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary relocate">🏗️ Ubicare Prodotto</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Tab Ubicazione da File - Enhanced Upload -->
+                <div id="relocate-file-tab" class="tab-content">
+                    <form id="relocate-file-form" enctype="multipart/form-data">
+                        <!-- Enhanced Upload Component -->
+                        <div class="enhanced-upload-container" id="relocate-file-upload"></div>
+                        
+                        <!-- Backup: Original file input (hidden by default) -->
+                        <input type="file" id="relocate-file" name="file" accept=".txt" style="display: none;">
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('ground-to-location-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary relocate">📁 Processa Ubicazione</button>
+                        </div>
+                        
+                        <!-- Sezione Istruzioni Collassabile -->
+                        <div class="collapsible-section">
+                            <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                                <span class="collapsible-icon">▶</span>
+                                <span class="collapsible-title">📋 Istruzioni Caricamento</span>
+                            </button>
+                            <div class="collapsible-content">
+                                <div style="background-color: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #0097E0;">
+                                    <strong>ℹ️ Formato File:</strong><br>
+                                    Stesso formato delle operazioni da file:<br>
+                                    • Ubicazione (es. A01P1P1)<br>
+                                    • SKU o SKU_QTY per quantità specifica<br>
+                                    • Scala automaticamente dalla TERRA
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabella moderna -->
+    <div class="table-container">
+        <div class="inventory-header">
+            <div class="title-and-search">
+                <div class="title-and-controls">
+                    <h2>Giacenza Attuale</h2>
+                    <div class="search-controls">
+                        <div class="search-field">
+                            <label for="search-location">Cerca per Ubicazione:</label>
+                            <input type="text" id="search-location" placeholder="Inserisci ubicazione...">
+                        </div>
+                        <div class="search-field">
+                            <label for="search-sku">Cerca per SKU:</label>
+                            <input type="text" id="search-sku" placeholder="Inserisci SKU...">
+                        </div>
+                        <button id="reset-sort-btn" class="reset-sort-inline-btn">🔄 Reset Ordinamento</button>
+                    </div>
+                </div>
+                <div class="consolidation-section">
+                    <button id="consolidation-suggestions-btn" 
+                            class="consolidation-btn" 
+                            onclick="showConsolidationSuggestions()"
+                            data-permission="inventory_view">
+                        🧩 Consigli di Consolidamento
+                    </button>
+                </div>
+            </div>
+        </div>
+        <table id="inventory-table-content">
+            <thead>
+                <tr>
+                    <th class="sortable" data-column="location">Ubicazione <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="sku">SKU Prodotto <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="description">Descrizione <span class="sort-arrow"></span></th>
+                    <th class="sortable" data-column="quantity">Quantità <span class="sort-arrow"></span></th>
+                </tr>
+            </thead>
+            <tbody id="inventory-table-body">
+                {% for item in inventory %}
+                <tr>
+                    <td>{{ item.location_name }}</td>
+                    <td>{{ item.product_sku }}</td>
+                    <td>{{ item.product.description }}</td>
+                    <td>{{ item.quantity }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Recap Overlay per Operazioni da File -->
+    <div id="recap-overlay" class="recap-overlay">
+        <div class="recap-content">
+            <div class="recap-header">
+                <h3 id="recap-title">Riepilogo Operazioni</h3>
+                <button class="overlay-close" onclick="closeRecap()">&times;</button>
+            </div>
+            
+            <div class="recap-stats">
+                <div class="recap-stats-grid">
+                    <div class="recap-stat total">
+                        <div>Totale</div>
+                        <div id="recap-total">0</div>
+                    </div>
+                    <div class="recap-stat ok">
+                        <div>OK</div>
+                        <div id="recap-ok">0</div>
+                    </div>
+                    <div class="recap-stat warning">
+                        <div>Avvisi</div>
+                        <div id="recap-warnings">0</div>
+                    </div>
+                    <div class="recap-stat error">
+                        <div>Errori</div>
+                        <div id="recap-errors">0</div>
                     </div>
                 </div>
             </div>
-        </details>
-    </div>
-
-    <div class="table-container">
-        <h2>Giacenza Attuale</h2>
-            <table id="inventory-table-content">
-                <thead>
-                    <tr>
-                        <th>Ubicazione</th>
-                        <th>SKU Prodotto</th>
-                        <th>Descrizione</th>
-                        <th>Quantità</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in inventory %}
-                    <tr>
-                        <td>{{ item.location_name }}</td>
-                        <td>{{ item.product_sku }}</td>
-                        <td>{{ item.product.description }}</td>
-                        <td>{{ item.quantity }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            
+            <div class="recap-body">
+                <div id="recap-errors-section" class="recap-section" style="display: none;">
+                    <h4>🚫 Errori da Correggere</h4>
+                    <div class="error-section">
+                        <div id="recap-errors-list"></div>
+                    </div>
+                </div>
+                
+                <div id="recap-warnings-section" class="recap-section" style="display: none;">
+                    <h4>⚠️ Avvisi</h4>
+                    <div class="warning-section">
+                        <div id="recap-warnings-list"></div>
+                    </div>
+                </div>
+                
+                <div id="recap-operations-section" class="recap-section">
+                    <h4>📋 Operazioni da Eseguire</h4>
+                    <table class="recap-table">
+                        <thead>
+                            <tr>
+                                <th>Riga</th>
+                                <th>Ubicazione</th>
+                                <th>SKU</th>
+                                <th>Descrizione</th>
+                                <th>Codice Input</th>
+                                <th>Quantità</th>
+                                <th>Giacenza Attuale</th>
+                                <th>Nuova Giacenza</th>
+                                <th>Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recap-operations-table">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="recap-actions">
+                <button class="btn-secondary" onclick="closeRecap()">Annulla</button>
+                <button id="recap-execute-btn" class="btn-primary">Esegui Operazioni</button>
+            </div>
         </div>
     </div>
 
-    <!-- Modale di Conferma Importazione -->
+    <!-- Overlay Consigli di Consolidamento -->
+    <div id="consolidation-suggestions-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>🧩 Consigli di Consolidamento</h3>
+                <button class="overlay-close" onclick="closeConsolidationSuggestions()">&times;</button>
+            </div>
+            <div class="suggestions-info">
+                <p><strong>ℹ️ Informazioni:</strong> Questi sono suggerimenti per ottimizzare lo spazio. Esegui manualmente gli spostamenti tramite le operazioni di inventario.</p>
+            </div>
+            <div class="suggestions-content">
+                <div class="suggestions-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Suggerimenti trovati:</span>
+                        <span class="stat-value" id="suggestions-count">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Ubicazioni liberabili:</span>
+                        <span class="stat-value" id="locations-saveable">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Prodotti analizzati:</span>
+                        <span class="stat-value" id="products-analyzed">0</span>
+                    </div>
+                </div>
+                
+                <div class="suggestions-table-container">
+                    <table class="suggestions-table">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Da Ubicazione</th>
+                                <th>Quantità</th>
+                                <th>A Ubicazione</th>
+                                <th>Quantità</th>
+                                <th>Totale</th>
+                                <th>Pallettizzazione</th>
+                                <th>Beneficio</th>
+                            </tr>
+                        </thead>
+                        <tbody id="suggestions-table-body">
+                            <!-- Suggerimenti saranno aggiunti qui via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="no-suggestions-message" class="no-suggestions" style="display: none;">
+                    <div class="info-icon">ℹ️</div>
+                    <div class="info-text">
+                        <h4>Nessun consolidamento possibile</h4>
+                        <p>Non ci sono ubicazioni che possano essere consolidate rispettando le pallettizzazioni definite.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="suggestions-footer">
+                <button id="export-consolidation-pdf" class="btn-primary" onclick="exportConsolidationPDF()">
+                    Esporta PDF
+                </button>
+                <button class="btn-secondary" onclick="closeConsolidationSuggestions()">Chiudi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal di Conferma Importazione (aggiornato) -->
     <div id="confirmation-modal" class="modal">
         <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <h2>Riepilogo Importazione</h2>
+            <h2>Riepilogo Importazione <span class="close-button">&times;</span></h2>
             <div id="modal-body"></div>
-            <button id="confirm-import-button">Conferma e Importa</button>
-            <button id="cancel-import-button">Annulla</button>
+            <div class="modal-actions">
+                <button id="cancel-import-button" class="btn-secondary">Annulla</button>
+                <button id="confirm-import-button" class="btn-primary">Conferma e Importa</button>
+            </div>
         </div>
     </div>
 
+    <!-- Scripts in ordine ottimizzato per caricamento rapido -->
+            </div> <!-- Fine mobile-content -->
+            </div> <!-- Fine protected-content -->
+    
+    <script src="/static/js/modern-auth.js"></script>
+    <script>
+        // Protezione pagina con nuovo sistema
+        document.addEventListener('DOMContentLoaded', function() {
+            window.requirePermission('inventory_view');
+        });
+    </script>
+    <script src="/static/js/enhanced-upload.js"></script>
     <script src="/static/js/inventory.js"></script>
     <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/mobile-navbar.js"></script>
+{% include 'partials/footer.html' %}
+    
+
 </body>
 </html>
