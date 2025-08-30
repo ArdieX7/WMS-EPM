@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Amministrazione - WMS EPM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/no-flash.css">
+    <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/mobile-navbar.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <link rel="stylesheet" href="/static/css/templates.css">
+</head>
+<body>
+    {% include 'partials/navbar.html' %}
+    
+    <!-- Loader permessi (visibile finché non si verificano i permessi) -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi amministratore...</div>
+    </div>
+
+    <!-- Contenuto protetto (nascosto finché non si verificano i permessi) -->
+    <div class="protected-content">
+    <!-- Mobile content wrapper -->
+    <div class="mobile-content">
+        <div class="admin-container">
+        <!-- Hero Section -->
+        <div class="admin-hero">
+            <h1 class="admin-title">🔧 Amministrazione Sistema</h1>
+            <p class="admin-subtitle">Gestione utenti, ruoli e permessi</p>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-icon">👥</span>
+                <div class="stat-number" id="total-users">0</div>
+                <div class="stat-label">Utenti Totali</div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-icon">🔑</span>
+                <div class="stat-number" id="active-users">0</div>
+                <div class="stat-label">Utenti Attivi</div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-icon">👑</span>
+                <div class="stat-number" id="admin-users">0</div>
+                <div class="stat-label">Amministratori</div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="admin-tabs">
+            <button class="tab-button active" onclick="showTab('users')">👥 Utenti</button>
+            <button class="tab-button" onclick="showTab('roles')">🔑 Ruoli</button>
+        </div>
+
+        <!-- Users Management -->
+        <div id="users-tab" class="management-section tab-content active">
+            <div class="section-header">
+                <h2>👥 Gestione Utenti</h2>
+                <button class="btn-primary" onclick="showCreateUserModal()">
+                    <span>➕</span> Nuovo Utente
+                </button>
+            </div>
+            
+            <div class="users-table-container">
+                <table class="users-table" id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Ruoli</th>
+                            <th>Stato</th>
+                            <th>Data Creazione</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <tr>
+                            <td colspan="7" class="loading">Caricamento utenti...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Roles Management -->
+        <div id="roles-tab" class="management-section tab-content" style="display: none;">
+            <div class="section-header">
+                <h2>🔑 Gestione Ruoli</h2>
+                <button class="btn-primary" onclick="showCreateRoleModal()">
+                    <span>➕</span> Nuovo Ruolo
+                </button>
+            </div>
+            
+            <div class="roles-table-container">
+                <table class="roles-table" id="rolesTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome Ruolo</th>
+                            <th>Descrizione</th>
+                            <th>Permessi</th>
+                            <th>Utenti Assegnati</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rolesTableBody">
+                        <tr>
+                            <td colspan="6" class="loading">Caricamento ruoli...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal per Creazione/Modifica Utente -->
+    <div id="userModal" class="overlay" style="display: none;">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3 id="modalTitle">Nuovo Utente</h3>
+                <button class="overlay-close" onclick="closeUserModal()">×</button>
+            </div>
+            <form id="userForm" class="overlay-form">
+                <div class="form-group">
+                    <label for="modalUsername">Username</label>
+                    <input type="text" id="modalUsername" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="modalEmail">Email</label>
+                    <input type="email" id="modalEmail" name="email" required>
+                </div>
+                
+                <div class="form-group" id="passwordGroup">
+                    <label for="modalPassword">Password</label>
+                    <input type="password" id="modalPassword" name="password" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="modalRoles">Ruolo</label>
+                    <select id="modalRoles" name="role" required>
+                        <option value="">Seleziona un ruolo...</option>
+                        <!-- Popolato dinamicamente -->
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="modalIsActive" name="is_active" checked>
+                        <span class="checkmark"></span>
+                        Utente Attivo
+                    </label>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeUserModal()">Annulla</button>
+                    <button type="submit" class="btn-primary" id="submitButton">
+                        <span class="button-text">Salva</span>
+                        <span class="button-loader" style="display: none;">Salvando...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal di Conferma Eliminazione Utente -->
+    <div id="deleteModal" class="overlay" style="display: none;">
+        <div class="overlay-content small">
+            <div class="overlay-header">
+                <h3>⚠️ Conferma Eliminazione</h3>
+                <button class="overlay-close" onclick="closeDeleteModal()">×</button>
+            </div>
+            <div class="overlay-body">
+                <p>Sei sicuro di voler eliminare l'utente <strong id="deleteUsername"></strong>?</p>
+                <p class="warning-text">Questa azione non può essere annullata.</p>
+                <div class="form-actions">
+                    <button class="btn-secondary" onclick="closeDeleteModal()">Annulla</button>
+                    <button class="btn-danger" onclick="confirmDeleteUser()">Elimina</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal per Creazione/Modifica Ruolo -->
+    <div id="roleModal" class="overlay" style="display: none;">
+        <div class="overlay-content large">
+            <div class="overlay-header">
+                <h3 id="roleModalTitle">Nuovo Ruolo</h3>
+                <button class="overlay-close" onclick="closeRoleModal()">×</button>
+            </div>
+            <form id="roleForm" class="overlay-form">
+                <div class="form-group">
+                    <label for="roleName">Nome Ruolo</label>
+                    <input type="text" id="roleName" name="name" required placeholder="es. supervisore">
+                </div>
+                
+                <div class="form-group">
+                    <label for="roleDescription">Descrizione</label>
+                    <textarea id="roleDescription" name="description" rows="2" placeholder="Descrizione del ruolo..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Permessi per Sezioni</label>
+                    <p class="help-text">Seleziona le sezioni che questo ruolo può visualizzare e le azioni che può eseguire:</p>
+                    <div class="permissions-container" id="permissionsContainer">
+                        <!-- Popolato dinamicamente dal JavaScript -->
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeRoleModal()">Annulla</button>
+                    <button type="submit" class="btn-primary" id="roleSubmitButton">
+                        <span class="button-text">Salva Ruolo</span>
+                        <span class="button-loader" style="display: none;">Salvando...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal di Conferma Eliminazione Ruolo -->
+    <div id="deleteRoleModal" class="overlay" style="display: none;">
+        <div class="overlay-content small">
+            <div class="overlay-header">
+                <h3>⚠️ Conferma Eliminazione</h3>
+                <button class="overlay-close" onclick="closeDeleteRoleModal()">×</button>
+            </div>
+            <div class="overlay-body">
+                <p>Sei sicuro di voler eliminare il ruolo <strong id="deleteRoleName"></strong>?</p>
+                <p class="warning-text">Questa azione non può essere annullata e potrebbe impedire l'accesso agli utenti con questo ruolo.</p>
+                <div class="form-actions">
+                    <button class="btn-secondary" onclick="closeDeleteRoleModal()">Annulla</button>
+                    <button class="btn-danger" onclick="confirmDeleteRole()">Elimina</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <script src="/static/js/modern-auth.js"></script>
+    <script>
+        // Protezione pagina con nuovo sistema
+        document.addEventListener('DOMContentLoaded', function() {
+            window.requirePermission('admin_users');
+        });
+    </script>
+    </div> <!-- Fine mobile-content -->
+
+    </div> <!-- Fine protected-content -->
+    </div> <!-- Fine admin-container -->
+    <script src="/static/js/admin.js"></script>
+    <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/mobile-navbar.js"></script>
+</body>
+</html>

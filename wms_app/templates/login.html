@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - WMS EPM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <!-- Hero Section con stile WMS -->
+        <div class="login-hero">
+            <div class="hero-content">
+                <h1 class="hero-title">WMS EPM</h1>
+                <p class="hero-subtitle">Sistema di Gestione Magazzino</p>
+                <div class="system-status">
+                    <span class="status-dot"></span>
+                    <span>Sistema Operativo</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card di Login -->
+        <div class="login-card">
+            <div class="login-header">
+                <h2>Accesso al Sistema</h2>
+                <p>Inserisci le tue credenziali per accedere</p>
+            </div>
+            
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <button type="submit" class="login-button" id="loginButton">
+                    <span class="button-text">Accedi</span>
+                    <span class="button-loader" style="display: none;">Accesso in corso...</span>
+                </button>
+            </form>
+            
+            <div class="login-footer">
+                <p>Utente di prova: <strong>admin</strong> / <strong>admin123</strong></p>
+            </div>
+        </div>
+
+        <!-- Messaggio di errore -->
+        <div id="errorMessage" class="error-message" style="display: none;">
+            <span class="error-icon">⚠</span>
+            <span class="error-text"></span>
+        </div>
+    </div>
+
+        <script src="/static/js/modern-auth.js"></script>
+    <script src="/static/js/login.js"></script>
+</body>
+</html>

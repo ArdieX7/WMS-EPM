@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Operazioni - WMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/navbar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/mobile-navbar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/logs.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/no-flash.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/responsive.css') }}">
+</head>
+<body>
+    {% include 'partials/navbar.html' %}
+    
+    <!-- Loader permessi -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
+
+    <!-- Contenuto protetto -->
+    <div class="protected-content">
+    <!-- Mobile content wrapper -->
+    <div class="mobile-content">
+    
+    <div class="container">
+        <!-- Header con titolo e controlli -->
+        <div class="page-header">
+            <div class="title-section">
+                <h1>📋 Log Operazioni</h1>
+                <p class="subtitle">Cronologia completa delle operazioni di magazzino</p>
+            </div>
+            <div class="header-actions">
+                <button id="refresh-logs-btn" class="action-btn">🔄 Aggiorna</button>
+                <button id="export-logs-btn" class="action-btn">📥 Esporta CSV</button>
+                <button id="cleanup-logs-btn" class="action-btn danger">🗑️ Pulizia</button>
+            </div>
+        </div>
+
+        <!-- Statistiche rapide -->
+        <div class="stats-grid" id="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-content">
+                    <h3 id="total-operations">-</h3>
+                    <p>Operazioni Totali</p>
+                </div>
+            </div>
+            <div class="stat-card error">
+                <div class="stat-icon">❌</div>
+                <div class="stat-content">
+                    <h3 id="error-operations">-</h3>
+                    <p>Errori</p>
+                </div>
+            </div>
+            <div class="stat-card warning">
+                <div class="stat-icon">⚠️</div>
+                <div class="stat-content">
+                    <h3 id="warning-operations">-</h3>
+                    <p>Warning</p>
+                </div>
+            </div>
+            <div class="stat-card success">
+                <div class="stat-icon">✅</div>
+                <div class="stat-content">
+                    <h3 id="success-rate">-</h3>
+                    <p>Success Rate</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filtri avanzati -->
+        <div class="filters-section">
+            <div class="filters-header">
+                <h3>🔍 Filtri di Ricerca</h3>
+                <div class="filter-actions">
+                    <button id="apply-filters-btn" class="filter-btn primary">Applica Filtri</button>
+                    <button id="reset-filters-btn" class="filter-btn">Reset</button>
+                </div>
+            </div>
+            
+            <div class="filters-grid">
+                <!-- Filtri temporali -->
+                <div class="filter-group">
+                    <label>Periodo:</label>
+                    <div class="date-range">
+                        <input type="datetime-local" id="start-date" class="filter-input">
+                        <span class="date-separator">→</span>
+                        <input type="datetime-local" id="end-date" class="filter-input">
+                    </div>
+                </div>
+
+                <!-- Filtri tipo operazione -->
+                <div class="filter-group">
+                    <label for="operation-type-filter">Tipo Operazione:</label>
+                    <select id="operation-type-filter" class="filter-select" multiple>
+                        <option value="">Tutti i tipi</option>
+                        {% for op_type in operation_types %}
+                        <option value="{{ op_type.value }}">{{ op_type.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Filtri categoria -->
+                <div class="filter-group">
+                    <label for="category-filter">Categoria:</label>
+                    <select id="category-filter" class="filter-select" multiple>
+                        <option value="">Tutte le categorie</option>
+                        {% for category in operation_categories %}
+                        <option value="{{ category.value }}">{{ category.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Filtri status -->
+                <div class="filter-group">
+                    <label for="status-filter">Status:</label>
+                    <select id="status-filter" class="filter-select" multiple>
+                        <option value="">Tutti gli status</option>
+                        {% for status in operation_statuses %}
+                        <option value="{{ status.value }}">{{ status.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Ricerca testuale -->
+                <div class="filter-group">
+                    <label for="search-sku">Cerca SKU:</label>
+                    <input type="text" id="search-sku" class="filter-input" placeholder="Inserisci SKU prodotto...">
+                </div>
+
+                <div class="filter-group">
+                    <label for="search-location">Cerca Ubicazione:</label>
+                    <input type="text" id="search-location" class="filter-input" placeholder="Inserisci ubicazione...">
+                </div>
+
+                <div class="filter-group">
+                    <label for="search-user">Cerca Utente:</label>
+                    <input type="text" id="search-user" class="filter-input" placeholder="Inserisci ID utente...">
+                </div>
+
+                <div class="filter-group">
+                    <label for="search-text">Ricerca Globale:</label>
+                    <input type="text" id="search-text" class="filter-input" placeholder="Cerca in tutti i campi...">
+                </div>
+            </div>
+        </div>
+
+        <!-- Controlli tabella -->
+        <div class="table-controls">
+            <div class="table-info">
+                <span id="results-info">Caricamento logs...</span>
+            </div>
+            <div class="table-actions">
+                <select id="page-size-select" class="control-select">
+                    <option value="25">25 per pagina</option>
+                    <option value="50" selected>50 per pagina</option>
+                    <option value="100">100 per pagina</option>
+                    <option value="200">200 per pagina</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Tabella logs -->
+        <div class="table-container">
+            <table class="logs-table" id="logs-table">
+                <thead>
+                    <tr>
+                        <th class="sortable" data-column="timestamp">
+                            Timestamp <span class="sort-indicator"></span>
+                        </th>
+                        <th class="sortable" data-column="operation_type">
+                            Operazione <span class="sort-indicator"></span>
+                        </th>
+                        <th class="sortable" data-column="status">
+                            Status <span class="sort-indicator"></span>
+                        </th>
+                        <th class="sortable" data-column="product_sku">
+                            SKU <span class="sort-indicator"></span>
+                        </th>
+                        <th class="no-sort">
+                            Ubicazioni
+                        </th>
+                        <th class="sortable" data-column="quantity">
+                            Qtà <span class="sort-indicator"></span>
+                        </th>
+                        <th class="sortable" data-column="user_id">
+                            Utente <span class="sort-indicator"></span>
+                        </th>
+                        <th class="no-sort">
+                            Dettagli
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="logs-table-body">
+                    <!-- Popolato via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Loading indicator -->
+        <div id="loading-indicator" class="loading-indicator" style="display: none;">
+            <div class="spinner"></div>
+            <p>Caricamento logs...</p>
+        </div>
+
+        <!-- Paginazione -->
+        <div class="pagination-container" id="pagination-container">
+            <!-- Popolato via JavaScript -->
+        </div>
+    </div>
+
+    <!-- Overlay dettagli log -->
+    <div id="log-details-overlay" class="overlay" style="display: none;">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h2>📄 Dettagli Operazione</h2>
+                <button class="close-btn" onclick="closeLogDetails()">&times;</button>
+            </div>
+            <div class="overlay-body" id="log-details-content">
+                <!-- Popolato via JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay export -->
+    <div id="export-overlay" class="overlay" style="display: none;">
+        <div class="overlay-content small">
+            <div class="overlay-header">
+                <h2>📥 Esporta Logs</h2>
+                <button class="close-btn" onclick="closeExportOverlay()">&times;</button>
+            </div>
+            <div class="overlay-body">
+                <form id="export-form">
+                    <div class="form-group">
+                        <label>Periodo di Export:</label>
+                        <div class="date-range">
+                            <input type="datetime-local" id="export-start-date" class="form-input">
+                            <span class="date-separator">→</span>
+                            <input type="datetime-local" id="export-end-date" class="form-input">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="export-limit">Limite Record:</label>
+                        <select id="export-limit" class="form-select">
+                            <option value="1000">1.000 record</option>
+                            <option value="5000" selected>5.000 record</option>
+                            <option value="10000">10.000 record</option>
+                        </select>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="action-btn primary">📥 Esporta CSV</button>
+                        <button type="button" class="action-btn" onclick="closeExportOverlay()">Annulla</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay cleanup -->
+    <div id="cleanup-overlay" class="overlay" style="display: none;">
+        <div class="overlay-content small">
+            <div class="overlay-header">
+                <h2>🗑️ Pulizia Logs</h2>
+                <button class="close-btn" onclick="closeCleanupOverlay()">&times;</button>
+            </div>
+            <div class="overlay-body">
+                <form id="cleanup-form">
+                    <div class="warning-message">
+                        <p><strong>⚠️ Attenzione:</strong> Questa operazione rimuoverà permanentemente i logs più vecchi del periodo specificato.</p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cleanup-days">Mantieni logs degli ultimi:</label>
+                        <select id="cleanup-days" class="form-select">
+                            <option value="30">30 giorni</option>
+                            <option value="60">60 giorni</option>
+                            <option value="90" selected>90 giorni</option>
+                            <option value="180">180 giorni</option>
+                            <option value="365">365 giorni</option>
+                        </select>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="action-btn danger">🗑️ Conferma Pulizia</button>
+                        <button type="button" class="action-btn" onclick="closeCleanupOverlay()">Annulla</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include auth JavaScript -->
+            </div> <!-- Fine mobile-content -->
+
+            </div> <!-- Fine protected-content -->
+    
+    <script src="/static/js/modern-auth.js"></script>
+    <script>
+        // Protezione pagina con nuovo sistema
+        document.addEventListener('DOMContentLoaded', function() {
+            window.requirePermission('logs_view');
+        });
+    </script>
+    
+    <!-- Include navbar JavaScript -->
+    <script src="{{ url_for('static', path='/js/navbar.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/mobile-navbar.js') }}"></script>
+    
+    <!-- Include logs JavaScript -->
+    <script src="{{ url_for('static', path='/js/logs.js') }}"></script>
+</body>
+</html>
