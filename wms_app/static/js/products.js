@@ -114,9 +114,18 @@
                 const pallet_quantity = parseInt(document.getElementById("pallet_quantity").value) || 0;
                 const eans = document.getElementById("eans").value.split(',').map(e => e.trim()).filter(e => e);
 
+                // Ottieni token JWT per autenticazione
+                const token = await window.modernAuth.getValidAccessToken();
+                if (!token) {
+                    alert("Errore: Sessione scaduta. Ricarica la pagina e riprova.");
+                    window.location.href = '/login';
+                    return;
+                }
+
                 const response = await fetch("/products/", {
                     method: "POST",
                     headers: {
+                        'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({ sku, description, estimated_value, weight, pallet_quantity, eans })
@@ -443,8 +452,19 @@
                 confirmBtn.innerHTML = "⏳ Eliminazione in corso...";
                 
                 try {
+                    // Ottieni token JWT per autenticazione
+                    const token = await window.modernAuth.getValidAccessToken();
+                    if (!token) {
+                        alert("Errore: Sessione scaduta. Ricarica la pagina e riprova.");
+                        window.location.href = '/login';
+                        return;
+                    }
+
                     const response = await fetch(`/products/${encodeURIComponent(sku)}`, {
-                        method: 'DELETE'
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
                     });
                     
                     if (response.ok) {
@@ -491,10 +511,19 @@
                 const pallet_quantity = parseInt(document.getElementById("edit-pallet_quantity").value) || 0;
                 const eans = document.getElementById("edit-eans").value.split(',').map(e => e.trim()).filter(e => e);
 
+                // Ottieni token JWT per autenticazione
+                const token = await window.modernAuth.getValidAccessToken();
+                if (!token) {
+                    alert("Errore: Sessione scaduta. Ricarica la pagina e riprova.");
+                    window.location.href = '/login';
+                    return;
+                }
+
                 const response = await fetch(`/products/${sku}`,
                     {
                         method: "PUT",
                         headers: {
+                            'Authorization': `Bearer ${token}`,
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({ sku, description, estimated_value, weight, pallet_quantity, eans })
@@ -540,8 +569,19 @@
                 formData.append("file", file);
 
                 try {
+                    // Ottieni token JWT per autenticazione
+                    const token = await window.modernAuth.getValidAccessToken();
+                    if (!token) {
+                        alert("Errore: Sessione scaduta. Ricarica la pagina e riprova.");
+                        window.location.href = '/login';
+                        return;
+                    }
+
                     const response = await fetch("/products/import-ean-txt", {
                         method: "POST",
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        },
                         body: formData,
                     });
 
