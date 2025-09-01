@@ -28,6 +28,11 @@
                         syncWithHiddenInput('picking-file', virtualFile);
                     }
                 });
+                
+                // Imposta la tab scanner come predefinita attiva per prelievo
+                if (pickingFileUpload) {
+                    pickingFileUpload.switchMode('scanner');
+                }
             }
 
             // Enhanced Upload per import ordini da file TXT (solo drag & drop)
