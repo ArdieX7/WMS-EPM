@@ -36,7 +36,7 @@ body {
 }
 
 /* Stats Grid */
-.stats-grid {
+.stats-grid, .backup-stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 1.5rem;
@@ -739,5 +739,304 @@ body {
     
     .action-buttons {
         flex-direction: column;
+    }
+}
+
+/* ==================== BACKUP STYLES ==================== */
+
+/* Backup Actions Row */
+.backup-actions {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+@media (min-width: 768px) {
+    .backup-actions {
+        justify-content: flex-start;
+    }
+}
+
+/* Backup Table */
+.backups-table-container {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.backups-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.backups-table th,
+.backups-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.backups-table th {
+    background: linear-gradient(135deg, #00516E 0%, #0097E0 100%);
+    color: white;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+}
+
+.backups-table tbody tr:hover {
+    background-color: #f8f9fa;
+    transform: scale(1.001);
+    transition: all 0.2s ease;
+}
+
+/* Backup Filename Styling */
+.backup-filename {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.backup-icon {
+    font-size: 1.2rem;
+}
+
+/* Backup Type Badges */
+.backup-type-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.backup-type-badge.type-daily {
+    background: linear-gradient(135deg, #28a745 0%, #34ce57 100%);
+    color: white;
+}
+
+.backup-type-badge.type-weekly {
+    background: linear-gradient(135deg, #0097E0 0%, #00D4F5 100%);
+    color: white;
+}
+
+.backup-type-badge.type-manual {
+    background: linear-gradient(135deg, #FF5913 0%, #ff7043 100%);
+    color: white;
+}
+
+/* Backup Status */
+.status-valid {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.status-invalid {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.status-unknown {
+    color: #6c757d;
+    font-weight: 600;
+}
+
+/* Backup Action Buttons */
+.backup-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.btn-small {
+    padding: 0.4rem 0.8rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-small:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-small.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-small.btn-secondary:hover {
+    background: #5a6268;
+}
+
+.btn-small.btn-primary {
+    background: linear-gradient(135deg, #0097E0 0%, #00D4F5 100%);
+    color: white;
+}
+
+.btn-small.btn-primary:hover {
+    background: linear-gradient(135deg, #0082c4 0%, #00bdd6 100%);
+}
+
+.btn-small.btn-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
+    color: white;
+}
+
+.btn-small.btn-danger:hover {
+    background: linear-gradient(135deg, #c82333 0%, #dc2d2d 100%);
+}
+
+/* Backup Info Panel */
+.backup-info-panel {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    margin-top: 2rem;
+}
+
+.backup-info-panel h3 {
+    color: #00516E;
+    margin-bottom: 1.5rem;
+    font-size: 1.3rem;
+}
+
+.backup-info-panel h4 {
+    color: #0097E0;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.backup-schedule {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.schedule-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border-left: 4px solid #0097E0;
+}
+
+.schedule-icon {
+    font-size: 1.5rem;
+    min-width: 2rem;
+    text-align: center;
+}
+
+.schedule-text {
+    font-weight: 500;
+    color: #495057;
+}
+
+.retention-policy ul {
+    list-style: none;
+    padding: 0;
+}
+
+.retention-policy li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e9ecef;
+    color: #495057;
+}
+
+.retention-policy li:last-child {
+    border-bottom: none;
+}
+
+.retention-policy li::before {
+    content: '📋 ';
+    margin-right: 0.5rem;
+}
+
+/* Progress Content in Modals */
+.progress-content {
+    text-align: center;
+    padding: 2rem;
+}
+
+.progress-content .spinner {
+    margin: 0 auto 1rem auto;
+}
+
+.progress-content p {
+    color: #495057;
+    font-weight: 500;
+}
+
+/* Backup Mobile Styles */
+@media (max-width: 768px) {
+    .backup-actions {
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .backup-actions button {
+        flex: 1;
+        min-width: auto;
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .backups-table {
+        font-size: 0.85rem;
+    }
+    
+    .backups-table th,
+    .backups-table td {
+        padding: 0.75rem 0.5rem;
+    }
+    
+    .backup-filename {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+    
+    .backup-actions {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .btn-small {
+        width: 100%;
+        justify-content: center;
+        padding: 0.5rem;
+    }
+    
+    .backup-info-panel {
+        padding: 1.5rem;
+    }
+    
+    .schedule-item {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+    
+    .schedule-icon {
+        min-width: auto;
     }
 }

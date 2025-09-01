@@ -427,6 +427,10 @@ function showTab(tabName) {
             if (currentUsers.length === 0) {
                 loadUsers();
             }
+        } else if (tabName === 'backup') {
+            // Carica dati backup
+            console.log('🔄 Caricamento dati backup...');
+            loadBackupData();
         }
     }
 }
@@ -753,4 +757,371 @@ function setRoleFormLoading(loading) {
     button.disabled = loading;
     buttonText.style.display = loading ? 'none' : 'inline';
     buttonLoader.style.display = loading ? 'inline-flex' : 'none';
+}
+
+// ==================== BACKUP MANAGEMENT ====================
+
+let currentBackupId = null;
+let backupList = [];
+
+// Backup tab handling is now managed in showTab function
+
+async function loadBackupData() {
+    await Promise.all([
+        loadBackupList(),
+        loadBackupStats()
+    ]);
+}
+
+async function loadBackupList() {
+    try {
+        const token = await window.modernAuth.getValidAccessToken();
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+
+        const response = await fetch('/admin/api/backup/list', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            backupList = data.backups || [];
+            displayBackupList(backupList);
+        } else {
+            showError('Errore nel caricamento backup');
+            displayBackupList([]);
+        }
+    } catch (error) {
+        console.error('Errore nel caricamento backup:', error);
+        showError('Errore di connessione');
+        displayBackupList([]);
+    }
+}
+
+async function loadBackupStats() {
+    try {
+        const token = await window.modernAuth.getValidAccessToken();
+        const response = await fetch('/admin/api/backup/stats', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const stats = await response.json();
+            updateBackupStats(stats);
+        }
+    } catch (error) {
+        console.error('Errore nel caricamento statistiche backup:', error);
+    }
+}
+
+function displayBackupList(backups) {
+    const tbody = document.getElementById('backupsTableBody');
+    if (!tbody) return;
+
+    if (backups.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="no-data">Nessun backup trovato</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = backups.map(backup => {
+        const createdAt = new Date(backup.created_at);
+        const formatDate = createdAt.toLocaleString('it-IT');
+        
+        // Icona tipo backup
+        const typeIcon = {
+            'daily': '🌅',
+            'weekly': '📅', 
+            'manual': '👤'
+        }[backup.backup_type] || '📄';
+
+        // Stato backup
+        const status = backup.is_valid === true ? 
+            '<span class="status-valid">✅ Valido</span>' : 
+            backup.is_valid === false ? 
+            '<span class="status-invalid">❌ Corrotto</span>' : 
+            '<span class="status-unknown">❓ Non verificato</span>';
+
+        return `
+            <tr>
+                <td>
+                    <div class="backup-filename">
+                        <span class="backup-icon">${typeIcon}</span>
+                        ${backup.filename}
+                    </div>
+                </td>
+                <td>
+                    <span class="backup-type-badge type-${backup.backup_type}">
+                        ${backup.backup_type}
+                    </span>
+                </td>
+                <td>${formatDate}</td>
+                <td>${backup.file_size_mb} MB</td>
+                <td>${status}</td>
+                <td>
+                    <div class="backup-actions">
+                        <button class="btn-small btn-secondary" onclick="validateBackup('${backup.backup_id}')" title="Valida Backup">
+                            ✅
+                        </button>
+                        <button class="btn-small btn-primary" onclick="showRestoreBackupModal('${backup.backup_id}', '${backup.filename}')" title="Ripristina Backup">
+                            🔄
+                        </button>
+                        <button class="btn-small btn-danger" onclick="showDeleteBackupModal('${backup.backup_id}', '${backup.filename}')" title="Elimina Backup">
+                            🗑️
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateBackupStats(stats) {
+    // Aggiorna statistiche nella UI
+    const totalBackupsEl = document.getElementById('total-backups');
+    const backupSizeEl = document.getElementById('backup-size');
+    const lastBackupEl = document.getElementById('last-backup');
+
+    if (totalBackupsEl) {
+        totalBackupsEl.textContent = stats.total_backups || 0;
+    }
+
+    if (backupSizeEl) {
+        backupSizeEl.textContent = `${stats.total_size_mb || 0} MB`;
+    }
+
+    if (lastBackupEl && stats.latest_backup) {
+        const lastDate = new Date(stats.latest_backup.created_at);
+        lastBackupEl.textContent = lastDate.toLocaleString('it-IT');
+    } else if (lastBackupEl) {
+        lastBackupEl.textContent = 'Mai';
+    }
+}
+
+// Funzioni principali backup
+async function createManualBackup() {
+    showBackupProgress('Creazione backup manuale in corso...');
+    
+    try {
+        const token = await window.modernAuth.getValidAccessToken();
+        const response = await fetch('/admin/api/backup/create', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            hideBackupProgress();
+            showSuccess(`Backup manuale creato: ${result.filename}`);
+            await loadBackupData(); // Ricarica dati
+        } else {
+            const error = await response.json();
+            hideBackupProgress();
+            showError(error.detail || 'Errore durante creazione backup');
+        }
+    } catch (error) {
+        console.error('Errore creazione backup:', error);
+        hideBackupProgress();
+        showError('Errore di connessione');
+    }
+}
+
+async function validateBackup(backupId) {
+    try {
+        const token = await window.modernAuth.getValidAccessToken();
+        const response = await fetch(`/admin/api/backup/validate/${backupId}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            const message = result.is_valid ? 
+                `✅ Backup valido: ${result.filename}` : 
+                `❌ Backup corrotto: ${result.filename}`;
+            
+            if (result.is_valid) {
+                showSuccess(message);
+            } else {
+                showError(message);
+            }
+            await loadBackupList(); // Ricarica lista per aggiornare stato
+        } else {
+            const error = await response.json();
+            showError(error.detail || 'Errore durante validazione');
+        }
+    } catch (error) {
+        console.error('Errore validazione backup:', error);
+        showError('Errore di connessione');
+    }
+}
+
+async function validateAllBackups() {
+    showBackupProgress('Validazione di tutti i backup in corso...');
+    
+    const validationPromises = backupList.map(backup => 
+        validateBackup(backup.backup_id)
+    );
+    
+    try {
+        await Promise.all(validationPromises);
+        hideBackupProgress();
+        showSuccess('Validazione completata per tutti i backup');
+    } catch (error) {
+        hideBackupProgress();
+        showError('Errore durante validazione multipla');
+    }
+}
+
+async function cleanupOldBackups() {
+    if (!confirm('Vuoi rimuovere automaticamente i backup vecchi secondo le policy di retention?')) {
+        return;
+    }
+
+    showBackupProgress('Pulizia backup vecchi in corso...');
+
+    try {
+        const token = await window.modernAuth.getValidAccessToken();
+        const response = await fetch('/admin/api/backup/cleanup', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            hideBackupProgress();
+            showSuccess(`Pulizia completata: ${result.total_deleted} backup rimossi`);
+            await loadBackupData(); // Ricarica dati
+        } else {
+            const error = await response.json();
+            hideBackupProgress();
+            showError(error.detail || 'Errore durante pulizia');
+        }
+    } catch (error) {
+        console.error('Errore pulizia backup:', error);
+        hideBackupProgress();
+        showError('Errore di connessione');
+    }
+}
+
+function refreshBackupList() {
+    loadBackupData();
+}
+
+// Modal functions
+function showRestoreBackupModal(backupId, filename) {
+    currentBackupId = backupId;
+    document.getElementById('restoreBackupName').textContent = filename;
+    document.getElementById('restoreBackupModal').style.display = 'flex';
+}
+
+function closeRestoreBackupModal() {
+    document.getElementById('restoreBackupModal').style.display = 'none';
+    currentBackupId = null;
+}
+
+function showDeleteBackupModal(backupId, filename) {
+    currentBackupId = backupId;
+    document.getElementById('deleteBackupName').textContent = filename;
+    document.getElementById('deleteBackupModal').style.display = 'flex';
+}
+
+function closeDeleteBackupModal() {
+    document.getElementById('deleteBackupModal').style.display = 'none';
+    currentBackupId = null;
+}
+
+function showBackupProgress(message) {
+    document.getElementById('backupProgressMessage').textContent = message;
+    document.getElementById('backupProgressModal').style.display = 'flex';
+}
+
+function hideBackupProgress() {
+    document.getElementById('backupProgressModal').style.display = 'none';
+}
+
+// Conferma azioni
+async function confirmRestoreBackup() {
+    if (!currentBackupId) return;
+
+    const button = document.getElementById('restoreBackupButton');
+    const buttonText = button.querySelector('.button-text');
+    const buttonLoader = button.querySelector('.button-loader');
+
+    // Mostra loading
+    button.disabled = true;
+    buttonText.style.display = 'none';
+    buttonLoader.style.display = 'inline-flex';
+
+    try {
+        const token = await window.modernAuth.getValidAccessToken();
+        const response = await fetch(`/admin/api/backup/restore/${currentBackupId}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            closeRestoreBackupModal();
+            showSuccess(`Backup ripristinato: ${result.restored_backup}. Backup di sicurezza: ${result.safety_backup}`);
+            
+            // Avvisa l'utente che potrebbe essere necessario ricaricare
+            setTimeout(() => {
+                if (confirm('Il database è stato ripristinato. È consigliabile ricaricare la pagina. Vuoi farlo ora?')) {
+                    window.location.reload();
+                }
+            }, 2000);
+        } else {
+            const error = await response.json();
+            showError(error.detail || 'Errore durante ripristino');
+        }
+    } catch (error) {
+        console.error('Errore ripristino backup:', error);
+        showError('Errore di connessione');
+    } finally {
+        // Ripristina button
+        button.disabled = false;
+        buttonText.style.display = 'inline';
+        buttonLoader.style.display = 'none';
+    }
+}
+
+async function confirmDeleteBackup() {
+    if (!currentBackupId) return;
+
+    try {
+        const token = await window.modernAuth.getValidAccessToken();
+        const response = await fetch(`/admin/api/backup/${currentBackupId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            closeDeleteBackupModal();
+            showSuccess(`Backup eliminato: ${result.deleted_backup}`);
+            await loadBackupData(); // Ricarica dati
+        } else {
+            const error = await response.json();
+            showError(error.detail || 'Errore durante eliminazione');
+        }
+    } catch (error) {
+        console.error('Errore eliminazione backup:', error);
+        showError('Errore di connessione');
+    }
 }
