@@ -53,6 +53,7 @@
         <div class="admin-tabs">
             <button class="tab-button active" onclick="showTab('users')">👥 Utenti</button>
             <button class="tab-button" onclick="showTab('roles')">🔑 Ruoli</button>
+            <button class="tab-button" onclick="showTab('backup')">💾 Backup</button>
         </div>
 
         <!-- Users Management -->
@@ -113,6 +114,90 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Backup Management -->
+        <div id="backup-tab" class="management-section tab-content" style="display: none;">
+            <div class="section-header">
+                <h2>💾 Gestione Backup Database</h2>
+                <button class="btn-primary" onclick="createManualBackup()">
+                    <span>💾</span> Backup Manuale
+                </button>
+            </div>
+
+            <!-- Backup Stats -->
+            <div class="backup-stats">
+                <div class="stat-card">
+                    <span class="stat-icon">📁</span>
+                    <div class="stat-number" id="total-backups">0</div>
+                    <div class="stat-label">Backup Totali</div>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-icon">💿</span>
+                    <div class="stat-number" id="backup-size">0 MB</div>
+                    <div class="stat-label">Spazio Occupato</div>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-icon">🕒</span>
+                    <div class="stat-number" id="last-backup">Mai</div>
+                    <div class="stat-label">Ultimo Backup</div>
+                </div>
+            </div>
+
+            <!-- Backup Actions -->
+            <div class="backup-actions">
+                <button class="btn-secondary" onclick="refreshBackupList()">🔄 Aggiorna</button>
+                <button class="btn-warning" onclick="validateAllBackups()">✅ Valida Tutti</button>
+                <button class="btn-danger" onclick="cleanupOldBackups()">🗑️ Pulizia Automatica</button>
+            </div>
+
+            <!-- Backup List -->
+            <div class="backups-table-container">
+                <table class="backups-table" id="backupsTable">
+                    <thead>
+                        <tr>
+                            <th>Nome File</th>
+                            <th>Tipo</th>
+                            <th>Data Creazione</th>
+                            <th>Dimensione</th>
+                            <th>Stato</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backupsTableBody">
+                        <tr>
+                            <td colspan="6" class="loading">Caricamento backup...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Backup Info Panel -->
+            <div class="backup-info-panel">
+                <h3>ℹ️ Informazioni Backup Automatici</h3>
+                <div class="backup-schedule">
+                    <div class="schedule-item">
+                        <span class="schedule-icon">🌅</span>
+                        <span class="schedule-text">Backup giornaliero: ogni giorno alle 2:00</span>
+                    </div>
+                    <div class="schedule-item">
+                        <span class="schedule-icon">📅</span>
+                        <span class="schedule-text">Backup settimanale: ogni domenica alle 3:00</span>
+                    </div>
+                    <div class="schedule-item">
+                        <span class="schedule-icon">🗑️</span>
+                        <span class="schedule-text">Pulizia automatica: primo giorno del mese alle 4:00</span>
+                    </div>
+                </div>
+                <div class="retention-policy">
+                    <h4>📋 Policy di Retention</h4>
+                    <ul>
+                        <li>Backup giornalieri: conservati per 7 giorni</li>
+                        <li>Backup settimanali: conservati per 4 settimane</li>
+                        <li>Backup manuali: conservati per 30 giorni</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -235,6 +320,68 @@
                 <div class="form-actions">
                     <button class="btn-secondary" onclick="closeDeleteRoleModal()">Annulla</button>
                     <button class="btn-danger" onclick="confirmDeleteRole()">Elimina</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal di Conferma Ripristino Backup -->
+    <div id="restoreBackupModal" class="overlay" style="display: none;">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>⚠️ Conferma Ripristino Backup</h3>
+                <button class="overlay-close" onclick="closeRestoreBackupModal()">×</button>
+            </div>
+            <div class="overlay-body">
+                <p>Sei sicuro di voler ripristinare il backup <strong id="restoreBackupName"></strong>?</p>
+                <div class="warning-text">
+                    <p>⚠️ <strong>ATTENZIONE:</strong> Questa operazione:</p>
+                    <ul>
+                        <li>Sovrascriverà completamente il database corrente</li>
+                        <li>Tutte le modifiche successive al backup saranno perse</li>
+                        <li>Verrà creato automaticamente un backup di sicurezza</li>
+                        <li>Il sistema potrebbe richiedere un riavvio</li>
+                    </ul>
+                </div>
+                <div class="form-actions">
+                    <button class="btn-secondary" onclick="closeRestoreBackupModal()">Annulla</button>
+                    <button class="btn-danger" onclick="confirmRestoreBackup()" id="restoreBackupButton">
+                        <span class="button-text">Ripristina Backup</span>
+                        <span class="button-loader" style="display: none;">Ripristinando...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal di Conferma Eliminazione Backup -->
+    <div id="deleteBackupModal" class="overlay" style="display: none;">
+        <div class="overlay-content small">
+            <div class="overlay-header">
+                <h3>⚠️ Conferma Eliminazione Backup</h3>
+                <button class="overlay-close" onclick="closeDeleteBackupModal()">×</button>
+            </div>
+            <div class="overlay-body">
+                <p>Sei sicuro di voler eliminare il backup <strong id="deleteBackupName"></strong>?</p>
+                <p class="warning-text">Questa azione non può essere annullata.</p>
+                <div class="form-actions">
+                    <button class="btn-secondary" onclick="closeDeleteBackupModal()">Annulla</button>
+                    <button class="btn-danger" onclick="confirmDeleteBackup()">Elimina</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal di Progresso Backup -->
+    <div id="backupProgressModal" class="overlay" style="display: none;">
+        <div class="overlay-content small">
+            <div class="overlay-header">
+                <h3>💾 Operazione in Corso</h3>
+            </div>
+            <div class="overlay-body">
+                <div class="progress-content">
+                    <div class="spinner"></div>
+                    <p id="backupProgressMessage">Creazione backup in corso...</p>
                 </div>
             </div>
         </div>

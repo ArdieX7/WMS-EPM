@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from wms_app.routers.auth import require_permission
 from wms_app.middleware.auth_middleware import AuthMiddleware
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+import atexit
 
 from wms_app.database import database
 from wms_app.models import products, inventory, orders, reservations, serials, ddt, settings, logs, auth
@@ -30,6 +33,92 @@ app = FastAPI(title="WMS EPM")
 # Aggiungi middleware di autenticazione
 auth_middleware = AuthMiddleware()
 app.middleware("http")(auth_middleware)
+
+# ==================== BACKUP SCHEDULER ====================
+scheduler = AsyncIOScheduler()
+
+async def run_daily_backup():
+    """Esegue backup giornaliero automatico"""
+    try:
+        from wms_app.services.backup_service import BackupService
+        from wms_app.database.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            backup_service = BackupService(db)
+            result = backup_service.create_daily_backup()
+            print(f"✅ Backup giornaliero completato: {result}")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Errore backup giornaliero: {e}")
+
+async def run_weekly_backup():
+    """Esegue backup settimanale automatico"""
+    try:
+        from wms_app.services.backup_service import BackupService
+        from wms_app.database.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            backup_service = BackupService(db)
+            result = backup_service.create_weekly_backup()
+            print(f"✅ Backup settimanale completato: {result}")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Errore backup settimanale: {e}")
+
+async def run_backup_cleanup():
+    """Esegue pulizia backup vecchi"""
+    try:
+        from wms_app.services.backup_service import BackupService
+        from wms_app.database.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            backup_service = BackupService(db)
+            result = backup_service.cleanup_old_backups()
+            print(f"✅ Pulizia backup completata: {result}")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ Errore pulizia backup: {e}")
+
+# Configura scheduler per backup automatici
+scheduler.add_job(
+    run_daily_backup,
+    CronTrigger(hour=2, minute=0),  # Ogni giorno alle 2:00
+    id='daily_backup',
+    name='Backup Giornaliero Automatico',
+    replace_existing=True
+)
+
+scheduler.add_job(
+    run_weekly_backup,
+    CronTrigger(day_of_week=6, hour=3, minute=0),  # Ogni domenica alle 3:00
+    id='weekly_backup',
+    name='Backup Settimanale Automatico',
+    replace_existing=True
+)
+
+scheduler.add_job(
+    run_backup_cleanup,
+    CronTrigger(day=1, hour=4, minute=0),  # Primo giorno del mese alle 4:00
+    id='backup_cleanup',
+    name='Pulizia Backup Automatica',
+    replace_existing=True
+)
+
+# Avvia scheduler
+scheduler.start()
+print("🚀 Scheduler backup avviato con successo")
+print("   - Backup giornaliero: ogni giorno alle 2:00")
+print("   - Backup settimanale: ogni domenica alle 3:00")
+print("   - Pulizia backup: primo giorno del mese alle 4:00")
+
+# Assicura che lo scheduler venga fermato quando l'app si chiude
+atexit.register(lambda: scheduler.shutdown())
 
 # Monta le cartelle per i file statici (CSS, JS) e i template (HTML)
 app.mount("/static", StaticFiles(directory="wms_app/static"), name="static")

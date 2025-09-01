@@ -8,6 +8,7 @@ from wms_app.routers.auth import require_role, get_current_user
 from wms_app.models.auth import User, Role, Permission
 from wms_app.schemas.auth import UserCreate, UserUpdate, User as UserSchema, RoleCreate, Role as RoleSchema
 from wms_app.services.auth_service import AuthService
+from wms_app.services.backup_service import BackupService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 templates = Jinja2Templates(directory="wms_app/templates")
@@ -229,3 +230,111 @@ async def get_all_permissions(current_user = Depends(require_role("admin")), db:
         })
     
     return [{"section": section, "permissions": perms} for section, perms in sections.items()]
+
+# ==================== BACKUP ENDPOINTS ====================
+
+@router.post("/api/backup/create")
+async def create_manual_backup(
+    current_user = Depends(require_role("admin")), 
+    db: Session = Depends(get_db)
+):
+    """Crea un backup manuale del database - solo per admin"""
+    try:
+        backup_service = BackupService(db)
+        result = backup_service.create_manual_backup(user_id=current_user.username)
+        return result
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante creazione backup: {str(e)}")
+
+@router.get("/api/backup/list")
+async def list_backups(
+    backup_type: str = None,
+    current_user = Depends(require_role("admin")), 
+    db: Session = Depends(get_db)
+):
+    """Lista tutti i backup disponibili - solo per admin"""
+    try:
+        backup_service = BackupService(db)
+        backups = backup_service.list_backups(backup_type=backup_type)
+        return {
+            "backups": backups,
+            "total_count": len(backups)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante recupero backup: {str(e)}")
+
+@router.post("/api/backup/restore/{backup_id}")
+async def restore_backup(
+    backup_id: str,
+    current_user = Depends(require_role("admin")), 
+    db: Session = Depends(get_db)
+):
+    """Ripristina un backup specifico - solo per admin"""
+    try:
+        backup_service = BackupService(db)
+        result = backup_service.restore_backup(backup_id, user_id=current_user.username)
+        return result
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante ripristino backup: {str(e)}")
+
+@router.delete("/api/backup/{backup_id}")
+async def delete_backup(
+    backup_id: str,
+    current_user = Depends(require_role("admin")), 
+    db: Session = Depends(get_db)
+):
+    """Elimina un backup specifico - solo per admin"""
+    try:
+        backup_service = BackupService(db)
+        result = backup_service.delete_backup(backup_id, user_id=current_user.username)
+        return result
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante eliminazione backup: {str(e)}")
+
+@router.get("/api/backup/stats")
+async def get_backup_stats(
+    current_user = Depends(require_role("admin")), 
+    db: Session = Depends(get_db)
+):
+    """Ottiene statistiche sui backup - solo per admin"""
+    try:
+        backup_service = BackupService(db)
+        stats = backup_service.get_backup_stats()
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante recupero statistiche: {str(e)}")
+
+@router.post("/api/backup/validate/{backup_id}")
+async def validate_backup(
+    backup_id: str,
+    current_user = Depends(require_role("admin")), 
+    db: Session = Depends(get_db)
+):
+    """Valida l'integrità di un backup - solo per admin"""
+    try:
+        backup_service = BackupService(db)
+        result = backup_service.validate_backup(backup_id)
+        return result
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante validazione backup: {str(e)}")
+
+@router.post("/api/backup/cleanup")
+async def cleanup_old_backups(
+    current_user = Depends(require_role("admin")), 
+    db: Session = Depends(get_db)
+):
+    """Rimuove backup vecchi secondo policy di retention - solo per admin"""
+    try:
+        backup_service = BackupService(db)
+        result = backup_service.cleanup_old_backups()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante pulizia backup: {str(e)}")
