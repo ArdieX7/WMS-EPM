@@ -107,34 +107,65 @@
         </div>
     </div>
 
-    <!-- Sezioni di ricerca modernizzate -->
-    <div class="search-sections">
+    <!-- Sezioni di ricerca modernizzate - Layout 3 colonne -->
+    <div class="search-sections" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 2rem;">
+        <style>
+        @media (max-width: 768px) {
+            .search-sections {
+                grid-template-columns: 1fr !important;
+                gap: 15px !important;
+            }
+        }
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .search-sections {
+                grid-template-columns: 1fr 1fr !important;
+            }
+        }
+        </style>
         <!-- Ricerca per Ubicazione -->
-        <div class="search-section" data-permission="analysis_location_by_sku">
+        <div class="search-section" data-permission="analysis_location_by_sku" style="margin-bottom: 0;">
             <h2 class="section-title">📍 Ricerca Prodotto per Ubicazione</h2>
             <div class="search-controls-horizontal">
                 <form id="product-location-form" class="search-form">
-                    <div class="form-group-inline">
-                        <label for="product-sku">SKU Prodotto:</label>
-                        <input type="text" id="product-sku" list="product-skus" placeholder="Inserisci SKU..." required>
-                        <datalist id="product-skus"></datalist>
-                        <button type="submit" class="btn-primary">🔍 Cerca</button>
+                    <div style="margin-bottom: 8px;">
+                        <label for="product-sku" style="display: block; margin-bottom: 4px;">SKU Prodotto:</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="text" id="product-sku" list="product-skus" placeholder="Inserisci SKU..." required style="flex: 1; min-width: 0;">
+                            <datalist id="product-skus"></datalist>
+                            <button type="submit" class="btn-primary" style="white-space: nowrap; padding: 8px 12px;">🔍</button>
+                        </div>
                     </div>
                 </form>
             </div>
         </div>
 
         <!-- Ricerca per Fila -->
-        <div class="search-section" data-permission="analysis_location_by_row">
+        <div class="search-section" data-permission="analysis_location_by_row" style="margin-bottom: 0;">
             <h2 class="section-title">📋 Ricerca Prodotti per Fila</h2>
             <div class="search-controls-horizontal">
                 <form id="products-by-row-form" class="search-form">
-                    <div class="form-group-inline">
-                        <label for="row-number">Numero Fila:</label>
-                        <input type="number" id="row-number" placeholder="Es. 1, 2, 3..." required>
-                        <button type="submit" class="btn-primary">🔍 Cerca</button>
+                    <div style="margin-bottom: 8px;">
+                        <label for="row-number" style="display: block; margin-bottom: 4px;">Numero Fila:</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="number" id="row-number" placeholder="Es. 1, 2, 3..." required style="flex: 1; min-width: 0;">
+                            <button type="submit" class="btn-primary" style="white-space: nowrap; padding: 8px 12px;">🔍</button>
+                        </div>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Stampa Prodotti a TERRA -->
+        <div class="search-section" data-permission="analysis_location_by_row" style="margin-bottom: 0;">
+            <h2 class="section-title">🏭 Prodotti a TERRA</h2>
+            <div class="search-controls-horizontal">
+                <div class="form-group-inline" style="flex-direction: column; align-items: stretch;">
+                    <label style="margin-bottom: 8px;">Stampa tutti i prodotti presenti a TERRA:</label>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" id="export-ground-csv" class="btn-export" style="flex: 1;">📊 CSV</button>
+                        <button type="button" id="export-ground-pdf" class="btn-export" style="flex: 1;">📄 PDF</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
