@@ -28,6 +28,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 syncWithHiddenInput('serial-file-input', virtualFile);
             }
         });
+        
+        // Imposta la tab scanner come predefinita attiva
+        if (serialFileUpload) {
+            serialFileUpload.switchMode('scanner');
+        }
     }
 
     // Utility function per sincronizzazione con input nascosto

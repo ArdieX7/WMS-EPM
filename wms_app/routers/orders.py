@@ -955,16 +955,23 @@ def fulfill_order(order_id: int, db: Session = Depends(get_db)):
 
     # Scala da OutgoingStock e completa l'ordine
     for line in order.lines:
-        outgoing_item = db.query(models.OutgoingStock).filter(
+        # FIX: Trova TUTTI i record OutgoingStock per questa linea d'ordine
+        # (può esserci più di un record se prelevato da posizioni multiple)
+        outgoing_items = db.query(models.OutgoingStock).filter(
             models.OutgoingStock.order_line_id == line.id,
             models.OutgoingStock.product_sku == line.product_sku
-        ).first()
+        ).all()
 
-        if outgoing_item:
-            # Sincronizza OutgoingStock con picked_quantity se necessario
-            if outgoing_item.quantity != line.picked_quantity:
-                outgoing_item.quantity = line.picked_quantity
-            db.delete(outgoing_item) # Rimuovi da outgoing stock
+        # Verifica che la somma delle quantità in OutgoingStock corrisponda a picked_quantity
+        total_outgoing_quantity = sum(item.quantity for item in outgoing_items)
+        if total_outgoing_quantity != line.picked_quantity:
+            # Log del problema ma continua l'evasione (per compatibilità con dati esistenti)
+            print(f"WARNING: OutgoingStock mismatch for order {order.order_number}, line {line.id}: "
+                  f"total_outgoing={total_outgoing_quantity}, picked={line.picked_quantity}")
+        
+        # Cancella TUTTI i record OutgoingStock per questa linea
+        for outgoing_item in outgoing_items:
+            db.delete(outgoing_item)
         
         if line.requested_quantity != line.picked_quantity:
             raise HTTPException(status_code=400, detail=f"Order line {line.id} not fully picked. Requested: {line.requested_quantity}, Picked: {line.picked_quantity}")

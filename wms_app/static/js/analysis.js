@@ -306,6 +306,17 @@ document.addEventListener("DOMContentLoaded", function() {
         // Avvia il download del CSV con tutta la giacenza
         window.location.href = '/analysis/export-total-stock-csv';
     });
+    
+    // Export buttons per prodotti a TERRA
+    document.getElementById("export-ground-csv").addEventListener("click", function() {
+        // Avvia il download del CSV con tutti i prodotti a TERRA
+        window.location.href = '/analysis/export-products-on-ground-csv';
+    });
+    
+    document.getElementById("export-ground-pdf").addEventListener("click", function() {
+        // Avvia il download del PDF con tutti i prodotti a TERRA
+        window.location.href = '/analysis/export-products-on-ground-pdf';
+    });
 
     // Gestione chiusura modali
     window.closeModal = function(modalId) {

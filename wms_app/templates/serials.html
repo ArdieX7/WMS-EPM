@@ -183,13 +183,19 @@
                             
                             <!-- Backup: Original file input (hidden) -->
                             <input type="file" id="serial-file-input" accept=".txt,.csv" style="display: none;">
+                            
+                            <!-- Bottone Analizza centrato -->
+                            <div style="display: flex; justify-content: center; margin: 20px 0;">
+                                <button type="submit" class="btn btn-primary btn-upload" style="padding: 12px 30px; font-size: 16px; font-weight: 600;">
+                                    📤 Analizza File
+                                </button>
+                            </div>
+                            
+                            <!-- Campo Caricato da sotto il bottone -->
                             <div class="form-group">
                                 <label for="uploaded-by-input">👤 Caricato da</label>
                                 <input type="text" id="uploaded-by-input" value="utente" required>
                             </div>
-                            <button type="submit" class="btn btn-primary btn-upload">
-                                📤 Analizza File
-                            </button>
                         </form>
                     </div>
 

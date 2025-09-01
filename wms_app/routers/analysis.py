@@ -299,11 +299,12 @@ async def export_product_locations_pdf(sku: str, db: Session = Depends(get_db)):
         story.append(Paragraph(f"Report Ubicazioni - Prodotto: {sku}", styles['h1']))
         story.append(Spacer(1, 0.2 * inch))
 
-        # Calcola righe per pagina: circa 35-40 righe per foglio A4 con margini
-        max_rows_per_page = 35
+        # Calcola righe per pagina: circa 25 righe per tabella (50 totali in 2 colonne) per pagina A4
+        max_rows_per_table = 25
+        max_rows_per_page = max_rows_per_table * 2  # Due colonne per pagina
         
         # Se i dati sono pochi, usa una sola tabella
-        if len(locations) <= max_rows_per_page:
+        if len(locations) <= max_rows_per_table:
             data = [["Ubicazione", "Qty", "Note"]]
             for item in locations:
                 data.append([item["location_name"], str(item["quantity"]), ""])
@@ -323,58 +324,77 @@ async def export_product_locations_pdf(sku: str, db: Session = Depends(get_db)):
             ])
             story.append(table)
         else:
-            # Dividi in due colonne solo se necessario per lo spazio
-            mid_point = len(locations) // 2
-            left_locations = locations[:mid_point]
-            right_locations = locations[mid_point:]
+            # Dividi in pagine con gestione multi-pagina
+            page_num = 1
+            for i in range(0, len(locations), max_rows_per_page):
+                page_data = locations[i:i + max_rows_per_page]
+                
+                # Se non è la prima pagina, aggiungi page break e titolo
+                if i > 0:
+                    story.append(PageBreak())
+                    story.append(Paragraph(f"Report Ubicazioni - Prodotto: {sku} (Pag. {page_num})", styles['h2']))
+                    story.append(Spacer(1, 0.1 * inch))
+                
+                # Dividi i dati della pagina in due colonne
+                mid_point = len(page_data) // 2
+                left_locations = page_data[:mid_point]
+                right_locations = page_data[mid_point:]
 
-            # Prima tabella (sinistra)
-            data1 = [["Ubicazione", "Qty", "Note"]]
-            for item in left_locations:
-                data1.append([item["location_name"], str(item["quantity"]), ""])
+                # Prima tabella (sinistra)
+                data1 = [["Ubicazione", "Qty", "Note"]]
+                for item in left_locations:
+                    data1.append([item["location_name"], str(item["quantity"]), ""])
 
-            table1 = Table(data1, colWidths=[1.2*inch, 0.4*inch, 1*inch])
-            table1.setStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), '#f2f2f2'),
-                ('GRID', (0, 0), (-1, -1), 1, '#ddd'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 3),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-                ('TOPPADDING', (0, 0), (-1, -1), 2),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ])
+                table1 = Table(data1, colWidths=[1.2*inch, 0.4*inch, 1*inch])
+                table1.setStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), '#f2f2f2'),
+                    ('GRID', (0, 0), (-1, -1), 1, '#ddd'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 3),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                    ('TOPPADDING', (0, 0), (-1, -1), 2),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ])
 
-            # Seconda tabella (destra)
-            data2 = [["Ubicazione", "Qty", "Note"]]
-            for item in right_locations:
-                data2.append([item["location_name"], str(item["quantity"]), ""])
+                # Seconda tabella (destra) - solo se ci sono dati
+                if right_locations:
+                    data2 = [["Ubicazione", "Qty", "Note"]]
+                    for item in right_locations:
+                        data2.append([item["location_name"], str(item["quantity"]), ""])
 
-            table2 = Table(data2, colWidths=[1.2*inch, 0.4*inch, 1*inch])
-            table2.setStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), '#f2f2f2'),
-                ('GRID', (0, 0), (-1, -1), 1, '#ddd'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 3),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-                ('TOPPADDING', (0, 0), (-1, -1), 2),
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ])
+                    table2 = Table(data2, colWidths=[1.2*inch, 0.4*inch, 1*inch])
+                    table2.setStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), '#f2f2f2'),
+                        ('GRID', (0, 0), (-1, -1), 1, '#ddd'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 3),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                        ('TOPPADDING', (0, 0), (-1, -1), 2),
+                        ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ])
 
-            # Crea contenitore per affiancare le tabelle con spazio tra loro
-            container_data = [[table1, "", table2]]  # Colonna vuota per spaziatura
-            container_table = Table(container_data, colWidths=[2.6*inch, 0.4*inch, 2.6*inch])
-            container_table.setStyle([
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 0),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            ])
-            story.append(container_table)
+                    # Crea contenitore per affiancare le tabelle
+                    container_data = [[table1, "", table2]]
+                    container_table = Table(container_data, colWidths=[2.6*inch, 0.4*inch, 2.6*inch])
+                else:
+                    # Se non ci sono dati per la seconda colonna, usa solo la prima
+                    container_data = [[table1, "", ""]]
+                    container_table = Table(container_data, colWidths=[2.6*inch, 0.4*inch, 2.6*inch])
+                
+                container_table.setStyle([
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                ])
+                story.append(container_table)
+                
+                page_num += 1
 
         doc.build(story)
         buffer.seek(0)
@@ -772,6 +792,194 @@ def debug_location_count(db: Session = Depends(get_db)):
             "difference": dashboard_count - pallet_count
         }
     }
+
+@router.get("/products-on-ground", response_model=List[analysis_schemas.ProductInRowItem])
+def get_products_on_ground(db: Session = Depends(get_db)):
+    """Restituisce tutti i prodotti a TERRA."""
+    products_query = db.query(
+        Inventory.location_name,
+        Inventory.product_sku,
+        Product.description,
+        Inventory.quantity
+    ).join(Product, Inventory.product_sku == Product.sku).filter(
+        Inventory.location_name == 'TERRA',
+        Inventory.quantity > 0
+    ).order_by(Inventory.product_sku)
+    
+    products_on_ground = products_query.all()
+
+    if not products_on_ground:
+        raise HTTPException(status_code=404, detail="Nessun prodotto trovato a TERRA.")
+
+    return [analysis_schemas.ProductInRowItem(
+        location_name=item.location_name,
+        product_sku=item.product_sku,
+        product_description=item.description,
+        quantity=item.quantity
+    ) for item in products_on_ground]
+
+@router.get("/export-products-on-ground-csv")
+async def export_products_on_ground_csv(db: Session = Depends(get_db)):
+    """Esporta i prodotti a TERRA in formato CSV."""
+    products_data = get_products_on_ground(db)
+    
+    output = io.StringIO()
+    output.write("ubicazione,sku,descrizione,quantita\n")
+    for item in products_data:
+        description = item.product_description.replace('"', '""') if item.product_description else ""
+        if "," in description:
+            description = f'"{description}"'
+        output.write(f"{item.location_name},{item.product_sku},{description},{item.quantity}\n")
+    
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=prodotti_terra.csv"}
+    )
+
+@router.get("/export-products-on-ground-pdf")
+async def export_products_on_ground_pdf(db: Session = Depends(get_db)):
+    """Esporta i prodotti a TERRA in formato PDF."""
+    # Query diretta per prodotti a TERRA
+    products_query = db.query(
+        Inventory.location_name,
+        Inventory.product_sku,
+        Product.description,
+        Inventory.quantity
+    ).join(Product, Inventory.product_sku == Product.sku).filter(
+        Inventory.location_name == 'TERRA',
+        Inventory.quantity > 0
+    ).order_by(Inventory.product_sku)
+    
+    products_on_ground = products_query.all()
+
+    if not products_on_ground:
+        raise HTTPException(status_code=404, detail="Nessun prodotto trovato a TERRA.")
+
+    # Converti in formato per PDF
+    products_data = [{
+        "location_name": item.location_name, 
+        "product_sku": item.product_sku, 
+        "product_description": item.description or "",
+        "quantity": item.quantity
+    } for item in products_on_ground]
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    story = []
+
+    # Titolo
+    story.append(Paragraph("Report Prodotti a TERRA", styles['h1']))
+    story.append(Spacer(1, 0.2 * inch))
+
+    # Calcola righe per pagina: circa 30 righe per tabella in layout 2-colonne
+    max_rows_per_table = 25
+    max_rows_per_page = max_rows_per_table * 2  # Due tabelle per pagina
+    
+    # Se i dati sono pochi, usa una sola tabella
+    if len(products_data) <= max_rows_per_table:
+        data = [["SKU", "Qty", "Note"]]
+        for item in products_data:
+            data.append([item["product_sku"], str(item["quantity"]), ""])
+
+        table = Table(data, colWidths=[2*inch, 0.8*inch, 2.7*inch])
+        table.setStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), '#f2f2f2'),
+            ('GRID', (0, 0), (-1, -1), 1, '#ddd'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ])
+        story.append(table)
+    else:
+        # Dividi in pagine con 2 colonne per pagina
+        page_num = 1
+        for i in range(0, len(products_data), max_rows_per_page):
+            page_data = products_data[i:i + max_rows_per_page]
+            
+            # Se non è la prima pagina, aggiungi page break e titolo
+            if i > 0:
+                story.append(PageBreak())
+                story.append(Paragraph(f"Report Prodotti a TERRA (Pag. {page_num})", styles['h2']))
+                story.append(Spacer(1, 0.1 * inch))
+            
+            # Dividi i dati della pagina in due colonne
+            mid_point = len(page_data) // 2
+            left_products = page_data[:mid_point]
+            right_products = page_data[mid_point:]
+
+            # Prima tabella (sinistra)
+            data1 = [["SKU", "Qty", "Note"]]
+            for item in left_products:
+                data1.append([item["product_sku"], str(item["quantity"]), ""])
+
+            table1 = Table(data1, colWidths=[1.5*inch, 0.4*inch, 1.5*inch])
+            table1.setStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), '#f2f2f2'),
+                ('GRID', (0, 0), (-1, -1), 1, '#ddd'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 2),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                ('TOPPADDING', (0, 0), (-1, -1), 2),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ])
+
+            # Seconda tabella (destra) - solo se ci sono dati
+            if right_products:
+                data2 = [["SKU", "Qty", "Note"]]
+                for item in right_products:
+                    data2.append([item["product_sku"], str(item["quantity"]), ""])
+
+                table2 = Table(data2, colWidths=[1.5*inch, 0.4*inch, 1.5*inch])
+                table2.setStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), '#f2f2f2'),
+                    ('GRID', (0, 0), (-1, -1), 1, '#ddd'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 2),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+                    ('TOPPADDING', (0, 0), (-1, -1), 2),
+                    ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ])
+
+                # Crea contenitore per affiancare le tabelle
+                container_data = [[table1, "", table2]]
+                container_table = Table(container_data, colWidths=[3.4*inch, 0.3*inch, 3.4*inch])
+            else:
+                # Se non ci sono dati per la seconda colonna, usa solo la prima
+                container_data = [[table1, "", ""]]
+                container_table = Table(container_data, colWidths=[3.4*inch, 0.3*inch, 3.4*inch])
+            
+            container_table.setStyle([
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ])
+            story.append(container_table)
+            
+            page_num += 1
+
+    doc.build(story)
+    buffer.seek(0)
+
+    return StreamingResponse(
+        io.BytesIO(buffer.getvalue()),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=prodotti_terra.pdf"}
+    )
 
 @router.get("/export-total-stock-csv")
 async def export_total_stock_csv(db: Session = Depends(get_db)):

@@ -53,13 +53,13 @@
             <!-- Sistema Tab -->
             <div class="tab-container">
                 <div class="tab-buttons">
-                    <button class="tab-btn active" onclick="switchOrdersTab('import-file-tab')">📄 Da File TXT</button>
-                    <button class="tab-btn" onclick="switchOrdersTab('import-excel-tab')">📊 Da File Excel</button>
+                    <button class="tab-btn" onclick="switchOrdersTab('import-file-tab')">📄 Da File TXT</button>
+                    <button class="tab-btn active" onclick="switchOrdersTab('import-excel-tab')">📊 Da File Excel</button>
                     <button class="tab-btn" onclick="switchOrdersTab('import-auto-tab')">🚀 Automatico da Cartella</button>
                 </div>
                 
                 <!-- Tab Import da File -->
-                <div id="import-file-tab" class="tab-content active">
+                <div id="import-file-tab" class="tab-content">
                     <form id="import-orders-form">
                         
                         <!-- Enhanced Upload Component (solo drag & drop) -->
@@ -67,9 +67,9 @@
                         
                         <!-- Backup: Original file input (hidden) -->
                         <input type="file" id="orders-file" accept=".txt" style="display: none;">
-                        <div class="form-actions">
+                        <div class="form-actions" style="display: flex; justify-content: center; gap: 15px; margin-top: 20px;">
                             <button type="button" class="btn-secondary" onclick="closeOverlay('import-orders-overlay')">✕</button>
-                            <button type="submit" class="btn-primary">📁 Importa</button>
+                            <button type="submit" class="btn-primary" style="padding: 12px 30px; font-size: 16px; font-weight: 600;">📁 Importa</button>
                         </div>
 
                         <div class="template-description">
@@ -81,7 +81,7 @@
                 </div>
                 
                 <!-- Tab Import da Excel -->
-                <div id="import-excel-tab" class="tab-content">
+                <div id="import-excel-tab" class="tab-content active">
                     <form id="import-excel-form">
                         
                         <!-- Enhanced Upload Component per Excel -->
@@ -89,9 +89,9 @@
                         
                         <!-- Backup: Original file input (hidden) -->
                         <input type="file" id="excel-file" accept=".xlsx" style="display: none;">
-                        <div class="form-actions">
+                        <div class="form-actions" style="display: flex; justify-content: center; gap: 15px; margin-top: 20px;">
                             <button type="button" class="btn-secondary" onclick="closeOverlay('import-orders-overlay')">✕</button>
-                            <button type="submit" class="btn-primary">📊 Importa</button>
+                            <button type="submit" class="btn-primary" style="padding: 12px 30px; font-size: 16px; font-weight: 600;">📊 Importa</button>
                         </div>
 
                         <div class="template-description">
@@ -189,7 +189,23 @@
                 <button class="overlay-close" onclick="closeOverlay('picking-file-overlay')">&times;</button>
             </div>
             <form id="import-picking-form">
-                <div class="template-description">
+                <!-- Enhanced Upload Component -->
+                <div class="enhanced-upload-container" id="picking-file-upload"></div>
+                
+                <!-- Backup: Original file input (hidden) -->
+                <input type="file" id="picking-file" accept=".txt" style="display: none;">
+                
+                <!-- Tasto Esegui centrato e più grande -->
+                <div style="display: flex; justify-content: center; margin: 20px 0;">
+                    <button type="submit" class="btn-primary" style="padding: 12px 30px; font-size: 16px; font-weight: 600;">📋 Esegui</button>
+                </div>
+                
+                <div class="form-actions" style="justify-content: center;">
+                    <button type="button" class="btn-secondary" onclick="closeOverlay('picking-file-overlay')">✕ Chiudi</button>
+                </div>
+                
+                <!-- Descrizione formato e template spostati in fondo -->
+                <div class="template-description" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6;">
                     <strong>Formato pistola scanner:</strong><br>
                     - <strong>Riga 1:</strong> Numero Ordine<br>
                     - <strong>Riga 2:</strong> Ubicazione<br>
@@ -197,15 +213,8 @@
                     - Il pattern si ripete per più ordini<br>
                     <br>Esempio: <code>1888</code> → <code>15A1P2</code> → <code>9512012430306</code> (ripetuto 5 volte) oppure <code>SND-12SFU-OD_10</code>
                 </div>
-                <a href="/static/templates/template_picking.txt" download="template_picking.txt" class="btn-template">📄 Scarica Template</a>
-                <!-- Enhanced Upload Component -->
-                <div class="enhanced-upload-container" id="picking-file-upload"></div>
-                
-                <!-- Backup: Original file input (hidden) -->
-                <input type="file" id="picking-file" accept=".txt" style="display: none;">
-                <div class="form-actions">
-                    <button type="button" class="btn-secondary" onclick="closeOverlay('picking-file-overlay')">✕</button>
-                    <button type="submit" class="btn-primary">📋 Esegui</button>
+                <div style="text-align: center; margin-top: 15px;">
+                    <a href="/static/templates/template_picking.txt" download="template_picking.txt" class="btn-template">📄 Scarica Template</a>
                 </div>
             </form>
             <div id="import-picking-result" class="result-container"></div>

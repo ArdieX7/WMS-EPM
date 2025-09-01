@@ -518,24 +518,26 @@
                 <div class="title-and-controls">
                     <h2>Giacenza Attuale</h2>
                     <div class="search-controls">
-                        <div class="search-field">
-                            <label for="search-location">Cerca per Ubicazione:</label>
-                            <input type="text" id="search-location" placeholder="Inserisci ubicazione...">
+                        <div class="search-field-wrapper">
+                            <div class="search-field">
+                                <label for="search-location">Cerca per Ubicazione:</label>
+                                <input type="text" id="search-location" placeholder="Inserisci ubicazione...">
+                            </div>
+                            <div class="search-field">
+                                <label for="search-sku">Cerca per SKU:</label>
+                                <input type="text" id="search-sku" placeholder="Inserisci SKU...">
+                            </div>
+                            <button id="reset-sort-btn" class="reset-sort-inline-btn">🔄 Reset Ordinamento</button>
                         </div>
-                        <div class="search-field">
-                            <label for="search-sku">Cerca per SKU:</label>
-                            <input type="text" id="search-sku" placeholder="Inserisci SKU...">
+                        <div class="consolidation-section">
+                            <button id="consolidation-suggestions-btn" 
+                                    class="consolidation-btn" 
+                                    onclick="showConsolidationSuggestions()"
+                                    data-permission="inventory_view">
+                                🧩 Consigli di Consolidamento
+                            </button>
                         </div>
-                        <button id="reset-sort-btn" class="reset-sort-inline-btn">🔄 Reset Ordinamento</button>
                     </div>
-                </div>
-                <div class="consolidation-section">
-                    <button id="consolidation-suggestions-btn" 
-                            class="consolidation-btn" 
-                            onclick="showConsolidationSuggestions()"
-                            data-permission="inventory_view">
-                        🧩 Consigli di Consolidamento
-                    </button>
                 </div>
             </div>
         </div>
