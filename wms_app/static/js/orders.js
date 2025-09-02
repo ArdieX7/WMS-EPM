@@ -4033,3 +4033,163 @@
         
         // Aggiorna il contatore all'avvio
         updateOutgoingStockCounter();
+
+        // Precompila date export al caricamento pagina
+        initializeExportDates();
+
+        // --- FUNZIONI EXPORT ORDINI ---
+
+        function initializeExportDates() {
+            const today = new Date();
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            
+            // Formatta le date in formato YYYY-MM-DD evitando problemi fuso orario
+            const formatDate = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+            
+            // Precompila i campi
+            const fromDateField = document.getElementById('export-from-date');
+            const toDateField = document.getElementById('export-to-date');
+            
+            if (fromDateField) {
+                fromDateField.value = formatDate(firstDayOfMonth);
+            }
+            
+            if (toDateField) {
+                toDateField.value = formatDate(today);
+            }
+        }
+        
+        // Export Excel
+        window.exportOrdersExcel = async function() {
+            try {
+                const fromDate = document.getElementById('export-from-date').value;
+                const toDate = document.getElementById('export-to-date').value;
+                
+                // Costruisci URL con parametri date
+                let url = '/orders/export-excel';
+                const params = new URLSearchParams();
+                if (fromDate) params.append('from_date', fromDate);
+                if (toDate) params.append('to_date', toDate);
+                if (params.toString()) url += '?' + params.toString();
+                
+                // Mostra loading
+                const loadingMsg = document.createElement('div');
+                loadingMsg.innerHTML = '⏳ Generazione file Excel in corso...';
+                loadingMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#0066CC;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+                document.body.appendChild(loadingMsg);
+                
+                const response = await fetch(url);
+                
+                // Rimuovi loading
+                document.body.removeChild(loadingMsg);
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    alert(`Errore generazione Excel: ${error.detail || 'Errore sconosciuto'}`);
+                    return;
+                }
+                
+                // Download del file Excel
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                
+                // Estrai nome file dalla response header se disponibile
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'export_ordini.xlsx';
+                if (contentDisposition) {
+                    const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
+                    if (matches && matches[1]) {
+                        filename = matches[1];
+                    }
+                }
+                
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(downloadUrl);
+                document.body.removeChild(a);
+                
+                // Feedback successo
+                const successMsg = document.createElement('div');
+                successMsg.innerHTML = '✅ File Excel scaricato con successo!';
+                successMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#28a745;color:white;padding:12px 18px;border-radius:6px;z-index:10000;font-weight:500;';
+                document.body.appendChild(successMsg);
+                setTimeout(() => document.body.removeChild(successMsg), 3000);
+                
+            } catch (error) {
+                console.error('Errore export Excel ordini:', error);
+                alert('Errore di rete durante la generazione del file Excel.');
+            }
+        };
+        
+        // Export PDF  
+        window.exportOrdersPdf = async function() {
+            try {
+                const fromDate = document.getElementById('export-from-date').value;
+                const toDate = document.getElementById('export-to-date').value;
+                
+                // Costruisci URL con parametri date
+                let url = '/orders/export-pdf';
+                const params = new URLSearchParams();
+                if (fromDate) params.append('from_date', fromDate);
+                if (toDate) params.append('to_date', toDate);
+                if (params.toString()) url += '?' + params.toString();
+                
+                // Mostra loading
+                const loadingMsg = document.createElement('div');
+                loadingMsg.innerHTML = '⏳ Generazione file PDF in corso...';
+                loadingMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+                document.body.appendChild(loadingMsg);
+                
+                const response = await fetch(url);
+                
+                // Rimuovi loading
+                document.body.removeChild(loadingMsg);
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    alert(`Errore generazione PDF: ${error.detail || 'Errore sconosciuto'}`);
+                    return;
+                }
+                
+                // Download del file PDF
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                
+                // Estrai nome file dalla response header se disponibile
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'export_ordini.pdf';
+                if (contentDisposition) {
+                    const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
+                    if (matches && matches[1]) {
+                        filename = matches[1];
+                    }
+                }
+                
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(downloadUrl);
+                document.body.removeChild(a);
+                
+                // Feedback successo
+                const successMsg = document.createElement('div');
+                successMsg.innerHTML = '✅ File PDF scaricato con successo!';
+                successMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#28a745;color:white;padding:12px 18px;border-radius:6px;z-index:10000;font-weight:500;';
+                document.body.appendChild(successMsg);
+                setTimeout(() => document.body.removeChild(successMsg), 3000);
+                
+            } catch (error) {
+                console.error('Errore export PDF ordini:', error);
+                alert('Errore di rete durante la generazione del file PDF.');
+            }
+        };

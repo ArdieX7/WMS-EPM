@@ -47,7 +47,10 @@
       "Bash(ufw:*)",
       "WebSearch",
       "Bash(venv/bin/python:*)",
-      "Bash(venv/bin/pip install:*)"
+      "Bash(venv/bin/pip install:*)",
+      "Read(/tmp/**)",
+      "Read(/tmp/**)",
+      "Read(/tmp/**)"
     ],
     "deny": []
   }
