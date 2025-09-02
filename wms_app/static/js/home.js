@@ -6,6 +6,7 @@ class Dashboard {
             inventory: 0,
             ground: 0,
             orders: 0,
+            readyOrders: 0,
             serials: 0
         };
         this.locationData = {
@@ -38,6 +39,7 @@ class Dashboard {
                 this.fetchStat('/api/stats/ground', 'ground'),
                 this.fetchStat('/api/stats/locations', 'locations'), 
                 this.fetchStat('/api/stats/orders', 'orders'),
+                this.fetchStat('/api/stats/ready-orders', 'readyOrders'),
                 this.fetchStat('/api/stats/serials', 'serials')
             ];
 
@@ -97,8 +99,9 @@ class Dashboard {
             inventory: 3487,
             ground: 127,
             locations: 235,
-            orders: 12,
-            serials: 12
+            orders: 8,
+            readyOrders: 4,
+            serials: 3
         };
         return fallbacks[statKey] || 0;
     }
@@ -108,8 +111,9 @@ class Dashboard {
         this.stats = {
             inventory: 3487,
             ground: 127,
-            orders: 12,
-            serials: 12
+            orders: 8,
+            readyOrders: 4,
+            serials: 3
         };
         this.updateStatsDisplay();
     }
@@ -119,6 +123,7 @@ class Dashboard {
         this.animateNumber('total-pieces', this.stats.inventory);
         this.animateNumber('total-pieces-ground', this.stats.ground);
         this.animateNumber('pending-orders', this.stats.orders);
+        this.animateNumber('ready-orders', this.stats.readyOrders);
         this.animateNumber('missing-serials', this.stats.serials);
         
         // Aggiorna grafico ubicazioni nella nuova sezione
