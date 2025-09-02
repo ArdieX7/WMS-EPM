@@ -1507,6 +1507,7 @@ async def parse_unload_container_file(file: UploadFile = File(...), db: Session 
     
     # ANALISI FILE: Consolida le quantità per SKU
     sku_quantities = {}
+    sku_original_codes = {}  # Mappa SKU -> primo codice originale trovato
     errors = []
     warnings = []
     recap_items = []
@@ -1533,15 +1534,36 @@ async def parse_unload_container_file(file: UploadFile = File(...), db: Session 
             })
             continue
         
-        # Verifica che il prodotto esista
-        product = db.query(models.Product).filter(models.Product.sku == sku).first()
-        if not product:
+        # Verifica che il prodotto esista - supporta sia EAN code che SKU
+        sku_found = None
+        product = None
+        input_code = sku  # Conserva il codice originale dal file per il logging
+        
+        # Prima prova a cercare come EAN code
+        ean_code = db.query(models.EanCode).filter(models.EanCode.ean == sku).first()
+        if ean_code:
+            sku_found = ean_code.product_sku
+            product = db.query(models.Product).filter(models.Product.sku == sku_found).first()
+        else:
+            # Altrimenti prova a cercare come SKU diretto
+            product = db.query(models.Product).filter(models.Product.sku == sku).first()
+            if product:
+                sku_found = product.sku
+        
+        if not product or not sku_found:
             errors.append({
                 'line': line_num,
                 'input': line,
-                'error': f"Prodotto '{sku}' non trovato"
+                'error': f"Prodotto con codice '{sku}' non trovato (né come EAN né come SKU)"
             })
             continue
+            
+        # Usa lo SKU risolto per il resto della logica
+        sku = sku_found
+        
+        # Traccia il primo codice originale per questo SKU (per il recap)
+        if sku not in sku_original_codes:
+            sku_original_codes[sku] = input_code
             
         # Accumula quantità per SKU
         sku_quantities[sku] = sku_quantities.get(sku, 0) + quantity
@@ -1563,7 +1585,7 @@ async def parse_unload_container_file(file: UploadFile = File(...), db: Session 
         
         recap_items.append({
             'line': f"Consolidato da {len([k for k in sku_quantities.keys() if k == sku])} righe",
-            'input_code': sku,
+            'input_code': sku_original_codes.get(sku, sku),  # Mostra il codice originale (EAN o SKU)
             'sku': sku,
             'location': 'TERRA',
             'description': description,
