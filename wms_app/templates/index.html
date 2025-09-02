@@ -18,7 +18,7 @@
     <div class="home-container">
         <!-- Hero Section -->
         <div class="hero-section">
-            <h1 class="hero-title">WMS EPM Dashboard</h1>
+            <h1 class="hero-title">Nyxcode WMS Dashboard</h1>
             <p class="hero-subtitle">Sistema di Gestione Magazzino - Controllo Centralizzato</p>
             <div class="system-status">
                 <span class="status-dot"></span>
@@ -192,11 +192,17 @@
                 </li>
             </ul>
         </div>
-    </div> <!-- Fine mobile-content -->
-
     </div>
 
         <script src="/static/js/modern-auth.js"></script>
+    
+    <script>
+        // Protezione pagina con sistema di autenticazione
+        document.addEventListener('DOMContentLoaded', function() {
+            window.requirePermission('dashboard_view');
+        });
+    </script>
+    
     <script src="/static/js/home.js"></script>
 
     {% include 'partials/footer.html' %}
