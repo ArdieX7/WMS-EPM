@@ -578,11 +578,18 @@
                 const orderLinesTable = document.getElementById('completed-order-lines');
                 orderLinesTable.innerHTML = '';
                 
+                let totalRequested = 0;
+                let totalPicked = 0;
+                
                 order.lines.forEach(line => {
                     const isFullyPicked = line.requested_quantity === line.picked_quantity;
                     const statusIcon = isFullyPicked ? '✅' : '⚠️';
                     const statusText = isFullyPicked ? 'Completo' : 'Parziale';
                     const rowClass = isFullyPicked ? 'status-ok' : 'status-warning';
+                    
+                    // Accumula i totali
+                    totalRequested += line.requested_quantity;
+                    totalPicked += line.picked_quantity;
                     
                     const row = document.createElement('tr');
                     row.className = rowClass;
@@ -594,6 +601,19 @@
                     `;
                     orderLinesTable.appendChild(row);
                 });
+                
+                // Aggiungi riga totale per ordini archiviati
+                const totalRow = document.createElement('tr');
+                totalRow.style.backgroundColor = '#f8f9fa';
+                totalRow.style.borderTop = '2px solid #0066CC';
+                totalRow.style.fontWeight = 'bold';
+                totalRow.innerHTML = `
+                    <td style="font-weight: bold; color: #0066CC;">TOTALE</td>
+                    <td style="text-align: center; font-weight: bold; color: #0066CC;">${totalRequested}</td>
+                    <td style="text-align: center; font-weight: bold; color: #0066CC;">${totalPicked}</td>
+                    <td style="text-align: center;">📊</td>
+                `;
+                orderLinesTable.appendChild(totalRow);
                 
                 // Messaggio di stato dinamico basato su completato/annullato
                 const statusMessage = document.getElementById('completed-order-status-message');
@@ -1312,9 +1332,19 @@
                                     <tbody>
                         `;
                         
+                        let totalRequested = 0;
+                        let totalPicked = 0;
+                        let totalRemaining = 0;
+                        
                         for (const sku in orderSummary.lines) {
                             const line = orderSummary.lines[sku];
                             const isComplete = line.remaining === 0;
+                            
+                            // Accumula i totali
+                            totalRequested += line.requested;
+                            totalPicked += line.picked;
+                            totalRemaining += line.remaining;
+                            
                             content += `
                                 <tr style="border-bottom: 1px solid #dee2e6;">
                                     <td style="padding: 12px; font-weight: 500;">${sku}</td>
@@ -1324,6 +1354,16 @@
                                 </tr>
                             `;
                         }
+                        
+                        // Aggiungi riga totale per ordini attivi
+                        content += `
+                            <tr style="border-top: 2px solid #0066CC; background-color: #f8f9fa; font-weight: bold;">
+                                <td style="padding: 12px; font-weight: bold; color: #0066CC;">TOTALE</td>
+                                <td style="padding: 12px; text-align: center; font-weight: bold; color: #0066CC;">${totalRequested}</td>
+                                <td style="padding: 12px; text-align: center; font-weight: bold; color: #0066CC;">${totalPicked}</td>
+                                <td style="padding: 12px; text-align: center; font-weight: bold; color: ${totalRemaining === 0 ? '#28a745' : '#0066CC'};">${totalRemaining}</td>
+                            </tr>
+                        `;
                         
                         content += `
                                     </tbody>
