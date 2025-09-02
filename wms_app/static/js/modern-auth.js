@@ -246,7 +246,7 @@ class ModernAuth {
     
     async initializePageAuth() {
         // Pagine pubbliche che non richiedono autenticazione
-        const publicPages = ['/login', '/'];
+        const publicPages = ['/login'];
         
         if (publicPages.includes(window.location.pathname)) {
             this.markPageAsAuthenticated();
@@ -331,7 +331,7 @@ class ModernAuth {
             // Mostra errore e redirect
             this.showError(`⛔ ACCESSO NEGATO - Permesso richiesto: ${permission}`);
             setTimeout(() => {
-                window.location.href = '/?error=permission_denied';
+                this.redirectToLogin();
             }, 3000);
             return false;
         }
@@ -612,7 +612,7 @@ window.requirePermission = (permission) => {
                     console.log(`❌ FALLBACK: Sistema ancora non inizializzato per ${permission}`);
                     // Se ancora non è inizializzato dopo 5 secondi, c'è un problema
                     window.modernAuth.showError(`Errore caricamento permessi: ${permission}`);
-                    setTimeout(() => window.location.href = '/', 2000);
+                    setTimeout(() => window.modernAuth.redirectToLogin(), 2000);
                 }
             }
         }, 5000); // Fallback dopo 5 secondi

@@ -1,13 +1,28 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Query
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.sql import func
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Optional
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, date
 import os
 import shutil
 from pathlib import Path
+import io
+
+# Import per export Excel e PDF
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    EXCEL_AVAILABLE = True
+except ImportError:
+    EXCEL_AVAILABLE = False
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.units import inch
 
 from wms_app import models, schemas
 from wms_app.database import database, get_db
@@ -158,6 +173,238 @@ def read_orders(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
         order.total_weight = total_weight
     
     return orders
+
+# --- EXPORT ENDPOINTS (devono essere prima di /{order_id}) ---
+
+@router.get("/export-excel")
+async def export_orders_excel(
+    from_date: Optional[date] = Query(None, description="Data inizio (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Data fine (YYYY-MM-DD)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Esporta ordini in formato Excel con filtro per range di date.
+    Include sia ordini attivi che archiviati.
+    """
+    if not EXCEL_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Export Excel non disponibile. Installare openpyxl.")
+    
+    try:
+        # Query unificata per ordini attivi e archiviati
+        query = db.query(models.Order).options(joinedload(models.Order.lines))
+        
+        # Applica filtri date se forniti
+        if from_date:
+            query = query.filter(models.Order.order_date >= from_date)
+        if to_date:
+            query = query.filter(models.Order.order_date <= to_date)
+            
+        orders = query.order_by(models.Order.order_date.desc()).all()
+        
+        # Crea workbook Excel
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Ordini Export"
+        
+        # Headers
+        headers = [
+            "N° Ordine", "Cliente", "Data Ordine", "Stato", 
+            "Quantità Totale", "N° DDT", "Evaso il"
+        ]
+        
+        # Styling headers
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="0066CC", end_color="0066CC", fill_type="solid")
+        header_alignment = Alignment(horizontal="center")
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+        
+        # Popola dati
+        for row, order in enumerate(orders, 2):
+            # Calcola quantità totale ordine
+            total_quantity = sum(line.requested_quantity for line in order.lines)
+            
+            # Determina stato
+            if order.is_cancelled:
+                status = "Annullato"
+            elif order.is_archived:
+                status = "Archiviato"
+            elif order.is_completed:
+                status = "Completato"
+            else:
+                status = "Attivo"
+            
+            # Popola riga
+            ws.cell(row=row, column=1, value=order.order_number)
+            ws.cell(row=row, column=2, value=order.customer_name or "")
+            ws.cell(row=row, column=3, value=order.order_date.strftime("%d/%m/%Y") if order.order_date else "")
+            ws.cell(row=row, column=4, value=status)
+            ws.cell(row=row, column=5, value=total_quantity)
+            ws.cell(row=row, column=6, value=order.ddt_number or "")
+            ws.cell(row=row, column=7, value=order.archived_date.strftime("%d/%m/%Y") if order.archived_date else "")
+        
+        # Auto-dimensiona colonne
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # Salva in buffer
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        
+        # Nome file con date
+        date_suffix = ""
+        if from_date and to_date:
+            date_suffix = f"_{from_date.strftime('%Y%m%d')}_{to_date.strftime('%Y%m%d')}"
+        elif from_date:
+            date_suffix = f"_dal_{from_date.strftime('%Y%m%d')}"
+        elif to_date:
+            date_suffix = f"_fino_{to_date.strftime('%Y%m%d')}"
+            
+        filename = f"export_ordini{date_suffix}.xlsx"
+        
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante l'export Excel: {str(e)}")
+
+@router.get("/export-pdf")
+async def export_orders_pdf(
+    from_date: Optional[date] = Query(None, description="Data inizio (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Data fine (YYYY-MM-DD)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Esporta ordini in formato PDF con filtro per range di date.
+    Include sia ordini attivi che archiviati.
+    """
+    try:
+        # Query unificata per ordini attivi e archiviati
+        query = db.query(models.Order).options(joinedload(models.Order.lines))
+        
+        # Applica filtri date se forniti
+        if from_date:
+            query = query.filter(models.Order.order_date >= from_date)
+        if to_date:
+            query = query.filter(models.Order.order_date <= to_date)
+            
+        orders = query.order_by(models.Order.order_date.desc()).all()
+        
+        # Crea PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+        
+        # Stili
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=30,
+            alignment=1  # Center
+        )
+        
+        # Contenuto PDF
+        story = []
+        
+        # Titolo
+        date_range = ""
+        if from_date and to_date:
+            date_range = f" ({from_date.strftime('%d/%m/%Y')} - {to_date.strftime('%d/%m/%Y')})"
+        elif from_date:
+            date_range = f" (dal {from_date.strftime('%d/%m/%Y')})"
+        elif to_date:
+            date_range = f" (fino al {to_date.strftime('%d/%m/%Y')})"
+            
+        title = Paragraph(f"Export Ordini{date_range}", title_style)
+        story.append(title)
+        story.append(Spacer(1, 12))
+        
+        # Prepara dati tabella
+        table_data = []
+        table_data.append(["N° Ordine", "Cliente", "Data", "Stato", "Qtà Tot", "DDT", "Evaso il"])
+        
+        for order in orders:
+            # Calcola quantità totale
+            total_quantity = sum(line.requested_quantity for line in order.lines)
+            
+            # Determina stato
+            if order.is_cancelled:
+                status = "Annullato"
+            elif order.is_archived:
+                status = "Archiviato"
+            elif order.is_completed:
+                status = "Completato"
+            else:
+                status = "Attivo"
+            
+            table_data.append([
+                order.order_number or "",
+                order.customer_name[:20] + "..." if order.customer_name and len(order.customer_name) > 20 else (order.customer_name or ""),
+                order.order_date.strftime("%d/%m/%Y") if order.order_date else "",
+                status,
+                str(total_quantity),
+                order.ddt_number or "",
+                order.archived_date.strftime("%d/%m/%Y") if order.archived_date else ""
+            ])
+        
+        # Crea tabella
+        table = Table(table_data, colWidths=[1.2*inch, 1.5*inch, 0.8*inch, 0.8*inch, 0.6*inch, 0.8*inch, 0.8*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ]))
+        
+        story.append(table)
+        
+        # Genera PDF
+        doc.build(story)
+        buffer.seek(0)
+        
+        # Nome file con date
+        date_suffix = ""
+        if from_date and to_date:
+            date_suffix = f"_{from_date.strftime('%Y%m%d')}_{to_date.strftime('%Y%m%d')}"
+        elif from_date:
+            date_suffix = f"_dal_{from_date.strftime('%Y%m%d')}"
+        elif to_date:
+            date_suffix = f"_fino_{to_date.strftime('%Y%m%d')}"
+            
+        filename = f"export_ordini{date_suffix}.pdf"
+        
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante l'export PDF: {str(e)}")
 
 @router.get("/archived")
 def get_archived_orders(db: Session = Depends(get_db)):

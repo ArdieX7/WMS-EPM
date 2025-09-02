@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 from wms_app.routers.auth import require_permission
 from wms_app.middleware.auth_middleware import AuthMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -13,7 +13,8 @@ import atexit
 from wms_app.database import database
 from wms_app.models import products, inventory, orders, reservations, serials, ddt, settings, logs, auth
 from wms_app.models.inventory import Location, Inventory  
-from wms_app.models.orders import Order
+from wms_app.models.orders import Order, OrderLine, OutgoingStock
+from wms_app.models.serials import ProductSerial
 
 
 
@@ -159,9 +160,17 @@ async def get_products_page(request: Request):
 # API endpoints per statistiche dashboard
 @app.get("/api/stats/inventory")
 async def get_inventory_stats(db: Session = Depends(database.get_db)):
-    """Totale pezzi in magazzino"""
-    total_pieces = db.query(func.sum(Inventory.quantity)).scalar() or 0
-    return {"count": total_pieces}
+    """Totale pezzi in magazzino (inventory + outgoing)"""
+    # Totale in inventario (scaffali + TERRA)
+    total_inventory = db.query(func.sum(Inventory.quantity)).scalar() or 0
+    
+    # Totale in uscita (già prelevato ma ancora fisicamente in magazzino)
+    total_outgoing = db.query(func.sum(OutgoingStock.quantity)).scalar() or 0
+    
+    # Giacenza totale = inventario + stock in uscita (tutto quello fisicamente presente)
+    total_stock = total_inventory + total_outgoing
+    
+    return {"count": total_stock}
 
 @app.get("/api/stats/ground")
 async def get_ground_stats(db: Session = Depends(database.get_db)):
@@ -183,13 +192,13 @@ async def get_ground_stats(db: Session = Depends(database.get_db)):
 @app.get("/api/stats/locations")
 async def get_locations_stats(db: Session = Depends(database.get_db)):
     """Ubicazioni utilizzate vs totali"""
-    # Ubicazioni con inventario (utilizzate)
-    used_locations = db.query(func.count(func.distinct(Inventory.location_name))).scalar() or 0
-    
-    # Totale ubicazioni disponibili
-    total_locations = db.query(func.count(Location.name)).filter(
-        Location.available == True
+    # Ubicazioni con inventario (utilizzate) - solo quelle con quantity > 0
+    used_locations = db.query(func.count(func.distinct(Inventory.location_name))).filter(
+        Inventory.quantity > 0
     ).scalar() or 0
+    
+    # Totale ubicazioni (stessa logica di analisi - senza filtro available)
+    total_locations = db.query(func.count(Location.name)).scalar() or 0
     
     # Calcola percentuale di utilizzo
     usage_percentage = round((used_locations / total_locations * 100), 1) if total_locations > 0 else 0
@@ -206,28 +215,77 @@ async def get_locations_stats(db: Session = Depends(database.get_db)):
 
 @app.get("/api/stats/orders")
 async def get_orders_stats(db: Session = Depends(database.get_db)):
-    """Ordini da completare (non evasi)"""
-    # Ordini non completati, non archiviati e non cancellati
-    pending_orders = db.query(func.count(Order.id)).filter(
+    """Ordini da completare (picking < 100%)"""
+    # Logica corretta: conta ordini attivi dove il progresso picking < 100%
+    # Calcola il rapporto picked_quantity/requested_quantity per ogni ordine
+    
+    subquery = db.query(
+        Order.id,
+        func.sum(OrderLine.requested_quantity).label('total_requested'),
+        func.sum(OrderLine.picked_quantity).label('total_picked')
+    ).join(OrderLine).filter(
         and_(
             Order.is_completed == False,
-            Order.is_archived == False,
+            Order.is_archived == False, 
             Order.is_cancelled == False
         )
-    ).scalar() or 0
+    ).group_by(Order.id).subquery()
     
-    return {"count": pending_orders}
-
-@app.get("/api/stats/serials")
-async def get_serials_stats(db: Session = Depends(database.get_db)):
-    """Seriali mancanti per ordini non evasi"""
-    # Stessa logica degli ordini pendenti - ordini che necessitano ancora di seriali
-    incomplete_orders = db.query(func.count(Order.id)).filter(
-        and_(
-            Order.is_completed == False,
-            Order.is_archived == False,
-            Order.is_cancelled == False
+    # Conta ordini dove progresso picking < 100%
+    incomplete_orders = db.query(func.count()).select_from(subquery).filter(
+        or_(
+            subquery.c.total_requested == 0,  # Ordini senza righe
+            subquery.c.total_picked < subquery.c.total_requested  # Picking incompleto
         )
     ).scalar() or 0
     
     return {"count": incomplete_orders}
+
+@app.get("/api/stats/ready-orders")
+async def get_ready_orders_stats(db: Session = Depends(database.get_db)):
+    """Ordini pronti per evasione (picking = 100%)"""
+    # Logica: conta ordini attivi dove il progresso picking = 100%
+    # Ma non ancora completati (is_completed = False)
+    
+    subquery = db.query(
+        Order.id,
+        func.sum(OrderLine.requested_quantity).label('total_requested'),
+        func.sum(OrderLine.picked_quantity).label('total_picked')
+    ).join(OrderLine).filter(
+        and_(
+            Order.is_completed == False,
+            Order.is_archived == False, 
+            Order.is_cancelled == False
+        )
+    ).group_by(Order.id).subquery()
+    
+    # Conta ordini dove progresso picking = 100%
+    ready_orders = db.query(func.count()).select_from(subquery).filter(
+        and_(
+            subquery.c.total_requested > 0,  # Deve avere righe
+            subquery.c.total_picked >= subquery.c.total_requested  # Picking completo
+        )
+    ).scalar() or 0
+    
+    return {"count": ready_orders}
+
+@app.get("/api/stats/serials")
+async def get_serials_stats(db: Session = Depends(database.get_db)):
+    """Seriali mancanti per ordini attivi"""
+    # Logica corretta: ordini attivi che NON hanno seriali associati
+    # LEFT JOIN tra orders e product_serials per trovare ordini senza seriali
+    
+    orders_without_serials = db.query(func.count(Order.id)).select_from(
+        Order
+    ).outerjoin(
+        ProductSerial, Order.order_number == ProductSerial.order_number
+    ).filter(
+        and_(
+            Order.is_completed == False,
+            Order.is_archived == False,
+            Order.is_cancelled == False,
+            ProductSerial.id.is_(None)  # Nessun record trovato in product_serials
+        )
+    ).scalar() or 0
+    
+    return {"count": orders_without_serials}

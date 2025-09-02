@@ -578,11 +578,18 @@
                 const orderLinesTable = document.getElementById('completed-order-lines');
                 orderLinesTable.innerHTML = '';
                 
+                let totalRequested = 0;
+                let totalPicked = 0;
+                
                 order.lines.forEach(line => {
                     const isFullyPicked = line.requested_quantity === line.picked_quantity;
                     const statusIcon = isFullyPicked ? '✅' : '⚠️';
                     const statusText = isFullyPicked ? 'Completo' : 'Parziale';
                     const rowClass = isFullyPicked ? 'status-ok' : 'status-warning';
+                    
+                    // Accumula i totali
+                    totalRequested += line.requested_quantity;
+                    totalPicked += line.picked_quantity;
                     
                     const row = document.createElement('tr');
                     row.className = rowClass;
@@ -594,6 +601,19 @@
                     `;
                     orderLinesTable.appendChild(row);
                 });
+                
+                // Aggiungi riga totale per ordini archiviati
+                const totalRow = document.createElement('tr');
+                totalRow.style.backgroundColor = '#f8f9fa';
+                totalRow.style.borderTop = '2px solid #0066CC';
+                totalRow.style.fontWeight = 'bold';
+                totalRow.innerHTML = `
+                    <td style="font-weight: bold; color: #0066CC;">TOTALE</td>
+                    <td style="text-align: center; font-weight: bold; color: #0066CC;">${totalRequested}</td>
+                    <td style="text-align: center; font-weight: bold; color: #0066CC;">${totalPicked}</td>
+                    <td style="text-align: center;">📊</td>
+                `;
+                orderLinesTable.appendChild(totalRow);
                 
                 // Messaggio di stato dinamico basato su completato/annullato
                 const statusMessage = document.getElementById('completed-order-status-message');
@@ -1312,9 +1332,19 @@
                                     <tbody>
                         `;
                         
+                        let totalRequested = 0;
+                        let totalPicked = 0;
+                        let totalRemaining = 0;
+                        
                         for (const sku in orderSummary.lines) {
                             const line = orderSummary.lines[sku];
                             const isComplete = line.remaining === 0;
+                            
+                            // Accumula i totali
+                            totalRequested += line.requested;
+                            totalPicked += line.picked;
+                            totalRemaining += line.remaining;
+                            
                             content += `
                                 <tr style="border-bottom: 1px solid #dee2e6;">
                                     <td style="padding: 12px; font-weight: 500;">${sku}</td>
@@ -1324,6 +1354,16 @@
                                 </tr>
                             `;
                         }
+                        
+                        // Aggiungi riga totale per ordini attivi
+                        content += `
+                            <tr style="border-top: 2px solid #0066CC; background-color: #f8f9fa; font-weight: bold;">
+                                <td style="padding: 12px; font-weight: bold; color: #0066CC;">TOTALE</td>
+                                <td style="padding: 12px; text-align: center; font-weight: bold; color: #0066CC;">${totalRequested}</td>
+                                <td style="padding: 12px; text-align: center; font-weight: bold; color: #0066CC;">${totalPicked}</td>
+                                <td style="padding: 12px; text-align: center; font-weight: bold; color: ${totalRemaining === 0 ? '#28a745' : '#0066CC'};">${totalRemaining}</td>
+                            </tr>
+                        `;
                         
                         content += `
                                     </tbody>
@@ -2443,8 +2483,11 @@
                         
                         return `<tr class="status-${item.status}" data-line="${item.line}">
                             <td>${statusIcon} ${item.line}</td>
-                            <td>${item.order_number}</td>
-                            <td>${item.customer_name || 'N/A'}</td>
+                            <td>
+                                <input type="text" class="recap-order-input" value="${item.order_number}" 
+                                       data-line="${item.line}" data-type="order_number" 
+                                       style="width: 100%; border: 1px solid #ddd; background: white; padding: 2px;">
+                            </td>
                             <td>
                                 <input type="text" class="recap-location-input" value="${item.location}" 
                                        data-line="${item.line}" data-type="location" 
@@ -2488,6 +2531,9 @@
                 executeBtn.onclick = function() {
                     executePickingRecap();
                 };
+                
+                // Setup degli input listeners per modifiche in tempo reale
+                setupPickingInputListeners();
             };
             
             // Chiude il recap picking
@@ -2498,13 +2544,20 @@
             
             // Corregge un'operazione di picking
             window.fixPickingOperation = function(line) {
+                const orderInput = document.querySelector(`input[data-line="${line}"][data-type="order_number"]`);
                 const locationInput = document.querySelector(`input[data-line="${line}"][data-type="location"]`);
                 const skuInput = document.querySelector(`input[data-line="${line}"][data-type="sku"]`);
                 const quantityInput = document.querySelector(`input[data-line="${line}"][data-type="quantity"]`);
                 
+                const newOrderNumber = orderInput ? orderInput.value.trim() : '';
                 const newLocation = locationInput ? locationInput.value.trim().toUpperCase() : '';
                 const newSku = skuInput ? skuInput.value.trim() : '';
                 const newQuantity = parseInt(quantityInput ? quantityInput.value : 1) || 1;
+                
+                if (!newOrderNumber) {
+                    alert('Inserisci un numero ordine valido');
+                    return;
+                }
                 
                 if (!newLocation) {
                     alert('Inserisci una ubicazione valida');
@@ -2519,6 +2572,7 @@
                 // Trova l'item nel recap e aggiornalo
                 const item = currentPickingRecapData.recap_items.find(item => item.line === line);
                 if (item) {
+                    item.order_number = newOrderNumber;
                     item.location = newLocation;
                     item.sku = newSku;
                     item.quantity = newQuantity;
@@ -3807,6 +3861,36 @@
             });
         }
 
+        // Setup listeners per input Picking Recap
+        function setupPickingInputListeners() {
+            const inputs = document.querySelectorAll('.recap-order-input, .recap-location-input, .recap-sku-input, .recap-quantity-input');
+            inputs.forEach(input => {
+                input.addEventListener('input', function() {
+                    const line = parseInt(this.dataset.line);
+                    const type = this.dataset.type;
+                    
+                    // Aggiorna immediatamente il valore nell'oggetto dati
+                    const item = currentPickingRecapData.recap_items.find(item => item.line === line);
+                    if (item) {
+                        if (type === 'order_number') {
+                            item.order_number = this.value.trim();
+                        } else if (type === 'location') {
+                            item.location = this.value.trim().toUpperCase();
+                        } else if (type === 'sku') {
+                            item.sku = this.value.trim();
+                        } else if (type === 'quantity') {
+                            item.quantity = parseInt(this.value) || 1;
+                        }
+                    }
+                });
+                
+                input.addEventListener('blur', function() {
+                    const line = parseInt(this.dataset.line);
+                    // Optional: trigger validation on blur if needed
+                });
+            });
+        }
+
         // Commit del recap Excel (creazione ordini)
         async function commitExcelRecap() {
             if (!currentExcelRecapData) {
@@ -4033,3 +4117,163 @@
         
         // Aggiorna il contatore all'avvio
         updateOutgoingStockCounter();
+
+        // Precompila date export al caricamento pagina
+        initializeExportDates();
+
+        // --- FUNZIONI EXPORT ORDINI ---
+
+        function initializeExportDates() {
+            const today = new Date();
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            
+            // Formatta le date in formato YYYY-MM-DD evitando problemi fuso orario
+            const formatDate = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+            
+            // Precompila i campi
+            const fromDateField = document.getElementById('export-from-date');
+            const toDateField = document.getElementById('export-to-date');
+            
+            if (fromDateField) {
+                fromDateField.value = formatDate(firstDayOfMonth);
+            }
+            
+            if (toDateField) {
+                toDateField.value = formatDate(today);
+            }
+        }
+        
+        // Export Excel
+        window.exportOrdersExcel = async function() {
+            try {
+                const fromDate = document.getElementById('export-from-date').value;
+                const toDate = document.getElementById('export-to-date').value;
+                
+                // Costruisci URL con parametri date
+                let url = '/orders/export-excel';
+                const params = new URLSearchParams();
+                if (fromDate) params.append('from_date', fromDate);
+                if (toDate) params.append('to_date', toDate);
+                if (params.toString()) url += '?' + params.toString();
+                
+                // Mostra loading
+                const loadingMsg = document.createElement('div');
+                loadingMsg.innerHTML = '⏳ Generazione file Excel in corso...';
+                loadingMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#0066CC;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+                document.body.appendChild(loadingMsg);
+                
+                const response = await fetch(url);
+                
+                // Rimuovi loading
+                document.body.removeChild(loadingMsg);
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    alert(`Errore generazione Excel: ${error.detail || 'Errore sconosciuto'}`);
+                    return;
+                }
+                
+                // Download del file Excel
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                
+                // Estrai nome file dalla response header se disponibile
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'export_ordini.xlsx';
+                if (contentDisposition) {
+                    const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
+                    if (matches && matches[1]) {
+                        filename = matches[1];
+                    }
+                }
+                
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(downloadUrl);
+                document.body.removeChild(a);
+                
+                // Feedback successo
+                const successMsg = document.createElement('div');
+                successMsg.innerHTML = '✅ File Excel scaricato con successo!';
+                successMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#28a745;color:white;padding:12px 18px;border-radius:6px;z-index:10000;font-weight:500;';
+                document.body.appendChild(successMsg);
+                setTimeout(() => document.body.removeChild(successMsg), 3000);
+                
+            } catch (error) {
+                console.error('Errore export Excel ordini:', error);
+                alert('Errore di rete durante la generazione del file Excel.');
+            }
+        };
+        
+        // Export PDF  
+        window.exportOrdersPdf = async function() {
+            try {
+                const fromDate = document.getElementById('export-from-date').value;
+                const toDate = document.getElementById('export-to-date').value;
+                
+                // Costruisci URL con parametri date
+                let url = '/orders/export-pdf';
+                const params = new URLSearchParams();
+                if (fromDate) params.append('from_date', fromDate);
+                if (toDate) params.append('to_date', toDate);
+                if (params.toString()) url += '?' + params.toString();
+                
+                // Mostra loading
+                const loadingMsg = document.createElement('div');
+                loadingMsg.innerHTML = '⏳ Generazione file PDF in corso...';
+                loadingMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+                document.body.appendChild(loadingMsg);
+                
+                const response = await fetch(url);
+                
+                // Rimuovi loading
+                document.body.removeChild(loadingMsg);
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    alert(`Errore generazione PDF: ${error.detail || 'Errore sconosciuto'}`);
+                    return;
+                }
+                
+                // Download del file PDF
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                
+                // Estrai nome file dalla response header se disponibile
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'export_ordini.pdf';
+                if (contentDisposition) {
+                    const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
+                    if (matches && matches[1]) {
+                        filename = matches[1];
+                    }
+                }
+                
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(downloadUrl);
+                document.body.removeChild(a);
+                
+                // Feedback successo
+                const successMsg = document.createElement('div');
+                successMsg.innerHTML = '✅ File PDF scaricato con successo!';
+                successMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#28a745;color:white;padding:12px 18px;border-radius:6px;z-index:10000;font-weight:500;';
+                document.body.appendChild(successMsg);
+                setTimeout(() => document.body.removeChild(successMsg), 3000);
+                
+            } catch (error) {
+                console.error('Errore export PDF ordini:', error);
+                alert('Errore di rete durante la generazione del file PDF.');
+            }
+        };
