@@ -62,7 +62,7 @@ debug_*
 archive_files_to_review/
 backup*/
 old*/
-temp*/
+# temp*/
 tmp*/
 
 # Generated files
