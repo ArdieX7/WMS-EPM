@@ -2483,8 +2483,11 @@
                         
                         return `<tr class="status-${item.status}" data-line="${item.line}">
                             <td>${statusIcon} ${item.line}</td>
-                            <td>${item.order_number}</td>
-                            <td>${item.customer_name || 'N/A'}</td>
+                            <td>
+                                <input type="text" class="recap-order-input" value="${item.order_number}" 
+                                       data-line="${item.line}" data-type="order_number" 
+                                       style="width: 100%; border: 1px solid #ddd; background: white; padding: 2px;">
+                            </td>
                             <td>
                                 <input type="text" class="recap-location-input" value="${item.location}" 
                                        data-line="${item.line}" data-type="location" 
@@ -2528,6 +2531,9 @@
                 executeBtn.onclick = function() {
                     executePickingRecap();
                 };
+                
+                // Setup degli input listeners per modifiche in tempo reale
+                setupPickingInputListeners();
             };
             
             // Chiude il recap picking
@@ -2538,13 +2544,20 @@
             
             // Corregge un'operazione di picking
             window.fixPickingOperation = function(line) {
+                const orderInput = document.querySelector(`input[data-line="${line}"][data-type="order_number"]`);
                 const locationInput = document.querySelector(`input[data-line="${line}"][data-type="location"]`);
                 const skuInput = document.querySelector(`input[data-line="${line}"][data-type="sku"]`);
                 const quantityInput = document.querySelector(`input[data-line="${line}"][data-type="quantity"]`);
                 
+                const newOrderNumber = orderInput ? orderInput.value.trim() : '';
                 const newLocation = locationInput ? locationInput.value.trim().toUpperCase() : '';
                 const newSku = skuInput ? skuInput.value.trim() : '';
                 const newQuantity = parseInt(quantityInput ? quantityInput.value : 1) || 1;
+                
+                if (!newOrderNumber) {
+                    alert('Inserisci un numero ordine valido');
+                    return;
+                }
                 
                 if (!newLocation) {
                     alert('Inserisci una ubicazione valida');
@@ -2559,6 +2572,7 @@
                 // Trova l'item nel recap e aggiornalo
                 const item = currentPickingRecapData.recap_items.find(item => item.line === line);
                 if (item) {
+                    item.order_number = newOrderNumber;
                     item.location = newLocation;
                     item.sku = newSku;
                     item.quantity = newQuantity;
@@ -3843,6 +3857,36 @@
                 input.addEventListener('blur', function() {
                     const line = parseInt(this.dataset.line);
                     validateExcelRow(line);
+                });
+            });
+        }
+
+        // Setup listeners per input Picking Recap
+        function setupPickingInputListeners() {
+            const inputs = document.querySelectorAll('.recap-order-input, .recap-location-input, .recap-sku-input, .recap-quantity-input');
+            inputs.forEach(input => {
+                input.addEventListener('input', function() {
+                    const line = parseInt(this.dataset.line);
+                    const type = this.dataset.type;
+                    
+                    // Aggiorna immediatamente il valore nell'oggetto dati
+                    const item = currentPickingRecapData.recap_items.find(item => item.line === line);
+                    if (item) {
+                        if (type === 'order_number') {
+                            item.order_number = this.value.trim();
+                        } else if (type === 'location') {
+                            item.location = this.value.trim().toUpperCase();
+                        } else if (type === 'sku') {
+                            item.sku = this.value.trim();
+                        } else if (type === 'quantity') {
+                            item.quantity = parseInt(this.value) || 1;
+                        }
+                    }
+                });
+                
+                input.addEventListener('blur', function() {
+                    const line = parseInt(this.dataset.line);
+                    // Optional: trigger validation on blur if needed
                 });
             });
         }
