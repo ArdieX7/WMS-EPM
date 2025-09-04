@@ -152,7 +152,7 @@ class LogsManager {
         if (logs.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
+                    <td colspan="9" style="text-align: center; padding: 2rem; color: #666;">
                         Nessun log trovato con i filtri applicati
                     </td>
                 </tr>
@@ -176,6 +176,7 @@ class LogsManager {
                 <td class="location-display">${this.formatLocations(log.location_from, log.location_to)}</td>
                 <td>${log.quantity || '-'}</td>
                 <td>${log.user_id || '-'}</td>
+                <td class="order-number">${this.formatOrderNumber(log.order_number)}</td>
                 <td>
                     ${this.formatDetailsPreview(log)}
                 </td>
@@ -221,6 +222,11 @@ class LogsManager {
         if (!locationFrom) return `→ ${locationTo}`;
         if (!locationTo) return locationFrom;
         return `${locationFrom} <span class="location-arrow">→</span> ${locationTo}`;
+    }
+    
+    formatOrderNumber(orderNumber) {
+        if (!orderNumber) return '<span style="color: #999;">-</span>';
+        return `<strong style="color: #0066CC;">${orderNumber}</strong>`;
     }
     
     formatDetailsPreview(log) {
@@ -472,13 +478,13 @@ class LogsManager {
         if (startDate) this.currentFilters.start_date = startDate;
         if (endDate) this.currentFilters.end_date = endDate;
         
-        // Multi-select
-        const operationTypes = Array.from(document.getElementById('operation-type-filter').selectedOptions)
-            .map(option => option.value).filter(v => v);
-        const categories = Array.from(document.getElementById('category-filter').selectedOptions)
-            .map(option => option.value).filter(v => v);
-        const statuses = Array.from(document.getElementById('status-filter').selectedOptions)
-            .map(option => option.value).filter(v => v);
+        // Checkbox filters
+        const operationTypes = Array.from(document.querySelectorAll('#operation-type-filter input[type="checkbox"]:checked'))
+            .map(checkbox => checkbox.value).filter(v => v);
+        const categories = Array.from(document.querySelectorAll('#category-filter input[type="checkbox"]:checked'))
+            .map(checkbox => checkbox.value).filter(v => v);
+        const statuses = Array.from(document.querySelectorAll('#status-filter input[type="checkbox"]:checked'))
+            .map(checkbox => checkbox.value).filter(v => v);
         
         if (operationTypes.length > 0) this.currentFilters.operation_types = operationTypes.join(',');
         if (categories.length > 0) this.currentFilters.operation_categories = categories.join(',');
@@ -488,11 +494,13 @@ class LogsManager {
         const searchSku = document.getElementById('search-sku').value.trim();
         const searchLocation = document.getElementById('search-location').value.trim();
         const searchUser = document.getElementById('search-user').value.trim();
+        const searchOrder = document.getElementById('search-order').value.trim();
         const searchText = document.getElementById('search-text').value.trim();
         
         if (searchSku) this.currentFilters.product_sku = searchSku;
         if (searchLocation) this.currentFilters.location = searchLocation;
         if (searchUser) this.currentFilters.user_id = searchUser;
+        if (searchOrder) this.currentFilters.order_number = searchOrder;
         if (searchText) this.currentFilters.search_text = searchText;
         
         this.currentPage = 1;
@@ -503,12 +511,16 @@ class LogsManager {
         // Reset form
         document.getElementById('start-date').value = '';
         document.getElementById('end-date').value = '';
-        document.getElementById('operation-type-filter').selectedIndex = 0;
-        document.getElementById('category-filter').selectedIndex = 0;
-        document.getElementById('status-filter').selectedIndex = 0;
+        
+        // Reset checkboxes
+        document.querySelectorAll('#operation-type-filter input[type="checkbox"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('#category-filter input[type="checkbox"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('#status-filter input[type="checkbox"]').forEach(cb => cb.checked = false);
+        
         document.getElementById('search-sku').value = '';
         document.getElementById('search-location').value = '';
         document.getElementById('search-user').value = '';
+        document.getElementById('search-order').value = '';
         document.getElementById('search-text').value = '';
         
         // Reset filtri interni
