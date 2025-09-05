@@ -95,12 +95,22 @@
                 <!-- Filtri tipo operazione -->
                 <div class="filter-group">
                     <label>Tipo Operazione:</label>
-                    <div class="checkbox-group" id="operation-type-filter">
-                        {% for op_type in operation_types %}
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="operation-type" value="{{ op_type.value }}" class="filter-checkbox">
-                            <span class="checkbox-label">{{ op_type.label }}</span>
-                        </label>
+                    <div class="checkbox-group hierarchical" id="operation-type-filter">
+                        {% for group_key, group_data in grouped_operation_types.items() %}
+                        <div class="operation-group">
+                            <label class="checkbox-item macro-category">
+                                <input type="checkbox" name="operation-group" value="{{ group_key }}" class="filter-checkbox group-checkbox" data-group="{{ group_key }}">
+                                <span class="checkbox-label group-label">{{ group_data.label }}</span>
+                            </label>
+                            <div class="sub-operations" data-parent-group="{{ group_key }}">
+                                {% for operation in group_data.operations %}
+                                <label class="checkbox-item sub-operation">
+                                    <input type="checkbox" name="operation-type" value="{{ operation.value }}" class="filter-checkbox operation-checkbox" data-parent="{{ group_key }}">
+                                    <span class="checkbox-label">{{ operation.label }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
                         {% endfor %}
                     </div>
                 </div>

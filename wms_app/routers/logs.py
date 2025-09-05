@@ -30,6 +30,108 @@ def get_all_operation_types():
     types.sort(key=lambda x: x["label"])
     return types
 
+def get_grouped_operation_types():
+    """Genera tipi di operazione raggruppati in macro-categorie gerarchiche."""
+    return {
+        "carico": {
+            "label": "📦 Carico",
+            "operations": [
+                {"value": OperationType.CARICO_MANUALE, "label": "Carico Manuale"},
+                {"value": OperationType.CARICO_FILE, "label": "Carico File"},
+                {"value": OperationType.SCARICO_CONTAINER_MANUALE, "label": "Scarico Container Manuale"},
+                {"value": OperationType.SCARICO_CONTAINER_FILE, "label": "Scarico Container File"}
+            ]
+        },
+        "scarico": {
+            "label": "📤 Scarico", 
+            "operations": [
+                {"value": OperationType.SCARICO_MANUALE, "label": "Scarico Manuale"},
+                {"value": OperationType.SCARICO_FILE, "label": "Scarico File"}
+            ]
+        },
+        "movimenti": {
+            "label": "🔄 Movimenti",
+            "operations": [
+                {"value": OperationType.SPOSTAMENTO_MANUALE, "label": "Spostamento Manuale"},
+                {"value": OperationType.SPOSTAMENTO_FILE, "label": "Spostamento File"},
+                {"value": OperationType.UBICAZIONE_DA_TERRA_MANUALE, "label": "Ubicazione Da Terra Manuale"},
+                {"value": OperationType.UBICAZIONE_DA_TERRA_FILE, "label": "Ubicazione Da Terra File"},
+                {"value": OperationType.RIALLINEAMENTO_MANUALE, "label": "Riallineamento Manuale"},
+                {"value": OperationType.RIALLINEAMENTO_FILE, "label": "Riallineamento File"},
+                {"value": OperationType.CONSOLIDAMENTO_TERRA, "label": "Consolidamento Terra"}
+            ]
+        },
+        "prelievo": {
+            "label": "🛒 Prelievo",
+            "operations": [
+                {"value": OperationType.PRELIEVO_FILE, "label": "Prelievo File"},
+                {"value": OperationType.PRELIEVO_MANUALE, "label": "Prelievo Manuale"},
+                {"value": OperationType.PRELIEVO_TEMPO_REALE, "label": "Prelievo Tempo Reale"},
+                {"value": OperationType.PICKING_GENERATO, "label": "Picking Generato"},
+                {"value": OperationType.PICKING_CONFERMATO, "label": "Picking Confermato"}
+            ]
+        },
+        "ordini": {
+            "label": "📋 Ordini",
+            "operations": [
+                {"value": OperationType.ORDINE_CREATO, "label": "Ordine Creato"},
+                {"value": OperationType.ORDINE_MODIFICATO, "label": "Ordine Modificato"},
+                {"value": OperationType.ORDINE_ELIMINATO, "label": "Ordine Eliminato"},
+                {"value": OperationType.ORDINE_COMPLETATO, "label": "Ordine Completato"},
+                {"value": OperationType.ORDINE_EVASO, "label": "Ordine Evaso"},
+                {"value": OperationType.ORDINE_ANNULLATO, "label": "Ordine Annullato"}
+            ]
+        },
+        "seriali": {
+            "label": "🏷️ Seriali",
+            "operations": [
+                {"value": OperationType.SERIALI_ASSEGNATI, "label": "Seriali Assegnati"},
+                {"value": OperationType.SERIALI_RIMOSSI, "label": "Seriali Rimossi"}
+            ]
+        },
+        "ddt": {
+            "label": "📄 DDT",
+            "operations": [
+                {"value": OperationType.DDT_CREATO, "label": "DDT Creato"},
+                {"value": OperationType.DDT_MODIFICATO, "label": "DDT Modificato"},
+                {"value": OperationType.DDT_FINALIZZATO, "label": "DDT Finalizzato"}
+            ]
+        },
+        "prodotti": {
+            "label": "📦 Prodotti",
+            "operations": [
+                {"value": OperationType.PRODOTTO_CREATO, "label": "Prodotto Creato"},
+                {"value": OperationType.PRODOTTO_MODIFICATO, "label": "Prodotto Modificato"},
+                {"value": OperationType.PRODOTTO_ELIMINATO, "label": "Prodotto Eliminato"}
+            ]
+        },
+        "magazzino": {
+            "label": "🏢 Magazzino",
+            "operations": [
+                {"value": OperationType.UBICAZIONE_CREATA, "label": "Ubicazione Creata"},
+                {"value": OperationType.UBICAZIONE_MODIFICATA, "label": "Ubicazione Modificata"},
+                {"value": OperationType.UBICAZIONE_ELIMINATA, "label": "Ubicazione Eliminata"}
+            ]
+        },
+        "sistema": {
+            "label": "⚙️ Sistema",
+            "operations": [
+                {"value": OperationType.SISTEMA_AVVIATO, "label": "Sistema Avviato"},
+                {"value": OperationType.BACKUP_CREATO, "label": "Backup Creato"},
+                {"value": OperationType.PULIZIA_DATABASE, "label": "Pulizia Database"}
+            ]
+        },
+        "prenotazioni": {
+            "label": "🔒 Prenotazioni",
+            "operations": [
+                {"value": OperationType.PRENOTAZIONE_CREATA, "label": "Prenotazione Creata"},
+                {"value": OperationType.PRENOTAZIONE_SCADUTA, "label": "Prenotazione Scaduta"},
+                {"value": OperationType.PRENOTAZIONE_COMPLETATA, "label": "Prenotazione Completata"},
+                {"value": OperationType.PRENOTAZIONE_CANCELLATA, "label": "Prenotazione Cancellata"}
+            ]
+        }
+    }
+
 templates = Jinja2Templates(directory="wms_app/templates")
 
 router = APIRouter(
@@ -47,6 +149,7 @@ async def logs_dashboard(request: Request):
             "request": request, 
             "active_page": "logs",
             "operation_types": get_all_operation_types(),
+            "grouped_operation_types": get_grouped_operation_types(),
             "operation_categories": [
                 {"value": OperationCategory.MANUAL, "label": "Manuale"},
                 {"value": OperationCategory.FILE, "label": "Da File"},

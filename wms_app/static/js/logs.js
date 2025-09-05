@@ -67,6 +67,9 @@ class LogsManager {
                 }
             });
         });
+        
+        // Hierarchical checkbox events
+        this.bindHierarchicalCheckboxes();
     }
     
     initializeFilters() {
@@ -81,6 +84,69 @@ class LogsManager {
         // Per export, imposta stesso range
         document.getElementById('export-start-date').value = this.formatDateTimeLocal(startDate);
         document.getElementById('export-end-date').value = this.formatDateTimeLocal(endDate);
+    }
+    
+    bindHierarchicalCheckboxes() {
+        // Gestisce i checkbox delle macro-categorie
+        document.querySelectorAll('.group-checkbox').forEach(groupCheckbox => {
+            groupCheckbox.addEventListener('change', (e) => {
+                const groupKey = e.target.dataset.group;
+                const isChecked = e.target.checked;
+                this.toggleGroupOperations(groupKey, isChecked);
+            });
+        });
+
+        // Gestisce i checkbox delle singole operazioni
+        document.querySelectorAll('.operation-checkbox').forEach(operationCheckbox => {
+            operationCheckbox.addEventListener('change', (e) => {
+                const groupKey = e.target.dataset.parent;
+                this.updateGroupCheckboxState(groupKey);
+                this.updateGroupVisualState(groupKey);
+            });
+        });
+    }
+
+    toggleGroupOperations(groupKey, isChecked) {
+        // Seleziona/deseleziona tutte le operazioni nel gruppo
+        const operationsInGroup = document.querySelectorAll(`input.operation-checkbox[data-parent="${groupKey}"]`);
+        operationsInGroup.forEach(checkbox => {
+            checkbox.checked = isChecked;
+        });
+        
+        this.updateGroupVisualState(groupKey);
+    }
+
+    updateGroupCheckboxState(groupKey) {
+        // Aggiorna lo stato del checkbox del gruppo basandoti sulle operazioni selezionate
+        const groupCheckbox = document.querySelector(`input.group-checkbox[data-group="${groupKey}"]`);
+        const operationsInGroup = document.querySelectorAll(`input.operation-checkbox[data-parent="${groupKey}"]`);
+        const checkedOperations = document.querySelectorAll(`input.operation-checkbox[data-parent="${groupKey}"]:checked`);
+        
+        if (checkedOperations.length === 0) {
+            // Nessuna operazione selezionata
+            groupCheckbox.checked = false;
+            groupCheckbox.indeterminate = false;
+        } else if (checkedOperations.length === operationsInGroup.length) {
+            // Tutte le operazioni selezionate
+            groupCheckbox.checked = true;
+            groupCheckbox.indeterminate = false;
+        } else {
+            // Alcune operazioni selezionate
+            groupCheckbox.checked = false;
+            groupCheckbox.indeterminate = true;
+        }
+    }
+
+    updateGroupVisualState(groupKey) {
+        // Aggiorna lo stato visivo del gruppo
+        const groupContainer = document.querySelector(`.operation-group .macro-category input[data-group="${groupKey}"]`).closest('.operation-group');
+        const checkedOperations = document.querySelectorAll(`input.operation-checkbox[data-parent="${groupKey}"]:checked`);
+        
+        if (checkedOperations.length > 0) {
+            groupContainer.classList.add('has-active-children');
+        } else {
+            groupContainer.classList.remove('has-active-children');
+        }
     }
     
     formatDateTimeLocal(date) {
@@ -478,8 +544,8 @@ class LogsManager {
         if (startDate) this.currentFilters.start_date = startDate;
         if (endDate) this.currentFilters.end_date = endDate;
         
-        // Checkbox filters
-        const operationTypes = Array.from(document.querySelectorAll('#operation-type-filter input[type="checkbox"]:checked'))
+        // Checkbox filters - Solo operazioni specifiche, non gruppi
+        const operationTypes = Array.from(document.querySelectorAll('#operation-type-filter .operation-checkbox:checked'))
             .map(checkbox => checkbox.value).filter(v => v);
         const categories = Array.from(document.querySelectorAll('#category-filter input[type="checkbox"]:checked'))
             .map(checkbox => checkbox.value).filter(v => v);
@@ -513,9 +579,17 @@ class LogsManager {
         document.getElementById('end-date').value = '';
         
         // Reset checkboxes
-        document.querySelectorAll('#operation-type-filter input[type="checkbox"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('#operation-type-filter input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+            cb.indeterminate = false;
+        });
         document.querySelectorAll('#category-filter input[type="checkbox"]').forEach(cb => cb.checked = false);
         document.querySelectorAll('#status-filter input[type="checkbox"]').forEach(cb => cb.checked = false);
+        
+        // Reset visual state for hierarchical groups
+        document.querySelectorAll('.operation-group').forEach(group => {
+            group.classList.remove('has-active-children');
+        });
         
         document.getElementById('search-sku').value = '';
         document.getElementById('search-location').value = '';

@@ -64,7 +64,7 @@
                     const palletQty = product.pallet_quantity || 0;
                     
                     const row = `<tr>
-                        <td>${product.sku}</td>
+                        <td><span class="sku-clickable" onclick="showProductHistory('${product.sku}')" title="Clicca per vedere lo storico movimentazioni">${product.sku}</span></td>
                         <td>${product.description || ''}</td>
                         <td>${formattedValue}</td>
                         <td>${eanList}</td>
@@ -608,4 +608,387 @@
                     }
                 }
             });
+
+            // Inizializzazione ProductHistoryManager
+            window.productHistoryManager = new ProductHistoryManager();
         });
+
+        // ProductHistoryManager - Gestione storico movimentazioni prodotto
+        class ProductHistoryManager {
+            constructor() {
+                this.currentSku = null;
+                this.currentPage = 1;
+                this.pageSize = 20;
+                this.currentFilters = {};
+                this.groupedOperationTypes = null;
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.loadGroupedOperationTypes();
+            }
+
+            bindEvents() {
+                // Bottoni filtri
+                document.getElementById('apply-history-filters-btn')?.addEventListener('click', () => this.applyFilters());
+                document.getElementById('reset-history-filters-btn')?.addEventListener('click', () => this.resetFilters());
+            }
+
+            async loadGroupedOperationTypes() {
+                try {
+                    // Riusa la stessa struttura dei logs
+                    this.groupedOperationTypes = {
+                        "carico": {
+                            "label": "📦 Carico",
+                            "operations": [
+                                {"value": "CARICO_MANUALE", "label": "Carico Manuale"},
+                                {"value": "CARICO_FILE", "label": "Carico File"},
+                                {"value": "SCARICO_CONTAINER_MANUALE", "label": "Scarico Container Manuale"},
+                                {"value": "SCARICO_CONTAINER_FILE", "label": "Scarico Container File"}
+                            ]
+                        },
+                        "scarico": {
+                            "label": "📤 Scarico", 
+                            "operations": [
+                                {"value": "SCARICO_MANUALE", "label": "Scarico Manuale"},
+                                {"value": "SCARICO_FILE", "label": "Scarico File"}
+                            ]
+                        },
+                        "movimenti": {
+                            "label": "🔄 Movimenti",
+                            "operations": [
+                                {"value": "SPOSTAMENTO_MANUALE", "label": "Spostamento Manuale"},
+                                {"value": "SPOSTAMENTO_FILE", "label": "Spostamento File"},
+                                {"value": "UBICAZIONE_DA_TERRA_MANUALE", "label": "Ubicazione Da Terra Manuale"},
+                                {"value": "UBICAZIONE_DA_TERRA_FILE", "label": "Ubicazione Da Terra File"},
+                                {"value": "RIALLINEAMENTO_MANUALE", "label": "Riallineamento Manuale"},
+                                {"value": "RIALLINEAMENTO_FILE", "label": "Riallineamento File"}
+                            ]
+                        },
+                        "prelievo": {
+                            "label": "🛒 Prelievo",
+                            "operations": [
+                                {"value": "PRELIEVO_FILE", "label": "Prelievo File"},
+                                {"value": "PRELIEVO_MANUALE", "label": "Prelievo Manuale"},
+                                {"value": "PRELIEVO_TEMPO_REALE", "label": "Prelievo Tempo Reale"},
+                                {"value": "PICKING_GENERATO", "label": "Picking Generato"},
+                                {"value": "PICKING_CONFERMATO", "label": "Picking Confermato"}
+                            ]
+                        },
+                        "ordini": {
+                            "label": "📋 Ordini",
+                            "operations": [
+                                {"value": "ORDINE_CREATO", "label": "Ordine Creato"},
+                                {"value": "ORDINE_MODIFICATO", "label": "Ordine Modificato"},
+                                {"value": "ORDINE_ELIMINATO", "label": "Ordine Eliminato"},
+                                {"value": "ORDINE_COMPLETATO", "label": "Ordine Completato"},
+                                {"value": "ORDINE_EVASO", "label": "Ordine Evaso"},
+                                {"value": "ORDINE_ANNULLATO", "label": "Ordine Annullato"}
+                            ]
+                        },
+                        "seriali": {
+                            "label": "🏷️ Seriali",
+                            "operations": [
+                                {"value": "SERIALI_ASSEGNATI", "label": "Seriali Assegnati"},
+                                {"value": "SERIALI_RIMOSSI", "label": "Seriali Rimossi"}
+                            ]
+                        }
+                    };
+
+                    this.renderOperationTypeFilters();
+                } catch (error) {
+                    console.error('Error loading operation types:', error);
+                }
+            }
+
+            renderOperationTypeFilters() {
+                const container = document.getElementById('history-operation-type-filter');
+                if (!container || !this.groupedOperationTypes) return;
+
+                container.innerHTML = '';
+
+                for (const [groupKey, groupData] of Object.entries(this.groupedOperationTypes)) {
+                    const groupDiv = document.createElement('div');
+                    groupDiv.className = 'operation-group';
+
+                    // Macro categoria
+                    const macroLabel = document.createElement('label');
+                    macroLabel.className = 'checkbox-item macro-category';
+                    macroLabel.innerHTML = `
+                        <input type="checkbox" name="operation-group" value="${groupKey}" class="filter-checkbox group-checkbox" data-group="${groupKey}">
+                        <span class="checkbox-label group-label">${groupData.label}</span>
+                    `;
+
+                    // Sub operazioni
+                    const subDiv = document.createElement('div');
+                    subDiv.className = 'sub-operations';
+                    subDiv.setAttribute('data-parent-group', groupKey);
+
+                    groupData.operations.forEach(operation => {
+                        const operationLabel = document.createElement('label');
+                        operationLabel.className = 'checkbox-item sub-operation';
+                        operationLabel.innerHTML = `
+                            <input type="checkbox" name="operation-type" value="${operation.value}" class="filter-checkbox operation-checkbox" data-parent="${groupKey}">
+                            <span class="checkbox-label">${operation.label}</span>
+                        `;
+                        subDiv.appendChild(operationLabel);
+                    });
+
+                    groupDiv.appendChild(macroLabel);
+                    groupDiv.appendChild(subDiv);
+                    container.appendChild(groupDiv);
+                }
+
+                // Bind eventi gerarchici
+                this.bindHierarchicalEvents();
+            }
+
+            bindHierarchicalEvents() {
+                // Gestisce i checkbox delle macro-categorie
+                document.querySelectorAll('#history-operation-type-filter .group-checkbox').forEach(groupCheckbox => {
+                    groupCheckbox.addEventListener('change', (e) => {
+                        const groupKey = e.target.dataset.group;
+                        const isChecked = e.target.checked;
+                        this.toggleGroupOperations(groupKey, isChecked);
+                    });
+                });
+
+                // Gestisce i checkbox delle singole operazioni
+                document.querySelectorAll('#history-operation-type-filter .operation-checkbox').forEach(operationCheckbox => {
+                    operationCheckbox.addEventListener('change', (e) => {
+                        const groupKey = e.target.dataset.parent;
+                        this.updateGroupCheckboxState(groupKey);
+                    });
+                });
+            }
+
+            toggleGroupOperations(groupKey, isChecked) {
+                const operationsInGroup = document.querySelectorAll(`#history-operation-type-filter input.operation-checkbox[data-parent="${groupKey}"]`);
+                operationsInGroup.forEach(checkbox => {
+                    checkbox.checked = isChecked;
+                });
+            }
+
+            updateGroupCheckboxState(groupKey) {
+                const groupCheckbox = document.querySelector(`#history-operation-type-filter input.group-checkbox[data-group="${groupKey}"]`);
+                const operationsInGroup = document.querySelectorAll(`#history-operation-type-filter input.operation-checkbox[data-parent="${groupKey}"]`);
+                const checkedOperations = document.querySelectorAll(`#history-operation-type-filter input.operation-checkbox[data-parent="${groupKey}"]:checked`);
+                
+                if (checkedOperations.length === 0) {
+                    groupCheckbox.checked = false;
+                    groupCheckbox.indeterminate = false;
+                } else if (checkedOperations.length === operationsInGroup.length) {
+                    groupCheckbox.checked = true;
+                    groupCheckbox.indeterminate = false;
+                } else {
+                    groupCheckbox.checked = false;
+                    groupCheckbox.indeterminate = true;
+                }
+            }
+
+            async showHistory(sku) {
+                this.currentSku = sku;
+                this.currentPage = 1;
+                
+                // Aggiorna UI
+                document.getElementById('history-product-title').textContent = `📊 Storico Movimentazioni - ${sku}`;
+                document.getElementById('history-product-info').textContent = `Cronologia operazioni per prodotto ${sku}`;
+                
+                // Imposta filtri di default (ultimi 30 giorni)
+                this.setDefaultFilters();
+                
+                // Carica dati
+                await this.loadHistory();
+                
+                // Mostra overlay
+                document.getElementById('product-history-overlay').style.display = 'block';
+            }
+
+            setDefaultFilters() {
+                const endDate = new Date();
+                const startDate = new Date();
+                startDate.setDate(startDate.getDate() - 30);
+                
+                document.getElementById('history-start-date').value = this.formatDateTimeLocal(startDate);
+                document.getElementById('history-end-date').value = this.formatDateTimeLocal(endDate);
+            }
+
+            formatDateTimeLocal(date) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
+            }
+
+            async loadHistory() {
+                if (!this.currentSku) return;
+
+                this.showLoading();
+                
+                try {
+                    const token = await window.modernAuth.getValidAccessToken();
+                    if (!token) {
+                        throw new Error('Token non valido');
+                    }
+
+                    // Costruisci parametri
+                    const params = new URLSearchParams({
+                        page: this.currentPage,
+                        page_size: this.pageSize,
+                        order_by: 'timestamp',
+                        order_direction: 'desc'
+                    });
+
+                    // Aggiungi filtri
+                    if (this.currentFilters.start_date) params.append('start_date', this.currentFilters.start_date);
+                    if (this.currentFilters.end_date) params.append('end_date', this.currentFilters.end_date);
+                    if (this.currentFilters.operation_types) params.append('operation_types', this.currentFilters.operation_types);
+
+                    const response = await fetch(`/products/${this.currentSku}/history?${params}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    this.renderHistory(data);
+                    this.updateStats(data);
+
+                } catch (error) {
+                    console.error('Error loading history:', error);
+                    this.showError(`Errore nel caricamento storico: ${error.message}`);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            renderHistory(data) {
+                const tbody = document.getElementById('history-table-body');
+                tbody.innerHTML = '';
+
+                if (!data.history || data.history.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="no-data">Nessuna operazione trovata per il periodo selezionato</td></tr>';
+                    return;
+                }
+
+                data.history.forEach(log => {
+                    const locationDisplay = this.formatLocation(log.location_from, log.location_to);
+                    const statusClass = this.getStatusClass(log.status);
+                    const orderNumber = log.order_number || '-';
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${log.timestamp}</td>
+                        <td><span class="operation-type">${log.operation_type}</span></td>
+                        <td><span class="status ${statusClass}">${log.status}</span></td>
+                        <td>${locationDisplay}</td>
+                        <td class="quantity">${log.quantity || '-'}</td>
+                        <td>${log.user_id || '-'}</td>
+                        <td class="order-number">${orderNumber}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            formatLocation(locationFrom, locationTo) {
+                if (locationFrom && locationTo) {
+                    return `${locationFrom} → ${locationTo}`;
+                } else if (locationFrom) {
+                    return `Da: ${locationFrom}`;
+                } else if (locationTo) {
+                    return `A: ${locationTo}`;
+                } else {
+                    return '-';
+                }
+            }
+
+            getStatusClass(status) {
+                switch (status) {
+                    case 'SUCCESS': return 'success';
+                    case 'ERROR': return 'error';
+                    case 'WARNING': return 'warning';
+                    case 'PARTIAL': return 'partial';
+                    default: return '';
+                }
+            }
+
+            updateStats(data) {
+                document.getElementById('history-total-ops').textContent = data.pagination?.total_count || 0;
+                
+                const periodInfo = data.period_info;
+                let periodText = 'Tutti i record';
+                if (periodInfo?.start_date && periodInfo?.end_date) {
+                    const startDate = new Date(periodInfo.start_date).toLocaleDateString('it-IT');
+                    const endDate = new Date(periodInfo.end_date).toLocaleDateString('it-IT');
+                    periodText = `${startDate} - ${endDate}`;
+                }
+                document.getElementById('history-period').textContent = periodText;
+            }
+
+            applyFilters() {
+                this.currentFilters = {};
+                this.currentPage = 1;
+
+                // Date
+                const startDate = document.getElementById('history-start-date').value;
+                const endDate = document.getElementById('history-end-date').value;
+                
+                if (startDate) this.currentFilters.start_date = startDate;
+                if (endDate) this.currentFilters.end_date = endDate;
+
+                // Operation types
+                const operationTypes = Array.from(document.querySelectorAll('#history-operation-type-filter .operation-checkbox:checked'))
+                    .map(checkbox => checkbox.value).filter(v => v);
+                if (operationTypes.length > 0) this.currentFilters.operation_types = operationTypes.join(',');
+
+                this.loadHistory();
+            }
+
+            resetFilters() {
+                // Reset filtri
+                document.getElementById('history-start-date').value = '';
+                document.getElementById('history-end-date').value = '';
+                
+                // Reset checkboxes
+                document.querySelectorAll('#history-operation-type-filter input[type="checkbox"]').forEach(cb => {
+                    cb.checked = false;
+                    cb.indeterminate = false;
+                });
+
+                // Imposta filtri di default
+                this.setDefaultFilters();
+                this.currentFilters = {};
+                this.currentPage = 1;
+                this.loadHistory();
+            }
+
+            showLoading() {
+                document.getElementById('history-loading').style.display = 'block';
+            }
+
+            hideLoading() {
+                document.getElementById('history-loading').style.display = 'none';
+            }
+
+            showError(message) {
+                const tbody = document.getElementById('history-table-body');
+                tbody.innerHTML = `<tr><td colspan="8" class="error-message">❌ ${message}</td></tr>`;
+            }
+        }
+
+        // Funzioni globali
+        function showProductHistory(sku) {
+            window.productHistoryManager.showHistory(sku);
+        }
+
+        function closeProductHistory() {
+            document.getElementById('product-history-overlay').style.display = 'none';
+        }
+

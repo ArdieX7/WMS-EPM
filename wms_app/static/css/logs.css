@@ -246,6 +246,84 @@ body {
     color: var(--secondary-color);
 }
 
+/* ==== STILI GERARCHICI TIPO OPERAZIONE ==== */
+.checkbox-group.hierarchical {
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.operation-group {
+    border-left: 3px solid transparent;
+    transition: border-color 0.2s ease;
+}
+
+.operation-group:hover {
+    border-left: 3px solid var(--accent-color);
+}
+
+/* Macro categoria */
+.macro-category {
+    margin-bottom: 0.25rem !important;
+    font-weight: 600;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 6px;
+    padding: 0.4rem 0.5rem !important;
+    border: 1px solid #dee2e6;
+}
+
+.macro-category:hover {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border-color: var(--secondary-color);
+}
+
+.macro-category .group-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.macro-category input:checked + .group-label {
+    color: var(--secondary-color);
+}
+
+/* Sotto-operazioni */
+.sub-operations {
+    margin-left: 1.5rem;
+    margin-top: 0.25rem;
+    padding-left: 0.5rem;
+    border-left: 2px dotted #ccc;
+}
+
+.sub-operation {
+    padding: 0.15rem 0.25rem !important;
+    font-size: 0.85rem !important;
+    margin-bottom: 0.1rem !important;
+}
+
+.sub-operation .checkbox-label {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.sub-operation:hover {
+    background-color: #f0f8ff;
+}
+
+.sub-operation input:checked + .checkbox-label {
+    color: var(--secondary-color);
+    font-weight: 500;
+}
+
+/* Stato attivo per gruppi con elementi selezionati */
+.operation-group.has-active-children .macro-category {
+    background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c8 100%);
+    border-color: var(--success-color);
+}
+
+.operation-group.has-active-children .macro-category .group-label {
+    color: var(--success-color);
+}
+
 /* Pulsanti filtri */
 .filter-btn {
     padding: 0.5rem 1rem;
