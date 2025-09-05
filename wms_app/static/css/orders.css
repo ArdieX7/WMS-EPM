@@ -1332,3 +1332,55 @@ th {
     white-space: normal;
     padding: 0.5rem !important;
 }
+
+/* Stili per la sezione posizioni di prelievo */
+#pickup-locations-section {
+    margin-top: 1.5rem;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    padding: 1rem;
+}
+
+#pickup-locations-section .form-group label {
+    color: #0066CC;
+    font-size: 1.1rem;
+    margin-bottom: 0.8rem;
+    display: block;
+    border-bottom: 2px solid #0066CC;
+    padding-bottom: 0.5rem;
+}
+
+#pickup-locations-section .recap-table {
+    background-color: white;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    overflow: hidden;
+}
+
+#pickup-locations-section .recap-table thead {
+    background-color: #0066CC;
+    color: white;
+}
+
+#pickup-locations-section .recap-table thead th {
+    padding: 0.8rem 0.6rem;
+    font-weight: 600;
+    text-align: center;
+    border-bottom: 2px solid #004499;
+}
+
+#pickup-locations-section .recap-table tbody tr:nth-child(odd) {
+    background-color: #f9f9f9;
+}
+
+#pickup-locations-section .recap-table tbody tr:hover {
+    background-color: #e3f2fd;
+    transition: background-color 0.2s ease;
+}
+
+#pickup-locations-section .recap-table tbody td {
+    padding: 0.6rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #eee;
+}

@@ -12,6 +12,126 @@ from wms_app.services.logging_service import LoggingService
 from wms_app.models.logs import OperationType, OperationCategory, OperationStatus
 from fastapi.templating import Jinja2Templates
 
+# Helper function per generare tutti i tipi di operazione
+def get_all_operation_types():
+    """Genera automaticamente tutti i tipi di operazione disponibili."""
+    types = []
+    
+    # Usa reflection per ottenere tutti i tipi da OperationType
+    for attr_name in dir(OperationType):
+        if not attr_name.startswith('_'):
+            value = getattr(OperationType, attr_name)
+            if isinstance(value, str):
+                # Crea label leggibile dal nome della costante
+                label = attr_name.replace('_', ' ').title()
+                types.append({"value": value, "label": label})
+    
+    # Ordina per label per una migliore UX
+    types.sort(key=lambda x: x["label"])
+    return types
+
+def get_grouped_operation_types():
+    """Genera tipi di operazione raggruppati in macro-categorie gerarchiche."""
+    return {
+        "carico": {
+            "label": "📦 Carico",
+            "operations": [
+                {"value": OperationType.CARICO_MANUALE, "label": "Carico Manuale"},
+                {"value": OperationType.CARICO_FILE, "label": "Carico File"},
+                {"value": OperationType.SCARICO_CONTAINER_MANUALE, "label": "Scarico Container Manuale"},
+                {"value": OperationType.SCARICO_CONTAINER_FILE, "label": "Scarico Container File"}
+            ]
+        },
+        "scarico": {
+            "label": "📤 Scarico", 
+            "operations": [
+                {"value": OperationType.SCARICO_MANUALE, "label": "Scarico Manuale"},
+                {"value": OperationType.SCARICO_FILE, "label": "Scarico File"}
+            ]
+        },
+        "movimenti": {
+            "label": "🔄 Movimenti",
+            "operations": [
+                {"value": OperationType.SPOSTAMENTO_MANUALE, "label": "Spostamento Manuale"},
+                {"value": OperationType.SPOSTAMENTO_FILE, "label": "Spostamento File"},
+                {"value": OperationType.UBICAZIONE_DA_TERRA_MANUALE, "label": "Ubicazione Da Terra Manuale"},
+                {"value": OperationType.UBICAZIONE_DA_TERRA_FILE, "label": "Ubicazione Da Terra File"},
+                {"value": OperationType.RIALLINEAMENTO_MANUALE, "label": "Riallineamento Manuale"},
+                {"value": OperationType.RIALLINEAMENTO_FILE, "label": "Riallineamento File"},
+                {"value": OperationType.CONSOLIDAMENTO_TERRA, "label": "Consolidamento Terra"}
+            ]
+        },
+        "prelievo": {
+            "label": "🛒 Prelievo",
+            "operations": [
+                {"value": OperationType.PRELIEVO_FILE, "label": "Prelievo File"},
+                {"value": OperationType.PRELIEVO_MANUALE, "label": "Prelievo Manuale"},
+                {"value": OperationType.PRELIEVO_TEMPO_REALE, "label": "Prelievo Tempo Reale"},
+                {"value": OperationType.PICKING_GENERATO, "label": "Picking Generato"},
+                {"value": OperationType.PICKING_CONFERMATO, "label": "Picking Confermato"}
+            ]
+        },
+        "ordini": {
+            "label": "📋 Ordini",
+            "operations": [
+                {"value": OperationType.ORDINE_CREATO, "label": "Ordine Creato"},
+                {"value": OperationType.ORDINE_MODIFICATO, "label": "Ordine Modificato"},
+                {"value": OperationType.ORDINE_ELIMINATO, "label": "Ordine Eliminato"},
+                {"value": OperationType.ORDINE_COMPLETATO, "label": "Ordine Completato"},
+                {"value": OperationType.ORDINE_EVASO, "label": "Ordine Evaso"},
+                {"value": OperationType.ORDINE_ANNULLATO, "label": "Ordine Annullato"}
+            ]
+        },
+        "seriali": {
+            "label": "🏷️ Seriali",
+            "operations": [
+                {"value": OperationType.SERIALI_ASSEGNATI, "label": "Seriali Assegnati"},
+                {"value": OperationType.SERIALI_RIMOSSI, "label": "Seriali Rimossi"}
+            ]
+        },
+        "ddt": {
+            "label": "📄 DDT",
+            "operations": [
+                {"value": OperationType.DDT_CREATO, "label": "DDT Creato"},
+                {"value": OperationType.DDT_MODIFICATO, "label": "DDT Modificato"},
+                {"value": OperationType.DDT_FINALIZZATO, "label": "DDT Finalizzato"}
+            ]
+        },
+        "prodotti": {
+            "label": "📦 Prodotti",
+            "operations": [
+                {"value": OperationType.PRODOTTO_CREATO, "label": "Prodotto Creato"},
+                {"value": OperationType.PRODOTTO_MODIFICATO, "label": "Prodotto Modificato"},
+                {"value": OperationType.PRODOTTO_ELIMINATO, "label": "Prodotto Eliminato"}
+            ]
+        },
+        "magazzino": {
+            "label": "🏢 Magazzino",
+            "operations": [
+                {"value": OperationType.UBICAZIONE_CREATA, "label": "Ubicazione Creata"},
+                {"value": OperationType.UBICAZIONE_MODIFICATA, "label": "Ubicazione Modificata"},
+                {"value": OperationType.UBICAZIONE_ELIMINATA, "label": "Ubicazione Eliminata"}
+            ]
+        },
+        "sistema": {
+            "label": "⚙️ Sistema",
+            "operations": [
+                {"value": OperationType.SISTEMA_AVVIATO, "label": "Sistema Avviato"},
+                {"value": OperationType.BACKUP_CREATO, "label": "Backup Creato"},
+                {"value": OperationType.PULIZIA_DATABASE, "label": "Pulizia Database"}
+            ]
+        },
+        "prenotazioni": {
+            "label": "🔒 Prenotazioni",
+            "operations": [
+                {"value": OperationType.PRENOTAZIONE_CREATA, "label": "Prenotazione Creata"},
+                {"value": OperationType.PRENOTAZIONE_SCADUTA, "label": "Prenotazione Scaduta"},
+                {"value": OperationType.PRENOTAZIONE_COMPLETATA, "label": "Prenotazione Completata"},
+                {"value": OperationType.PRENOTAZIONE_CANCELLATA, "label": "Prenotazione Cancellata"}
+            ]
+        }
+    }
+
 templates = Jinja2Templates(directory="wms_app/templates")
 
 router = APIRouter(
@@ -28,34 +148,8 @@ async def logs_dashboard(request: Request):
         {
             "request": request, 
             "active_page": "logs",
-            "operation_types": [
-                # Operazioni Inventario
-                {"value": OperationType.CARICO_MANUALE, "label": "Carico Manuale"},
-                {"value": OperationType.SCARICO_MANUALE, "label": "Scarico Manuale"},
-                {"value": OperationType.SPOSTAMENTO_MANUALE, "label": "Spostamento Manuale"},
-                {"value": OperationType.CARICO_FILE, "label": "Carico da File"},
-                {"value": OperationType.SCARICO_FILE, "label": "Scarico da File"},
-                {"value": OperationType.SPOSTAMENTO_FILE, "label": "Spostamento da File"},
-                
-                # Operazioni Container
-                {"value": OperationType.SCARICO_CONTAINER_MANUALE, "label": "Scarico Container Manuale"},
-                {"value": OperationType.SCARICO_CONTAINER_FILE, "label": "Scarico Container File"},
-                {"value": OperationType.UBICAZIONE_DA_TERRA_MANUALE, "label": "Ubicazione da Terra Manuale"},
-                {"value": OperationType.UBICAZIONE_DA_TERRA_FILE, "label": "Ubicazione da Terra File"},
-                {"value": OperationType.CONSOLIDAMENTO_TERRA, "label": "Consolidamento Terra"},
-                
-                # Operazioni Picking
-                {"value": OperationType.PICKING_GENERATO, "label": "Picking Generato"},
-                {"value": OperationType.PICKING_CONFERMATO, "label": "Picking Confermato"},
-                {"value": OperationType.PRENOTAZIONE_CREATA, "label": "Prenotazione Creata"},
-                {"value": OperationType.PRENOTAZIONE_SCADUTA, "label": "Prenotazione Scaduta"},
-                
-                # Operazioni Sistema
-                {"value": OperationType.PRODOTTO_CREATO, "label": "Prodotto Creato"},
-                {"value": OperationType.PRODOTTO_MODIFICATO, "label": "Prodotto Modificato"},
-                {"value": OperationType.PRODOTTO_ELIMINATO, "label": "Prodotto Eliminato"},
-                {"value": OperationType.SISTEMA_AVVIATO, "label": "Sistema Avviato"},
-            ],
+            "operation_types": get_all_operation_types(),
+            "grouped_operation_types": get_grouped_operation_types(),
             "operation_categories": [
                 {"value": OperationCategory.MANUAL, "label": "Manuale"},
                 {"value": OperationCategory.FILE, "label": "Da File"},
@@ -88,6 +182,7 @@ async def get_logs_data(
     location: Optional[str] = Query(None),
     user_id: Optional[str] = Query(None),
     search_text: Optional[str] = Query(None),
+    order_number: Optional[str] = Query(None),
     order_by: str = Query("timestamp"),
     order_direction: str = Query("desc")
 ):
@@ -135,6 +230,7 @@ async def get_logs_data(
             location=location,
             user_id=user_id,
             search_text=search_text,
+            order_number=order_number,
             order_by=order_by,
             order_direction=order_direction
         )
@@ -142,6 +238,9 @@ async def get_logs_data(
         # Converti logs in formato JSON-serializable
         logs_data = []
         for log in result['logs']:
+            # Estrai numero ordine usando la funzione helper
+            order_number_extracted = LoggingService.extract_order_number(log.operation_type, log.details)
+            
             log_dict = {
                 'id': log.id,
                 'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
@@ -153,6 +252,7 @@ async def get_logs_data(
                 'location_to': log.location_to,
                 'quantity': log.quantity,
                 'user_id': log.user_id,
+                'order_number': order_number_extracted,
                 'file_name': log.file_name,
                 'file_line_number': log.file_line_number,
                 'error_message': log.error_message,
@@ -211,6 +311,7 @@ async def export_logs_csv(
     location: Optional[str] = Query(None),
     user_id: Optional[str] = Query(None),
     search_text: Optional[str] = Query(None),
+    order_number: Optional[str] = Query(None),
     limit: int = Query(5000, ge=1, le=10000)
 ):
     """
@@ -253,6 +354,7 @@ async def export_logs_csv(
             location=location,
             user_id=user_id,
             search_text=search_text,
+            order_number=order_number,
             order_by="timestamp",
             order_direction="desc"
         )
@@ -272,6 +374,7 @@ async def export_logs_csv(
             'A Ubicazione', 
             'Quantità',
             'Utente',
+            'Numero Ordine',
             'Nome File',
             'Riga File',
             'Messaggio Errore',
@@ -282,6 +385,9 @@ async def export_logs_csv(
         
         # Dati CSV
         for log in result['logs']:
+            # Estrai numero ordine usando la funzione helper
+            order_number_extracted = LoggingService.extract_order_number(log.operation_type, log.details)
+            
             writer.writerow([
                 log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                 log.operation_type,
@@ -292,6 +398,7 @@ async def export_logs_csv(
                 log.location_to or '',
                 log.quantity or '',
                 log.user_id or '',
+                order_number_extracted or '',
                 log.file_name or '',
                 log.file_line_number or '',
                 log.error_message or '',

@@ -240,6 +240,94 @@
         </table>
     </div>
 
+    <!-- Overlay Storico Prodotto -->
+    <div id="product-history-overlay" class="overlay" style="display: none;">
+        <div class="overlay-content large">
+            <div class="overlay-header">
+                <div class="header-info">
+                    <h2 id="history-product-title">📊 Storico Movimentazioni</h2>
+                    <p id="history-product-info" class="product-subtitle"></p>
+                </div>
+                <button class="close-btn" onclick="closeProductHistory()">&times;</button>
+            </div>
+            <div class="overlay-body">
+                <!-- Statistiche rapide -->
+                <div class="history-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Totale Operazioni:</span>
+                        <span id="history-total-ops" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Periodo:</span>
+                        <span id="history-period" class="stat-value">-</span>
+                    </div>
+                </div>
+
+                <!-- Filtri -->
+                <div class="history-filters">
+                    <div class="filters-header">
+                        <h3>🔍 Filtri</h3>
+                        <div class="filter-actions">
+                            <button id="apply-history-filters-btn" class="filter-btn primary">Applica</button>
+                            <button id="reset-history-filters-btn" class="filter-btn">Reset</button>
+                        </div>
+                    </div>
+                    
+                    <div class="filters-grid">
+                        <!-- Periodo -->
+                        <div class="filter-group">
+                            <label>Periodo:</label>
+                            <div class="date-range">
+                                <input type="datetime-local" id="history-start-date" class="filter-input">
+                                <span class="date-separator">↓</span>
+                                <input type="datetime-local" id="history-end-date" class="filter-input">
+                            </div>
+                        </div>
+
+                        <!-- Tipo Operazione (gerarchico) -->
+                        <div class="filter-group">
+                            <label>Tipo Operazione:</label>
+                            <div class="checkbox-group hierarchical" id="history-operation-type-filter">
+                                <!-- Popolato via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabella -->
+                <div class="table-container">
+                    <table class="history-table" id="history-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-column="timestamp">Timestamp</th>
+                                <th class="sortable" data-column="operation_type">Operazione</th>
+                                <th class="sortable" data-column="status">Status</th>
+                                <th class="no-sort">Ubicazioni</th>
+                                <th class="sortable" data-column="quantity">Qtà</th>
+                                <th class="sortable" data-column="user_id">Utente</th>
+                                <th class="sortable" data-column="order_number">Ordine</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body">
+                            <!-- Popolato via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Loading -->
+                <div id="history-loading" class="loading-indicator" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Caricamento storico...</p>
+                </div>
+
+                <!-- Paginazione -->
+                <div class="pagination-container" id="history-pagination">
+                    <!-- Popolato via JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts in ordine ottimizzato per caricamento rapido -->
             </div> <!-- Fine mobile-content -->
 

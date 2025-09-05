@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse, HTMLResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case, or_
-from typing import List
+from sqlalchemy import func, case, or_, extract, and_
+from typing import List, Dict, Any
 import io
+from datetime import datetime, timedelta
+import calendar
 
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, Paragraph, Spacer, KeepTogether, PageBreak
@@ -13,7 +15,7 @@ import math
 
 from wms_app.models.products import Product
 from wms_app.models.inventory import Inventory, Location
-from wms_app.models.orders import OutgoingStock
+from wms_app.models.orders import OutgoingStock, Order, OrderLine
 from wms_app.schemas import analysis as analysis_schemas
 from wms_app.database import get_db
 from wms_app.routers.auth import require_permission
@@ -31,6 +33,129 @@ router = APIRouter(
 async def test_endpoint():
     print("🟢 TEST ENDPOINT CHIAMATO - IL SERVER FUNZIONA!")
     return {"status": "OK", "message": "Server funziona correttamente"}
+
+@router.get("/orders-statistics")
+def get_orders_statistics(db: Session = Depends(get_db), current_user = Depends(require_permission("analysis_dashboard"))):
+    """Get orders statistics for current and previous month."""
+    
+    # Get current date
+    now = datetime.now()
+    current_month = now.month
+    current_year = now.year
+    
+    # Calculate previous month
+    if current_month == 1:
+        previous_month = 12
+        previous_year = current_year - 1
+    else:
+        previous_month = current_month - 1
+        previous_year = current_year
+    
+    # Get month names in Italian
+    month_names = {
+        1: "Gennaio", 2: "Febbraio", 3: "Marzo", 4: "Aprile", 
+        5: "Maggio", 6: "Giugno", 7: "Luglio", 8: "Agosto",
+        9: "Settembre", 10: "Ottobre", 11: "Novembre", 12: "Dicembre"
+    }
+    
+    # Count orders for current month (completed/archived orders)
+    current_month_orders = db.query(func.count(Order.id)).filter(
+        and_(
+            extract('month', Order.archived_date) == current_month,
+            extract('year', Order.archived_date) == current_year,
+            Order.is_archived == 1
+        )
+    ).scalar() or 0
+    
+    # Count orders for previous month
+    previous_month_orders = db.query(func.count(Order.id)).filter(
+        and_(
+            extract('month', Order.archived_date) == previous_month,
+            extract('year', Order.archived_date) == previous_year,
+            Order.is_archived == 1
+        )
+    ).scalar() or 0
+    
+    # Get total pieces shipped for current month
+    current_month_pieces_query = db.query(func.sum(OrderLine.picked_quantity)).join(Order).filter(
+        and_(
+            extract('month', Order.archived_date) == current_month,
+            extract('year', Order.archived_date) == current_year,
+            Order.is_archived == 1
+        )
+    )
+    current_month_pieces = current_month_pieces_query.scalar() or 0
+    
+    # Get total pieces shipped for previous month
+    previous_month_pieces_query = db.query(func.sum(OrderLine.picked_quantity)).join(Order).filter(
+        and_(
+            extract('month', Order.archived_date) == previous_month,
+            extract('year', Order.archived_date) == previous_year,
+            Order.is_archived == 1
+        )
+    )
+    previous_month_pieces = previous_month_pieces_query.scalar() or 0
+    
+    # Get top products for current month (for pie chart)
+    current_month_products_query = db.query(
+        OrderLine.product_sku,
+        Product.description,
+        func.sum(OrderLine.picked_quantity).label('total_quantity')
+    ).join(Order).join(Product, OrderLine.product_sku == Product.sku).filter(
+        and_(
+            extract('month', Order.archived_date) == current_month,
+            extract('year', Order.archived_date) == current_year,
+            Order.is_archived == 1
+        )
+    ).group_by(OrderLine.product_sku, Product.description).order_by(
+        func.sum(OrderLine.picked_quantity).desc()
+    ).limit(10)
+    
+    current_month_products = []
+    for row in current_month_products_query.all():
+        current_month_products.append({
+            "sku": row.product_sku,
+            "description": row.description,
+            "quantity": int(row.total_quantity)
+        })
+    
+    # Get top products for previous month (for pie chart)
+    previous_month_products_query = db.query(
+        OrderLine.product_sku,
+        Product.description,
+        func.sum(OrderLine.picked_quantity).label('total_quantity')
+    ).join(Order).join(Product, OrderLine.product_sku == Product.sku).filter(
+        and_(
+            extract('month', Order.archived_date) == previous_month,
+            extract('year', Order.archived_date) == previous_year,
+            Order.is_archived == 1
+        )
+    ).group_by(OrderLine.product_sku, Product.description).order_by(
+        func.sum(OrderLine.picked_quantity).desc()
+    ).limit(10)
+    
+    previous_month_products = []
+    for row in previous_month_products_query.all():
+        previous_month_products.append({
+            "sku": row.product_sku,
+            "description": row.description,
+            "quantity": int(row.total_quantity)
+        })
+    
+    return {
+        "current_month": {
+            "name": month_names[current_month],
+            "orders_count": current_month_orders,
+            "pieces_total": current_month_pieces,
+            "top_products": current_month_products
+        },
+        "previous_month": {
+            "name": month_names[previous_month],
+            "orders_count": previous_month_orders,
+            "pieces_total": previous_month_pieces,
+            "top_products": previous_month_products
+        }
+    }
 
 @router.get("/dashboard", response_class=HTMLResponse)
 async def get_analysis_dashboard(request: Request):

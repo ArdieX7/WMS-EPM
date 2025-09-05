@@ -279,6 +279,7 @@ class LoggingService:
         location: Optional[str] = None,
         user_id: Optional[str] = None,
         search_text: Optional[str] = None,
+        order_number: Optional[str] = None,
         order_by: str = "timestamp",
         order_direction: str = "desc"
     ) -> Dict[str, Any]:
@@ -313,6 +314,11 @@ class LoggingService:
             )
         if user_id:
             query = query.filter(OperationLog.user_id.ilike(f"%{user_id}%"))
+        
+        # Filtro numero ordine (cerca nel campo details JSON)
+        if order_number:
+            order_pattern = f"%{order_number}%"
+            query = query.filter(OperationLog.details.ilike(order_pattern))
         
         # Ricerca testuale
         if search_text:
@@ -349,6 +355,58 @@ class LoggingService:
             "page_size": limit,
             "total_pages": (total_count + limit - 1) // limit
         }
+    
+    @staticmethod
+    def extract_order_number(operation_type: str, details: Optional[Union[str, Dict[str, Any]]]) -> Optional[str]:
+        """
+        Estrae il numero ordine dal campo details JSON per operazioni specifiche.
+        
+        Args:
+            operation_type: Tipo di operazione
+            details: JSON string contenente i dettagli dell'operazione
+            
+        Returns:
+            str: Numero ordine se trovato, None altrimenti
+        """
+        # Lista delle operazioni che contengono numeri ordine
+        order_related_operations = {
+            OperationType.PRELIEVO_FILE,
+            OperationType.PRELIEVO_MANUALE, 
+            OperationType.PRELIEVO_TEMPO_REALE,
+            OperationType.SERIALI_ASSEGNATI,
+            OperationType.SERIALI_RIMOSSI,
+            OperationType.ORDINE_EVASO,
+            OperationType.ORDINE_ANNULLATO,
+            OperationType.ORDINE_COMPLETATO,
+            OperationType.ORDINE_CREATO
+        }
+        
+        # Se non è un'operazione correlata agli ordini, ritorna None
+        if operation_type not in order_related_operations:
+            return None
+            
+        # Se details è vuoto, ritorna None
+        if not details:
+            return None
+            
+        try:
+            # Se details è già un dict, usalo direttamente
+            if isinstance(details, dict):
+                details_json = details
+            else:
+                # Altrimenti prova a parsarlo come JSON string
+                details_json = json.loads(details)
+                
+            order_number = details_json.get('order_number')
+            
+            if order_number is not None:
+                return str(order_number)
+                
+        except (json.JSONDecodeError, AttributeError, TypeError):
+            # Se il JSON non è valido o altri errori, ignora silenziosamente
+            pass
+            
+        return None
     
     def get_log_statistics(self, days: int = 7) -> Dict[str, Any]:
         """

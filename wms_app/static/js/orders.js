@@ -635,6 +635,11 @@
                     statusMessage.style.color = '#155724';
                 }
                 
+                // Carica i dettagli delle posizioni di prelievo per ordini completati
+                if (!order.is_cancelled) {
+                    loadPickupLocations(order.order_number);
+                }
+                
                 // Mostra l'overlay
                 document.getElementById('completed-order-details-overlay').style.display = 'block';
             }
@@ -642,7 +647,63 @@
             // Funzione per chiudere l'overlay dettagli ordine completato
             window.closeCompletedOrderDetails = function() {
                 document.getElementById('completed-order-details-overlay').style.display = 'none';
+                // Nascondi anche la sezione posizioni prelievo
+                document.getElementById('pickup-locations-section').style.display = 'none';
                 currentOrderData = null;
+            }
+            
+            // Funzione per caricare i dettagli delle posizioni di prelievo
+            async function loadPickupLocations(orderNumber) {
+                const pickupSection = document.getElementById('pickup-locations-section');
+                const pickupBody = document.getElementById('pickup-locations-body');
+                
+                try {
+                    // Mostra loading nella sezione
+                    pickupSection.style.display = 'block';
+                    pickupBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 1rem;">🔄 Caricamento posizioni prelievo...</td></tr>';
+                    
+                    const response = await window.modernAuth.authenticatedFetch(`/orders/${orderNumber}/pickup-locations`);
+                    if (!response.ok) {
+                        throw new Error(`Errore ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Popola la tabella con i dati delle posizioni
+                    if (data.pickup_locations && data.pickup_locations.length > 0) {
+                        pickupBody.innerHTML = '';
+                        
+                        data.pickup_locations.forEach(pickup => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${pickup.product_sku}</td>
+                                <td><strong>${pickup.location_from || 'N/D'}</strong></td>
+                                <td style="text-align: center; font-weight: bold; color: #0066CC;">${pickup.quantity_picked}</td>
+                                <td style="font-size: 0.9rem;">${pickup.timestamp}</td>
+                                <td style="font-size: 0.9rem;">${pickup.operator}</td>
+                            `;
+                            pickupBody.appendChild(row);
+                        });
+                        
+                        // Aggiungi riga riepilogativa
+                        const totalOperations = data.total_operations;
+                        const totalRow = document.createElement('tr');
+                        totalRow.style.backgroundColor = '#f8f9fa';
+                        totalRow.style.borderTop = '2px solid #0066CC';
+                        totalRow.style.fontWeight = 'bold';
+                        totalRow.innerHTML = `
+                            <td colspan="2" style="font-weight: bold; color: #0066CC;">TOTALE OPERAZIONI</td>
+                            <td colspan="3" style="text-align: center; font-weight: bold; color: #0066CC;">${totalOperations}</td>
+                        `;
+                        pickupBody.appendChild(totalRow);
+                    } else {
+                        pickupBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 1rem; color: #666; font-style: italic;">📭 Nessuna posizione di prelievo trovata per questo ordine</td></tr>';
+                    }
+                    
+                } catch (error) {
+                    console.error('Errore nel caricamento posizioni prelievo:', error);
+                    pickupBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 1rem; color: #dc3545;">❌ Errore nel caricamento: ${error.message}</td></tr>`;
+                }
             }
 
             // Funzione per mostrare il nuovo overlay picking moderno per singoli ordini

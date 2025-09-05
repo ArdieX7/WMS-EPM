@@ -10,6 +10,9 @@
     <link rel="stylesheet" href="/static/css/collapsible.css">
     <link rel="stylesheet" href="/static/css/responsive.css">
     <link rel="stylesheet" href="/static/css/footer.css">
+    
+    <!-- Chart.js CDN for pie charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     {% include 'partials/navbar.html' %}
@@ -33,9 +36,13 @@
 
     <h1>Dashboard Analisi Magazzino</h1>
 
-    <!-- Dashboard KPI Ultra-Compatta (Principale) -->
-    <div class="dashboard-ultra-compact" data-permission="analysis_dashboard">
-        <div class="ultra-compact-grid">
+    <!-- Statistics Section: Dashboard + Orders Stats -->
+    <div class="statistics-main-grid">
+        <!-- LEFT: Existing Dashboard KPIs -->
+        <div class="statistics-left-column">
+            <!-- Dashboard KPI Ultra-Compatta (Principale) -->
+            <div class="dashboard-ultra-compact" data-permission="analysis_dashboard">
+            <div class="ultra-compact-grid">
             <!-- Sezione Giacenze -->
             <div class="mini-section" data-permission="analysis_stock_metrics">
                 <h4 class="mini-section-title">📦 Giacenze</h4>
@@ -104,11 +111,66 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
+            </div>
+            </div>
+            </div>
+            <!-- RIGHT: Orders Statistics -->
+            <div class="statistics-right-column">
+            <!-- Orders Statistics Section -->
+            <div class="orders-statistics-section" data-permission="analysis_dashboard">
+                <h2 class="section-title">📊 Statistiche Ordini</h2>
+                
+                <!-- Orders KPI Cards -->
+                <div class="orders-kpi-grid">
+                    <div class="orders-kpi-card" id="orders-current-month">
+                        <div class="kpi-value">0</div>
+                        <div class="kpi-label">Ordini Mese Corrente</div>
+                        <div class="kpi-period" id="current-month-name">--</div>
+                    </div>
+                    <div class="orders-kpi-card" id="orders-previous-month">
+                        <div class="kpi-value">0</div>
+                        <div class="kpi-label">Ordini Mese Passato</div>
+                        <div class="kpi-period" id="previous-month-name">--</div>
+                    </div>
+                    <div class="orders-kpi-card" id="pieces-current-month">
+                        <div class="kpi-value">0</div>
+                        <div class="kpi-label">Pezzi Usciti Mese Corrente</div>
+                        <div class="kpi-period" id="current-month-pieces">--</div>
+                    </div>
+                    <div class="orders-kpi-card" id="pieces-previous-month">
+                        <div class="kpi-value">0</div>
+                        <div class="kpi-label">Pezzi Usciti Mese Passato</div>
+                        <div class="kpi-period" id="previous-month-pieces">--</div>
+                    </div>
+                </div>
 
+                <!-- Charts Section -->
+                <div class="charts-section">
+                    <div class="chart-container">
+                        <h3 class="chart-title">Top Prodotti - <span id="current-chart-month">Mese Corrente</span></h3>
+                        <div class="chart-wrapper">
+                            <canvas id="current-month-chart" width="200" height="200"></canvas>
+                            <div class="chart-no-data" id="current-chart-no-data" style="display: none;">
+                                <p>📊 Nessun dato disponibile</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <h3 class="chart-title">Top Prodotti - <span id="previous-chart-month">Mese Passato</span></h3>
+                        <div class="chart-wrapper">
+                            <canvas id="previous-month-chart" width="200" height="200"></canvas>
+                            <div class="chart-no-data" id="previous-chart-no-data" style="display: none;">
+                                <p>📊 Nessun dato disponibile</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+        </div>
+</div>
     <!-- Sezioni di ricerca modernizzate - Layout 3 colonne -->
-    <div class="search-sections" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 2rem;">
+    <div class="search-sections" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 2rem; width: 100%;">
         <style>
         @media (max-width: 768px) {
             .search-sections {
@@ -168,9 +230,10 @@
                 </div>
             </div>
         </div>
+        </div>
     </div>
-
-    <div class="table-container">
+        <!-- Table Section - Full Width -->
+        <div class="table-container" style="width: 100%; margin-top: 2rem;">
         <div class="analysis-header">
             <div class="title-and-search">
                 <h2>Giacenza per Prodotto</h2>
@@ -199,10 +262,10 @@
                 <!-- I dati verranno caricati qui -->
             </tbody>
         </table>
-    </div>
+        </div>
 
-    <!-- Modal per i risultati della ricerca SKU -->
-    <div id="product-location-modal" class="overlay">
+        <!-- Modal per i risultati della ricerca SKU -->
+        <div id="product-location-modal" class="overlay">
         <div class="overlay-content">
             <div class="overlay-header">
                 <h3 id="modal-title">Risultati Ricerca</h3>
@@ -218,10 +281,10 @@
                 <div id="modal-body"></div>
             </div>
         </div>
-    </div>
+        </div>
 
-    <!-- Modal per i risultati della ricerca per Fila -->
-    <div id="products-by-row-modal" class="overlay">
+        <!-- Modal per i risultati della ricerca per Fila -->
+        <div id="products-by-row-modal" class="overlay">
         <div class="overlay-content">
             <div class="overlay-header">
                 <h3 id="row-modal-title">Risultati Ricerca</h3>
@@ -237,10 +300,10 @@
                 <div id="row-modal-body"></div>
             </div>
         </div>
-    </div>
+        </div>
 
-    <!-- Modal per SKU Critici -->
-    <div id="critical-stock-modal" class="overlay">
+        <!-- Modal per SKU Critici -->
+        <div id="critical-stock-modal" class="overlay">
         <div class="overlay-content">
             <div class="overlay-header">
                 <h3>⚠️ SKU con Giacenza Critica (≤ 15 pezzi)</h3>
@@ -279,10 +342,10 @@
                 </div>
             </div>
         </div>
-    </div>
+        </div>
 
-    <!-- Modal per Dettagli Pallet -->
-    <div id="pallet-details-modal" class="overlay">
+        <!-- Modal per Dettagli Pallet -->
+        <div id="pallet-details-modal" class="overlay">
         <div class="overlay-content">
             <div class="overlay-header">
                 <h3>🚛 Dettagli Pallet Totali</h3>
@@ -359,24 +422,24 @@
                 </div>
             </div>
         </div>
-    </div>
+     </div>
 
-    <!-- Scripts in ordine ottimizzato per caricamento rapido -->
+        <!-- Scripts in ordine ottimizzato per caricamento rapido -->
             </div> <!-- Fine mobile-content -->
 
             </div> <!-- Fine protected-content -->
     
-    <script src="/static/js/modern-auth.js"></script>
-    <script>
+        <script src="/static/js/modern-auth.js"></script>
+     <script>
         // Protezione pagina con nuovo sistema
         document.addEventListener('DOMContentLoaded', function() {
             window.requirePermission('analysis_view');
         });
-    </script>
-    <script src="/static/js/analysis.js"></script>
-    <script src="/static/js/navbar.js"></script>
-    <script src="/static/js/mobile-navbar.js"></script>
-{% include 'partials/footer.html' %}
+     </script>
+        <script src="/static/js/analysis.js"></script>
+     <script src="/static/js/navbar.js"></script>
+        <script src="/static/js/mobile-navbar.js"></script>
+        {% include 'partials/footer.html' %}
     
 
 </body>

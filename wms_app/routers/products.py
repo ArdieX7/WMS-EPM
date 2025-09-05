@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+from datetime import datetime, timedelta
 import io
 
 from wms_app import models
 from wms_app.schemas import products as product_schemas # Aggiornato l'alias
-from wms_app.database import database
+from wms_app.database import database, get_db
 from wms_app.routers.auth import require_permission
+from wms_app.services.logging_service import LoggingService
 
 router = APIRouter(
     prefix="/products",
@@ -127,6 +129,118 @@ def validate_product_deletion(sku: str, db: Session = Depends(database.get_db)):
         "dependencies": dependencies,
         "total_dependencies": len(dependencies)
     }
+
+# Endpoint per ottenere lo storico delle movimentazioni di un prodotto
+@router.get("/{sku}/history")
+def get_product_history(
+    sku: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("products_view")),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=500),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    operation_types: Optional[str] = Query(None),
+    order_by: str = Query("timestamp"),
+    order_direction: str = Query("desc")
+):
+    """
+    Recupera lo storico delle movimentazioni per un prodotto specifico.
+    """
+    # Verifica che il prodotto esista
+    product = db.query(models.Product).filter(models.Product.sku == sku).first()
+    if not product:
+        raise HTTPException(status_code=404, detail=f"Prodotto '{sku}' non trovato")
+    
+    logger = LoggingService(db)
+    
+    try:
+        # Parsing date se fornite
+        start_datetime = None
+        end_datetime = None
+        
+        if start_date:
+            start_datetime = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        if end_date:
+            end_datetime = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        else:
+            # Default: ultimi 30 giorni se non specificato
+            if not start_date:
+                start_datetime = datetime.utcnow() - timedelta(days=30)
+        
+        # Parsing operation types
+        operation_types_list = None
+        if operation_types:
+            operation_types_list = [t.strip() for t in operation_types.split(',') if t.strip()]
+        
+        # Calcola offset per paginazione
+        offset = (page - 1) * page_size
+        
+        # Recupera logs per il prodotto specifico
+        result = logger.get_logs(
+            limit=page_size,
+            offset=offset,
+            start_date=start_datetime,
+            end_date=end_datetime,
+            operation_types=operation_types_list,
+            product_sku=sku,  # Filtro per SKU specifico
+            order_by=order_by,
+            order_direction=order_direction
+        )
+        
+        # Converti logs in formato JSON-serializable
+        history_data = []
+        for log in result['logs']:
+            # Estrai numero ordine usando la funzione helper
+            order_number_extracted = LoggingService.extract_order_number(log.operation_type, log.details)
+            
+            log_dict = {
+                'id': log.id,
+                'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'operation_type': log.operation_type,
+                'operation_category': log.operation_category,
+                'status': log.status,
+                'location_from': log.location_from,
+                'location_to': log.location_to,
+                'quantity': log.quantity,
+                'user_id': log.user_id,
+                'order_number': order_number_extracted,
+                'file_name': log.file_name,
+                'file_line_number': log.file_line_number,
+                'error_message': log.error_message,
+                'warning_message': log.warning_message,
+                'details': log.details,
+                'execution_time_ms': log.execution_time_ms,
+                'operation_id': log.operation_id
+            }
+            history_data.append(log_dict)
+        
+        # Aggiungi info prodotto
+        product_info = {
+            'sku': product.sku,
+            'description': product.description,
+            'estimated_value': float(product.estimated_value or 0),
+            'weight': float(product.weight or 0),
+            'pallet_quantity': product.pallet_quantity or 0
+        }
+        
+        return {
+            "product": product_info,
+            "history": history_data,
+            "pagination": {
+                "current_page": page,
+                "page_size": page_size,
+                "total_pages": result['total_pages'],
+                "total_count": result['total_count']
+            },
+            "period_info": {
+                "start_date": start_datetime.strftime('%Y-%m-%d %H:%M:%S') if start_datetime else None,
+                "end_date": end_datetime.strftime('%Y-%m-%d %H:%M:%S') if end_datetime else None
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore nel recupero storico prodotto: {str(e)}")
 
 # Endpoint per ottenere i dettagli di un singolo prodotto (DEVE ESSERE DOPO QUELLI SPECIFICI)
 @router.get("/{sku:path}", response_model=product_schemas.Product)
@@ -361,4 +475,6 @@ def delete_product(sku: str, db: Session = Depends(database.get_db)):
             status_code=500, 
             detail=f"Errore durante l'eliminazione del prodotto: {str(e)}"
         )
+
+
 

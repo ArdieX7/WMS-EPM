@@ -94,35 +94,51 @@
 
                 <!-- Filtri tipo operazione -->
                 <div class="filter-group">
-                    <label for="operation-type-filter">Tipo Operazione:</label>
-                    <select id="operation-type-filter" class="filter-select" multiple>
-                        <option value="">Tutti i tipi</option>
-                        {% for op_type in operation_types %}
-                        <option value="{{ op_type.value }}">{{ op_type.label }}</option>
+                    <label>Tipo Operazione:</label>
+                    <div class="checkbox-group hierarchical" id="operation-type-filter">
+                        {% for group_key, group_data in grouped_operation_types.items() %}
+                        <div class="operation-group">
+                            <label class="checkbox-item macro-category">
+                                <input type="checkbox" name="operation-group" value="{{ group_key }}" class="filter-checkbox group-checkbox" data-group="{{ group_key }}">
+                                <span class="checkbox-label group-label">{{ group_data.label }}</span>
+                            </label>
+                            <div class="sub-operations" data-parent-group="{{ group_key }}">
+                                {% for operation in group_data.operations %}
+                                <label class="checkbox-item sub-operation">
+                                    <input type="checkbox" name="operation-type" value="{{ operation.value }}" class="filter-checkbox operation-checkbox" data-parent="{{ group_key }}">
+                                    <span class="checkbox-label">{{ operation.label }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
                         {% endfor %}
-                    </select>
+                    </div>
                 </div>
 
                 <!-- Filtri categoria -->
                 <div class="filter-group">
-                    <label for="category-filter">Categoria:</label>
-                    <select id="category-filter" class="filter-select" multiple>
-                        <option value="">Tutte le categorie</option>
+                    <label>Categoria:</label>
+                    <div class="checkbox-group" id="category-filter">
                         {% for category in operation_categories %}
-                        <option value="{{ category.value }}">{{ category.label }}</option>
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="category" value="{{ category.value }}" class="filter-checkbox">
+                            <span class="checkbox-label">{{ category.label }}</span>
+                        </label>
                         {% endfor %}
-                    </select>
+                    </div>
                 </div>
 
                 <!-- Filtri status -->
                 <div class="filter-group">
-                    <label for="status-filter">Status:</label>
-                    <select id="status-filter" class="filter-select" multiple>
-                        <option value="">Tutti gli status</option>
+                    <label>Status:</label>
+                    <div class="checkbox-group" id="status-filter">
                         {% for status in operation_statuses %}
-                        <option value="{{ status.value }}">{{ status.label }}</option>
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="status" value="{{ status.value }}" class="filter-checkbox">
+                            <span class="checkbox-label">{{ status.label }}</span>
+                        </label>
                         {% endfor %}
-                    </select>
+                    </div>
                 </div>
 
                 <!-- Ricerca testuale -->
@@ -139,6 +155,11 @@
                 <div class="filter-group">
                     <label for="search-user">Cerca Utente:</label>
                     <input type="text" id="search-user" class="filter-input" placeholder="Inserisci ID utente...">
+                </div>
+
+                <div class="filter-group">
+                    <label for="search-order">Cerca Ordine:</label>
+                    <input type="text" id="search-order" class="filter-input" placeholder="Inserisci numero ordine...">
                 </div>
 
                 <div class="filter-group">
@@ -188,6 +209,9 @@
                         </th>
                         <th class="sortable" data-column="user_id">
                             Utente <span class="sort-indicator"></span>
+                        </th>
+                        <th class="sortable" data-column="order_number">
+                            Ordine <span class="sort-indicator"></span>
                         </th>
                         <th class="no-sort">
                             Dettagli

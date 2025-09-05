@@ -653,7 +653,293 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
+    // Check if orders section is visible and adjust layout
+    function checkOrdersSectionVisibility() {
+        const rightColumn = document.querySelector('.statistics-right-column');
+        const mainGrid = document.querySelector('.statistics-main-grid');
+        
+        if (rightColumn && mainGrid) {
+            // Check if right column is visible (not hidden by permissions)
+            const ordersSection = rightColumn.querySelector('.orders-statistics-section');
+            if (ordersSection && window.getComputedStyle(ordersSection).display !== 'none') {
+                mainGrid.classList.add('has-orders-section');
+                console.log('✅ Orders section visible, added has-orders-section class');
+                
+                // Initialize Orders Charts Manager only if Chart.js is available
+                if (typeof Chart !== 'undefined') {
+                    console.log('✅ Chart.js loaded, initializing orders charts...');
+                    const ordersChartsManager = new OrdersChartsManager();
+                    ordersChartsManager.initialize();
+                } else {
+                    console.error('❌ Chart.js not loaded');
+                    // Try again after a short delay
+                    setTimeout(() => {
+                        if (typeof Chart !== 'undefined') {
+                            console.log('✅ Chart.js loaded on retry, initializing orders charts...');
+                            const ordersChartsManager = new OrdersChartsManager();
+                            ordersChartsManager.initialize();
+                        } else {
+                            console.error('❌ Chart.js still not loaded after retry');
+                        }
+                    }, 1000);
+                }
+            } else {
+                mainGrid.classList.remove('has-orders-section');
+                console.log('📊 Orders section not visible due to permissions');
+            }
+        }
+    }
+
+    // Run the check
+    checkOrdersSectionVisibility();
+
     // Chiamate iniziali
     loadDashboardData();
     loadProductSkus();
 });
+
+// Orders Charts Manager for pie charts
+class OrdersChartsManager {
+    constructor() {
+        this.currentChart = null;
+        this.previousChart = null;
+        this.colors = [
+            '#0097E0', '#00516E', '#00D4F5', '#FF5913', '#28a745',
+            '#ffc107', '#dc3545', '#6f42c1', '#fd7e14', '#20c997'
+        ];
+    }
+
+    async initialize() {
+        try {
+            const response = await window.modernAuth.authenticatedFetch('/analysis/orders-statistics');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            this.updateKPIs(data);
+            this.createCharts(data);
+        } catch (error) {
+            console.error('Error loading orders statistics:', error);
+            this.showError();
+        }
+    }
+
+    updateKPIs(data) {
+        // Update current month data
+        const currentOrdersValue = document.getElementById('orders-current-month')?.querySelector('.kpi-value');
+        if (currentOrdersValue) {
+            currentOrdersValue.textContent = data.current_month.orders_count;
+        }
+        const currentMonthName = document.getElementById('current-month-name');
+        if (currentMonthName) {
+            currentMonthName.textContent = data.current_month.name;
+        }
+        
+        const currentPiecesValue = document.getElementById('pieces-current-month')?.querySelector('.kpi-value');
+        if (currentPiecesValue) {
+            currentPiecesValue.textContent = data.current_month.pieces_total.toLocaleString();
+        }
+        const currentMonthPieces = document.getElementById('current-month-pieces');
+        if (currentMonthPieces) {
+            currentMonthPieces.textContent = data.current_month.name;
+        }
+
+        // Update previous month data
+        const previousOrdersValue = document.getElementById('orders-previous-month')?.querySelector('.kpi-value');
+        if (previousOrdersValue) {
+            previousOrdersValue.textContent = data.previous_month.orders_count;
+        }
+        const previousMonthName = document.getElementById('previous-month-name');
+        if (previousMonthName) {
+            previousMonthName.textContent = data.previous_month.name;
+        }
+        
+        const previousPiecesValue = document.getElementById('pieces-previous-month')?.querySelector('.kpi-value');
+        if (previousPiecesValue) {
+            previousPiecesValue.textContent = data.previous_month.pieces_total.toLocaleString();
+        }
+        const previousMonthPieces = document.getElementById('previous-month-pieces');
+        if (previousMonthPieces) {
+            previousMonthPieces.textContent = data.previous_month.name;
+        }
+
+        // Update chart titles
+        const currentChartMonth = document.getElementById('current-chart-month');
+        if (currentChartMonth) {
+            currentChartMonth.textContent = data.current_month.name;
+        }
+        const previousChartMonth = document.getElementById('previous-chart-month');
+        if (previousChartMonth) {
+            previousChartMonth.textContent = data.previous_month.name;
+        }
+    }
+
+    createCharts(data) {
+        this.createCurrentMonthChart(data.current_month);
+        this.createPreviousMonthChart(data.previous_month);
+    }
+
+    createCurrentMonthChart(monthData) {
+        const ctx = document.getElementById('current-month-chart');
+        const noDataElement = document.getElementById('current-chart-no-data');
+        
+        if (!ctx) return;
+        
+        if (monthData.top_products.length === 0) {
+            ctx.style.display = 'none';
+            if (noDataElement) noDataElement.style.display = 'block';
+            return;
+        }
+
+        ctx.style.display = 'block';
+        if (noDataElement) noDataElement.style.display = 'none';
+
+        // Prepare chart data
+        const labels = monthData.top_products.map(p => `${p.sku.substring(0, 10)}${p.sku.length > 10 ? '...' : ''}`);
+        const quantities = monthData.top_products.map(p => p.quantity);
+
+        // Destroy existing chart if exists
+        if (this.currentChart) {
+            this.currentChart.destroy();
+        }
+
+        this.currentChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: quantities,
+                    backgroundColor: this.colors.slice(0, quantities.length),
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 10,
+                            font: {
+                                size: 10
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                const index = context[0].dataIndex;
+                                return monthData.top_products[index].sku;
+                            },
+                            label: function(context) {
+                                const quantity = context.raw.toLocaleString();
+                                const total = quantities.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((context.raw / total) * 100).toFixed(1) : 0;
+                                return `Quantità: ${quantity} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    createPreviousMonthChart(monthData) {
+        const ctx = document.getElementById('previous-month-chart');
+        const noDataElement = document.getElementById('previous-chart-no-data');
+        
+        if (!ctx) return;
+        
+        if (monthData.top_products.length === 0) {
+            ctx.style.display = 'none';
+            if (noDataElement) noDataElement.style.display = 'block';
+            return;
+        }
+
+        ctx.style.display = 'block';
+        if (noDataElement) noDataElement.style.display = 'none';
+
+        // Prepare chart data
+        const labels = monthData.top_products.map(p => `${p.sku.substring(0, 10)}${p.sku.length > 10 ? '...' : ''}`);
+        const quantities = monthData.top_products.map(p => p.quantity);
+
+        // Destroy existing chart if exists
+        if (this.previousChart) {
+            this.previousChart.destroy();
+        }
+
+        this.previousChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: quantities,
+                    backgroundColor: this.colors.slice(0, quantities.length),
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 10,
+                            font: {
+                                size: 10
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                const index = context[0].dataIndex;
+                                return monthData.top_products[index].sku;
+                            },
+                            label: function(context) {
+                                const quantity = context.raw.toLocaleString();
+                                const total = quantities.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((context.raw / total) * 100).toFixed(1) : 0;
+                                return `Quantità: ${quantity} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    showError() {
+        // Update KPIs with error state
+        document.querySelectorAll('.orders-kpi-card .kpi-value').forEach(el => {
+            el.textContent = '❌';
+            el.style.color = '#dc3545';
+        });
+
+        // Show error in charts
+        const currentNoData = document.getElementById('current-chart-no-data');
+        const previousNoData = document.getElementById('previous-chart-no-data');
+        
+        if (currentNoData) {
+            currentNoData.innerHTML = '<p>❌ Errore nel caricamento dati</p>';
+            currentNoData.style.display = 'block';
+        }
+        if (previousNoData) {
+            previousNoData.innerHTML = '<p>❌ Errore nel caricamento dati</p>';
+            previousNoData.style.display = 'block';
+        }
+        
+        const currentChart = document.getElementById('current-month-chart');
+        const previousChart = document.getElementById('previous-month-chart');
+        
+        if (currentChart) currentChart.style.display = 'none';
+        if (previousChart) previousChart.style.display = 'none';
+    }
+}
