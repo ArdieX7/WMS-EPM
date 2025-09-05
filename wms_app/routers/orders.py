@@ -2967,3 +2967,62 @@ def update_customer_name(
             api_endpoint=f"/orders/{order_number}/customer"
         )
         raise HTTPException(status_code=500, detail=f"Errore durante l'aggiornamento: {str(e)}")
+
+@router.get("/{order_number}/pickup-locations")
+def get_order_pickup_locations(
+    order_number: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("orders_view"))
+):
+    """
+    Recupera i dettagli delle posizioni di prelievo per un ordine completato.
+    Mostra da quali ubicazioni sono stati prelevati i prodotti.
+    """
+    try:
+        # Verifica che l'ordine esista
+        order = db.query(models.Order).filter(
+            models.Order.order_number == order_number
+        ).first()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail=f"Ordine '{order_number}' non trovato")
+        
+        # Recupera i log di prelievo per questo ordine
+        logger = LoggingService(db)
+        pickup_logs = logger.get_logs(
+            operation_types=[
+                OperationType.PRELIEVO_MANUALE,
+                OperationType.PRELIEVO_FILE,
+                OperationType.PRELIEVO_TEMPO_REALE,
+                OperationType.PICKING_CONFERMATO
+            ],
+            order_number=order_number,
+            limit=1000,  # Recupera tutti i log di prelievo
+            order_by="timestamp",
+            order_direction="asc"
+        )
+        
+        pickup_details = []
+        for log in pickup_logs['logs']:
+            # Estrai informazioni dettagliate dal log
+            pickup_detail = {
+                'product_sku': log.product_sku,
+                'location_from': log.location_from,
+                'quantity_picked': log.quantity,
+                'timestamp': log.timestamp.strftime('%d/%m/%Y %H:%M'),
+                'operator': log.user_id or 'Sistema',
+                'operation_type': log.operation_type,
+                'details': log.details
+            }
+            pickup_details.append(pickup_detail)
+        
+        return {
+            "order_number": order_number,
+            "pickup_locations": pickup_details,
+            "total_operations": len(pickup_details)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore nel recupero posizioni prelievo: {str(e)}")
