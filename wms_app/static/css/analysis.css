@@ -4,6 +4,196 @@ body {
     background-color: #f4f7f6;
 }
 
+/* Statistics Section Layout - Top Statistics Area */
+.statistics-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+/* Fallback: force 1-column if orders section not present */
+.statistics-main-grid:not(.has-orders-section) {
+    grid-template-columns: 1fr !important;
+}
+
+.statistics-left-column,
+.statistics-right-column {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Orders Statistics Section - More Compact */
+.orders-statistics-section {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    border-left: 4px solid var(--secondary-color);
+    height: fit-content;
+}
+
+.orders-statistics-section .section-title {
+    margin: 0 0 1rem 0;
+    color: var(--primary-color);
+    font-size: 1.2rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Orders KPI Grid - More Compact */
+.orders-kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.orders-kpi-card {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 0.75rem;
+    text-align: center;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.orders-kpi-card:hover {
+    border-color: var(--secondary-color);
+    box-shadow: 0 1px 4px rgba(0, 151, 224, 0.2);
+}
+
+.orders-kpi-card .kpi-value {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-bottom: 0.2rem;
+}
+
+.orders-kpi-card .kpi-label {
+    font-size: 0.8rem;
+    color: #666;
+    font-weight: 500;
+    margin-bottom: 0.2rem;
+    line-height: 1.2;
+}
+
+.orders-kpi-card .kpi-period {
+    font-size: 0.7rem;
+    color: var(--secondary-color);
+    font-weight: 500;
+}
+
+/* Charts Section - More Compact */
+.charts-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.chart-container {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 0.75rem;
+    border: 1px solid #dee2e6;
+}
+
+.chart-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin: 0 0 0.75rem 0;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.chart-wrapper {
+    position: relative;
+    height: 200px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.chart-wrapper canvas {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.chart-no-data {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .statistics-main-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .orders-kpi-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    
+    .charts-section {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        margin: 1em;
+    }
+    
+    .statistics-main-grid {
+        gap: 1rem;
+    }
+    
+    .orders-kpi-grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    .orders-kpi-card {
+        padding: 0.5rem;
+    }
+    
+    .orders-kpi-card .kpi-value {
+        font-size: 1.2rem;
+    }
+    
+    .orders-kpi-card .kpi-label {
+        font-size: 0.75rem;
+    }
+    
+    .chart-wrapper {
+        height: 180px;
+    }
+    
+    .chart-title {
+        font-size: 0.8rem;
+    }
+    
+    .orders-statistics-section {
+        padding: 0.75rem;
+    }
+}
+
+/* Table Section - Full Width */
+.table-container {
+    width: 100% !important;
+    max-width: none !important;
+}
+
 /* Palette colori unificata - da products.css */
 :root {
     --primary-color: #00516E;
