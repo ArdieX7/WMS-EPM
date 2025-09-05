@@ -1298,22 +1298,30 @@ async def _parse_picking_file_scanner(file: UploadFile, db: Session) -> Tuple[Di
     # Ottieni le ubicazioni esistenti dal database per confronto
     all_locations = {loc.name for loc in db.query(models.Location).all()}
     
+    # Aggiunge anche tutti gli ordini esistenti per aiutare il riconoscimento
+    all_orders = {o.order_number for o in db.query(models.Order).all()}
+    
     for i, line in enumerate(lines):
         line = line.strip()
         if not line:
             continue
-            
-        # Verifica se è un numero ordine (numerico o alfanumerico corto)
-        if line.replace('-', '').replace('_', '').isalnum() and len(line) <= 10:
-            # Verifica che non sia una ubicazione esistente
-            if line not in all_locations:
-                current_order = line
-                current_location = None
-                continue
         
-        # Verifica se è una ubicazione esistente nel database
+        # PRIMA verifica se è una ubicazione esistente nel database
         if line in all_locations:
             current_location = line
+            continue
+        
+        # SECONDA verifica: è un ordine conosciuto nel database?
+        if line in all_orders:
+            current_order = line
+            current_location = None
+            continue
+            
+        # TERZA verifica: se non abbiamo ancora un ordine e la riga sembra un ordine
+        # (solo numerico o molto corto), trattalo come ordine
+        if current_order is None and (line.isdigit() or (len(line) <= 6 and line.replace('-', '').replace('_', '').isalnum())):
+            current_order = line
+            current_location = None
             continue
         
         # Altrimenti è un prodotto
