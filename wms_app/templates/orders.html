@@ -48,6 +48,37 @@
             </div>
         </div>
         
+        <!-- Nuova Sezione Export Prodotti per Ordine -->
+    <div style="display: flex; justify-content: center; margin-bottom: 2rem;">
+        <div style="min-width: 300px; max-width: 600px;">
+            <h2 style="color: #0066CC; text-align: left; margin-bottom: 1rem; font-size: 1.3rem;">📦 Export Prodotti per Ordine Usciti</h2>
+            <div class="export-section" style="background: #e8f4f8; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #0066CC; text-align: center;">
+                <div style="display: flex; gap: 0.75rem; align-items: end; flex-wrap: wrap; justify-content: center; margin-bottom: 1rem;">
+                    <div style="min-width: 140px;">
+                        <label for="export-products-from-date" style="display: block; text-align: left; margin-bottom: 0.5rem; font-weight: 600; color: #495057; font-size: 0.9rem;">📅 Da:</label>
+                        <input type="date" id="export-products-from-date" style="width: 140px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9rem;">
+                    </div>
+                    <div style="min-width: 140px;">
+                        <label for="export-products-to-date" style="display: block; text-align: left; margin-bottom: 0.5rem; font-weight: 600; color: #495057; font-size: 0.9rem;">📅 A:</label>
+                        <input type="date" id="export-products-to-date" style="width: 140px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9rem;">
+                    </div>
+                    <div class="export-buttons" style="display: flex; gap: 0.5rem;">
+                        <button class="action-btn secondary" onclick="exportProductsExcel()" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; min-width: auto; white-space: nowrap;">
+                            📊 Excel
+                        </button>
+                        <button class="action-btn secondary" onclick="exportProductsPdf()" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; min-width: auto; white-space: nowrap;">
+                            📄 PDF
+                        </button>
+                    </div>
+                </div>
+                <div style="text-align: left; font-size: 0.85rem; color: #6c757d; line-height: 1.4;">
+                    <strong>Una riga per ogni prodotto-ordine con:</strong><br>
+                    N° Ordine, Cliente, Data, SKU, Descrizione, Qtà Richiesta, Qtà Prelevata, Stato<br>
+                    <strong>Nota:</strong> Include solo ordini con prodotti prelevati/completati
+                </div>
+            </div>
+        </div>
+    </div>
         <!-- Sezione Export Ordini -->
         <div style="min-width: 300px; text-align: right;">
             <h2 style="color: #0066CC; text-align: left; margin-bottom: 1rem; font-size: 1.3rem;">📈 Export Dati Ordini</h2>
@@ -78,6 +109,8 @@
         </div>
         
     </div>
+
+    
 
     <!-- Overlay Import Ordini Unificato -->
     <div id="import-orders-overlay" class="overlay">
@@ -129,10 +162,6 @@
                         
                         <!-- Backup: Original file input (hidden) -->
                         <input type="file" id="excel-file" accept=".xlsx" style="display: none;">
-                        <div class="form-actions" style="display: flex; justify-content: center; gap: 15px; margin-top: 20px;">
-                            <button type="button" class="btn-secondary" onclick="closeOverlay('import-orders-overlay')">✕</button>
-                            <button type="submit" class="btn-primary" style="padding: 12px 30px; font-size: 16px; font-weight: 600;">📊 Importa</button>
-                        </div>
 
                         <div class="template-description">
                             Il file Excel deve avere le seguenti colonne con esattamente questi nomi negli header:
