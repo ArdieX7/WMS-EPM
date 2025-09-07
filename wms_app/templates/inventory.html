@@ -71,6 +71,7 @@
                     <button class="tab-btn active" onclick="switchManualTab('add-stock-manual-tab')">➕ Carico</button>
                     <button class="tab-btn" onclick="switchManualTab('subtract-stock-manual-tab')">➖ Scarico</button>
                     <button class="tab-btn" onclick="switchManualTab('move-stock-manual-tab')">🔀 Spostamenti</button>
+                    <button class="tab-btn" onclick="switchManualTab('relocate-ground-manual-tab')">🏗️ Ubicazione da Terra</button>
                 </div>
                 
                 <!-- Tab Carico -->
@@ -146,6 +147,31 @@
                         </div>
                     </form>
                 </div>
+                
+                <!-- Tab Ubicazione da Terra -->
+                <div id="relocate-ground-manual-tab" class="tab-content">
+                    <form id="relocate-ground-manual-form">
+                        <div class="form-group">
+                            <label for="relocate-ground-product-sku">Prodotto (SKU):</label>
+                            <input type="text" id="relocate-ground-product-sku" list="product-skus" required>
+                            <datalist id="product-skus"></datalist>
+                        </div>
+                        <div class="form-group">
+                            <label for="relocate-ground-quantity">Quantità da Ubicare:</label>
+                            <input type="number" id="relocate-ground-quantity" min="1" required>
+                            <div class="help-text">Quantità da spostare dalla TERRA.</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="relocate-ground-location">Ubicazione di Destinazione:</label>
+                            <input type="text" id="relocate-ground-location" placeholder="Es. A01P1P1" required>
+                            <div class="help-text">Ubicazione dove posizionare il prodotto.</div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('manual-operations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary relocate">🏗️ Ubicare Prodotto</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -165,21 +191,23 @@
                     <button class="tab-btn" onclick="switchTab('subtract-stock-tab')">➖ Scarico</button>
                     <button class="tab-btn" onclick="switchTab('realign-stock-tab')">🔄 Riallineamento</button>
                     <button class="tab-btn" onclick="switchTab('movements-tab')">🔀 Spostamenti</button>
+                    <button class="tab-btn" onclick="switchTab('relocate-ground-file-tab')">🏗️ Ubicazione da Terra</button>
                 </div>
                 
                 <!-- Tab Carico - Enhanced Upload -->
                 <div id="add-stock-tab" class="tab-content active">
                     <form id="add-stock-form">
+                                                <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('file-operations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary">➕ Carica Prodotti</button>
+                        </div>
                         <!-- Enhanced Upload Component -->
                         <div class="enhanced-upload-container" id="add-stock-upload"></div>
                         
                         <!-- Backup: Original file input (hidden by default) -->
                         <input type="file" id="add-stock-file" accept=".txt" style="display: none;">
                         
-                        <div class="form-actions">
-                            <button type="button" class="btn-secondary" onclick="closeOverlay('file-operations-overlay')">Annulla</button>
-                            <button type="submit" class="btn-primary">➕ Carica Prodotti</button>
-                        </div>
+
                         
                         <!-- Sezione Istruzioni Collassabile -->
                         <div class="collapsible-section">
@@ -207,16 +235,17 @@
                 <!-- Tab Scarico - Enhanced Upload -->
                 <div id="subtract-stock-tab" class="tab-content">
                     <form id="subtract-stock-form">
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('file-operations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary">➖ Scarica Prodotti</button>
+                        </div>
                         <!-- Enhanced Upload Component -->
                         <div class="enhanced-upload-container" id="subtract-stock-upload"></div>
                         
                         <!-- Backup: Original file input (hidden by default) -->
                         <input type="file" id="subtract-stock-file" accept=".txt" style="display: none;">
                         
-                        <div class="form-actions">
-                            <button type="button" class="btn-secondary" onclick="closeOverlay('file-operations-overlay')">Annulla</button>
-                            <button type="submit" class="btn-primary">➖ Scarica Prodotti</button>
-                        </div>
+                        
                         
                         <!-- Sezione Istruzioni Collassabile -->
                         <div class="collapsible-section">
@@ -244,16 +273,17 @@
                 <!-- Tab Riallineamento - Enhanced Upload -->
                 <div id="realign-stock-tab" class="tab-content">
                     <form id="import-stock-form">
+                                                <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('file-operations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary">🔄 Analizza File</button>
+                        </div>
                         <!-- Enhanced Upload Component -->
                         <div class="enhanced-upload-container" id="realign-stock-upload"></div>
                         
                         <!-- Backup: Original file input (hidden by default) -->
                         <input type="file" id="stock-file" accept=".txt" style="display: none;">
                         
-                        <div class="form-actions">
-                            <button type="button" class="btn-secondary" onclick="closeOverlay('file-operations-overlay')">Annulla</button>
-                            <button type="submit" class="btn-primary">🔄 Analizza File</button>
-                        </div>
+
                         
                         <!-- Sezione Istruzioni Collassabile -->
                         <div class="collapsible-section">
@@ -280,17 +310,15 @@
                 <!-- Tab Spostamenti - Enhanced Upload -->
                 <div id="movements-tab" class="tab-content">
                     <form id="movements-form">
+                          <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('file-operations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary">🔀 Analizza Spostamenti</button>
+                        </div>
                         <!-- Enhanced Upload Component -->
                         <div class="enhanced-upload-container" id="movements-upload"></div>
                         
                         <!-- Backup: Original file input (hidden by default) -->
                         <input type="file" id="movements-file" accept=".txt" style="display: none;">
-                        
-                        <div class="form-actions">
-                            <button type="button" class="btn-secondary" onclick="closeOverlay('file-operations-overlay')">Annulla</button>
-                            <button type="submit" class="btn-primary">🔀 Analizza Spostamenti</button>
-                        </div>
-                        
                         <!-- Sezione Istruzioni Collassabile -->
                         <div class="collapsible-section">
                             <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
@@ -310,6 +338,40 @@
                                     </code>
                                 </div>
                                 <a href="/static/templates/template_movements.txt" download="template_movements.txt" class="btn-template">📄 Scarica Template</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Tab Ubicazione da Terra da File - Enhanced Upload -->
+                <div id="relocate-ground-file-tab" class="tab-content">
+                    <form id="relocate-ground-file-form" enctype="multipart/form-data">
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('file-operations-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary relocate">📁 Processa Ubicazione</button>
+                        </div>
+                        <!-- Enhanced Upload Component -->
+                        <div class="enhanced-upload-container" id="relocate-ground-file-upload"></div>
+                        
+                        <!-- Backup: Original file input (hidden by default) -->
+                        <input type="file" id="relocate-ground-file" name="file" accept=".txt" style="display: none;">
+                        
+                        
+                        
+                        <!-- Sezione Istruzioni Collassabile -->
+                        <div class="collapsible-section">
+                            <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                                <span class="collapsible-icon">▶</span>
+                                <span class="collapsible-title">📋 Istruzioni Caricamento</span>
+                            </button>
+                            <div class="collapsible-content">
+                                <div style="background-color: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #0097E0;">
+                                    <strong>ℹ️ Formato File:</strong><br>
+                                    Stesso formato delle operazioni da file:<br>
+                                    • Ubicazione (es. A01P1P1)<br>
+                                    • SKU o SKU_QTY per quantità specifica<br>
+                                    • Scala automaticamente dalla TERRA
+                                </div>
                             </div>
                         </div>
                     </form>
@@ -403,16 +465,17 @@
                 <!-- Tab Carico da File - Enhanced Upload -->
                 <div id="unload-file-tab" class="tab-content">
                     <form id="unload-file-form" enctype="multipart/form-data">
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('unload-container-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary truck">📁 Processa Scarico</button>
+                        </div>
                         <!-- Enhanced Upload Component -->
                         <div class="enhanced-upload-container" id="unload-file-upload"></div>
                         
                         <!-- Backup: Original file input (hidden by default) -->
                         <input type="file" id="unload-file" name="file" accept=".txt" style="display: none;">
                         
-                        <div class="form-actions">
-                            <button type="button" class="btn-secondary" onclick="closeOverlay('unload-container-overlay')">Annulla</button>
-                            <button type="submit" class="btn-primary truck">📁 Processa Scarico</button>
-                        </div>
+                        
                         
                         <!-- Sezione Istruzioni Collassabile -->
                         <div class="collapsible-section">
@@ -478,16 +541,17 @@
                 <!-- Tab Ubicazione da File - Enhanced Upload -->
                 <div id="relocate-file-tab" class="tab-content">
                     <form id="relocate-file-form" enctype="multipart/form-data">
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('ground-to-location-overlay')">Annulla</button>
+                            <button type="submit" class="btn-primary relocate">📁 Processa Ubicazione</button>
+                        </div>
                         <!-- Enhanced Upload Component -->
                         <div class="enhanced-upload-container" id="relocate-file-upload"></div>
                         
                         <!-- Backup: Original file input (hidden by default) -->
                         <input type="file" id="relocate-file" name="file" accept=".txt" style="display: none;">
                         
-                        <div class="form-actions">
-                            <button type="button" class="btn-secondary" onclick="closeOverlay('ground-to-location-overlay')">Annulla</button>
-                            <button type="submit" class="btn-primary relocate">📁 Processa Ubicazione</button>
-                        </div>
+                        
                         
                         <!-- Sezione Istruzioni Collassabile -->
                         <div class="collapsible-section">

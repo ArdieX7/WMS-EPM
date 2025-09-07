@@ -207,7 +207,7 @@ body {
 .tab-buttons {
     display: flex;
     border-bottom: 2px solid #F2F2F2;
-    margin-bottom: 1.5rem;
+    /*margin-bottom: 1.5rem; */
 }
 
 .tab-btn {

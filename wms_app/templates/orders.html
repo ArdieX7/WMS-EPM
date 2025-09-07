@@ -120,7 +120,10 @@
                 <!-- Tab Import da Excel -->
                 <div id="import-excel-tab" class="tab-content active">
                     <form id="import-excel-form">
-                        
+                        <div class="form-actions" style="display: flex; justify-content: center; gap: 15px; margin-top: 20px; margin-bottom: 20px;">
+                            <button type="button" class="btn-secondary" onclick="closeOverlay('import-orders-overlay')">✕</button>
+                            <button type="submit" class="btn-primary" style="padding: 12px 30px; font-size: 16px; font-weight: 600;">📊 Importa</button>
+                        </div>
                         <!-- Enhanced Upload Component per Excel -->
                         <div class="enhanced-upload-container" id="excel-file-upload"></div>
                         
@@ -226,6 +229,9 @@
                 <button class="overlay-close" onclick="closeOverlay('picking-file-overlay')">&times;</button>
             </div>
             <form id="import-picking-form">
+                <div style="display: flex; justify-content: center; margin: 20px 0;">
+                    <button type="submit" class="btn-primary" style="padding: 12px 30px; font-size: 16px; font-weight: 600;">📋 Esegui</button>
+                </div>
                 <!-- Enhanced Upload Component -->
                 <div class="enhanced-upload-container" id="picking-file-upload"></div>
                 
@@ -233,9 +239,7 @@
                 <input type="file" id="picking-file" accept=".txt" style="display: none;">
                 
                 <!-- Tasto Esegui centrato e più grande -->
-                <div style="display: flex; justify-content: center; margin: 20px 0;">
-                    <button type="submit" class="btn-primary" style="padding: 12px 30px; font-size: 16px; font-weight: 600;">📋 Esegui</button>
-                </div>
+                
                 
                 <div class="form-actions" style="justify-content: center;">
                     <button type="button" class="btn-secondary" onclick="closeOverlay('picking-file-overlay')">✕ Chiudi</button>
