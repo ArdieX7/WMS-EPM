@@ -48,6 +48,11 @@ body {
         padding: 1rem;
     }
     
+    .hero-logo {
+        max-height: 120px !important;
+        margin-bottom: 0.75rem !important;
+    }
+    
     .hero-title {
         font-size: 2rem !important;
         margin-bottom: 0.25rem !important;
@@ -67,6 +72,11 @@ body {
 @media (max-width: 480px) and (max-height: 700px) {
     .login-hero {
         padding: 0.75rem;
+    }
+    
+    .hero-logo {
+        max-height: 100px !important;
+        margin-bottom: 0.5rem !important;
     }
     
     .hero-title {
@@ -99,6 +109,13 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 1rem;
+}
+
+.hero-logo {
+    max-height: 180px;
+    width: auto;
+    margin-bottom: 0.25rem;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
 }
 
 .hero-title {
