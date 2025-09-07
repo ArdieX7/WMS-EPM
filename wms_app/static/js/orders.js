@@ -4338,3 +4338,156 @@
                 alert('Errore di rete durante la generazione del file PDF.');
             }
         };
+
+        // === NUOVE FUNZIONI EXPORT PRODOTTI PER ORDINE ===
+        
+        window.exportProductsExcel = async function() {
+            try {
+                const fromDate = document.getElementById('export-products-from-date').value;
+                const toDate = document.getElementById('export-products-to-date').value;
+                
+                // Costruisci URL con parametri date
+                let url = '/orders/export-products-excel';
+                const params = new URLSearchParams();
+                if (fromDate) params.append('from_date', fromDate);
+                if (toDate) params.append('to_date', toDate);
+                if (params.toString()) url += '?' + params.toString();
+                
+                // Mostra loading
+                const loadingMsg = document.createElement('div');
+                loadingMsg.innerHTML = '⏳ Generazione file Excel prodotti in corso...';
+                loadingMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#0066CC;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+                document.body.appendChild(loadingMsg);
+                
+                // Effettua la richiesta
+                const response = await fetch(url);
+                
+                if (response.ok) {
+                    // Download del file
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    
+                    // Genera nome file con date se specificate
+                    let fileName = 'export_prodotti_ordini';
+                    if (fromDate || toDate) {
+                        fileName += `_${fromDate || 'inizio'}_${toDate || 'fine'}`;
+                    }
+                    fileName += '.xlsx';
+                    
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(downloadUrl);
+                    
+                    // Mostra successo
+                    loadingMsg.innerHTML = '✅ File Excel prodotti scaricato con successo!';
+                    loadingMsg.style.background = '#28a745';
+                    setTimeout(() => loadingMsg.remove(), 3000);
+                } else {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+            } catch (error) {
+                console.error('Errore export Excel prodotti:', error);
+                const errorMsg = document.createElement('div');
+                errorMsg.innerHTML = '❌ Errore durante il download del file Excel prodotti';
+                errorMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+                document.body.appendChild(errorMsg);
+                setTimeout(() => errorMsg.remove(), 5000);
+            }
+        };
+
+        window.exportProductsPdf = async function() {
+            try {
+                const fromDate = document.getElementById('export-products-from-date').value;
+                const toDate = document.getElementById('export-products-to-date').value;
+                
+                // Costruisci URL con parametri date
+                let url = '/orders/export-products-pdf';
+                const params = new URLSearchParams();
+                if (fromDate) params.append('from_date', fromDate);
+                if (toDate) params.append('to_date', toDate);
+                if (params.toString()) url += '?' + params.toString();
+                
+                // Mostra loading
+                const loadingMsg = document.createElement('div');
+                loadingMsg.innerHTML = '⏳ Generazione file PDF prodotti in corso...';
+                loadingMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+                document.body.appendChild(loadingMsg);
+                
+                // Effettua la richiesta
+                const response = await fetch(url);
+                
+                if (response.ok) {
+                    // Download del file
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    
+                    // Genera nome file con date se specificate
+                    let fileName = 'export_prodotti_ordini';
+                    if (fromDate || toDate) {
+                        fileName += `_${fromDate || 'inizio'}_${toDate || 'fine'}`;
+                    }
+                    fileName += '.pdf';
+                    
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(downloadUrl);
+                    
+                    // Mostra successo
+                    loadingMsg.innerHTML = '✅ File PDF prodotti scaricato con successo!';
+                    loadingMsg.style.background = '#28a745';
+                    setTimeout(() => loadingMsg.remove(), 3000);
+                } else {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+            } catch (error) {
+                console.error('Errore export PDF prodotti:', error);
+                const errorMsg = document.createElement('div');
+                errorMsg.innerHTML = '❌ Errore durante il download del file PDF prodotti';
+                errorMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+                document.body.appendChild(errorMsg);
+                setTimeout(() => errorMsg.remove(), 5000);
+            }
+        };
+
+        // Inizializza date di default per export prodotti
+        function initializeProductsExportDates() {
+            const today = new Date();
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            
+            // Funzione helper per formattare date
+            const formatDate = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+            
+            // Precompila i campi export prodotti
+            const productsFromDateField = document.getElementById('export-products-from-date');
+            const productsToDateField = document.getElementById('export-products-to-date');
+            
+            if (productsFromDateField) {
+                productsFromDateField.value = formatDate(firstDayOfMonth);
+            }
+            
+            if (productsToDateField) {
+                productsToDateField.value = formatDate(today);
+            }
+        }
+
+        // Inizializza le date quando il documento è pronto
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeProductsExportDates);
+        } else {
+            initializeProductsExportDates();
+        }

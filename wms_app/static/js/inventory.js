@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let movementsUpload = null;
     let unloadFileUpload = null;
     let relocateFileUpload = null;
+    let relocateGroundFileUpload = null;
 
     // Enhanced Upload per tab carico
     if (document.getElementById('add-stock-upload')) {
@@ -129,6 +130,26 @@ document.addEventListener('DOMContentLoaded', function() {
             onScannerProcess: function(virtualFile, content) {
                 console.log('✅ Dati scanner elaborati ubicazione:', content.split('\n').length, 'righe');
                 syncWithHiddenInput('relocate-file', virtualFile);
+            }
+        });
+    }
+
+    // Enhanced Upload per il nuovo tab ubicazione da terra (nelle operazioni da file)
+    if (document.getElementById('relocate-ground-file-upload')) {
+        console.log('🚀 Inizializzazione Enhanced Upload per ubicazione da terra (operazioni file)...');
+        relocateGroundFileUpload = window.createEnhancedUpload('relocate-ground-file-upload', {
+            acceptedTypes: ['.txt'],
+            maxFileSize: 10 * 1024 * 1024,
+            enableDragDrop: true,
+            enableScanner: true,
+            scannerPlaceholder: 'Incolla qui i dati dalla pistola scanner...\n\nEsempio:\nA01P1P1\nSKU123\nSKU456_5\n...',
+            onFileSelect: function(file) {
+                console.log('✅ File selezionato via Enhanced Upload ubicazione da terra:', file.name);
+                syncWithHiddenInput('relocate-ground-file', file);
+            },
+            onScannerProcess: function(virtualFile, content) {
+                console.log('✅ Dati scanner elaborati ubicazione da terra:', content.split('\n').length, 'righe');
+                syncWithHiddenInput('relocate-ground-file', virtualFile);
             }
         });
     }
@@ -1843,6 +1864,111 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.error('Errore nella fetch:', error);
             alert('Si è verificato un errore durante l\'analisi del file.');
+        });
+    });
+
+    // === NUOVI FORM UBICAZIONE DA TERRA ===
+    
+    // Form ubicazione da terra manuale (nuovo tab nelle operazioni manuali)
+    document.getElementById('relocate-ground-manual-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const sku = document.getElementById('relocate-ground-product-sku').value.trim();
+        const quantity = parseInt(document.getElementById('relocate-ground-quantity').value) || 0;
+        const location = document.getElementById('relocate-ground-location').value.trim().toUpperCase();
+        
+        if (!sku) {
+            alert('Inserisci un SKU valido');
+            return;
+        }
+        
+        if (!location) {
+            alert('Inserisci un\'ubicazione valida');
+            return;
+        }
+        
+        if (quantity <= 0) {
+            alert('Inserisci una quantità valida maggiore di 0');
+            return;
+        }
+        
+        // Utilizza la stessa logica del form originale
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Elaborazione...';
+        
+        fetch('/inventory/relocate-from-ground-manual', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                product_sku: sku,
+                quantity: quantity,
+                target_location: location
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert(`✅ Ubicazione completata: ${quantity}x ${sku} da TERRA a ${location}`);
+                closeOverlay('manual-operations-overlay');
+                location.reload();
+            } else {
+                alert(`❌ Errore: ${data.message}`);
+            }
+        })
+        .catch(error => {
+            console.error('Errore nella richiesta di ubicazione:', error);
+            alert('❌ Errore nella richiesta di ubicazione');
+        })
+        .finally(() => {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        });
+    });
+
+    // Form ubicazione da terra da file (nuovo tab nelle operazioni da file)
+    document.getElementById('relocate-ground-file-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const fileInput = document.getElementById('relocate-ground-file');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            console.log('Nessun file selezionato.');
+            return;
+        }
+        
+        // Utilizza la stessa logica del form originale
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Elaborazione...';
+        
+        fetch('/inventory/parse-relocate-from-ground-file', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.detail) {
+                alert('Errore: ' + data.detail);
+            } else {
+                currentRecapFileName = file.name;
+                showRelocateGroundRecap(data, 'Ubicazione da Terra da File');
+                closeOverlay('file-operations-overlay');
+            }
+        })
+        .catch(error => {
+            console.error('Errore nell\'elaborazione del file:', error);
+            alert('❌ Errore nell\'elaborazione del file');
+        })
+        .finally(() => {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
         });
     });
 

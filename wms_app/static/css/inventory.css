@@ -224,6 +224,19 @@ body {
     overflow-y: auto;
 }
 
+/* Overlay più larghi per operazioni da file (5 tab) */
+#file-operations-overlay .overlay-content {
+    max-width: 800px;
+    width: 95%;
+}
+
+/* Tab più compatti quando ci sono 5 voci */
+#file-operations-overlay .tab-btn {
+    padding: 1rem 0.75rem;
+    font-size: 0.95rem;
+    min-width: 0;
+}
+
 .overlay-header {
     display: flex;
     justify-content: space-between;
@@ -336,8 +349,9 @@ body {
 .form-actions {
     display: flex;
     gap: 1rem;
-    justify-content: flex-end;
+    justify-content: center;
     padding-top: 1rem;
+    padding-bottom: 1rem;
     border-top: 1px solid #F2F2F2;
 }
 
@@ -661,7 +675,7 @@ tr:hover {
 
 .tab-content {
     display: none;
-    padding: 1.5rem;
+    padding: 0.25rem;
 }
 
 .tab-content.active {
@@ -690,6 +704,12 @@ tr:hover {
     
     .tab-btn.active {
         border-bottom: 2px solid #0097E0;
+    }
+    
+    /* Tab più compatti per mobile quando ci sono molte voci */
+    #file-operations-overlay .tab-btn {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.9rem;
     }
 }
 

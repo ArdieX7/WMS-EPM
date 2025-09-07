@@ -12,6 +12,8 @@ import io
 
 # Import per export Excel e PDF
 try:
+    import openpyxl
+    import openpyxl.styles
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
     EXCEL_AVAILABLE = True
@@ -1011,6 +1013,300 @@ async def import_picking_from_txt_legacy(file: UploadFile = File(...), db: Sessi
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore interno: {str(e)}")
+
+# --- Export Prodotti per Ordine (prima degli endpoint con path parameters) ---
+
+@router.get("/export-products-excel")
+async def export_products_excel(
+    from_date: Optional[date] = Query(None, description="Data inizio (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Data fine (YYYY-MM-DD)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Esporta i prodotti per ordine usciti in formato Excel con filtro per range di date.
+    Una riga per ogni prodotto-ordine con dettagli completi.
+    """
+    if not EXCEL_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Export Excel non disponibile. Installare openpyxl.")
+    
+    try:
+        # Query usando il pattern che funziona nel resto del sistema
+        query = db.query(models.Order).options(
+            joinedload(models.Order.lines).joinedload(models.OrderLine.product)
+        )
+        
+        # Applica filtri date se forniti
+        if from_date:
+            query = query.filter(models.Order.order_date >= from_date)
+        if to_date:
+            query = query.filter(models.Order.order_date <= to_date)
+        
+        # Ordinamento per data decrescente
+        orders = query.order_by(models.Order.order_date.desc()).all()
+        
+        if not orders:
+            raise HTTPException(status_code=404, detail="Nessun ordine trovato per il periodo specificato.")
+        
+        # Estrai tutte le righe prodotto da tutti gli ordini
+        product_lines = []
+        for order in orders:
+            for line in order.lines:
+                product_lines.append({
+                    'order_number': order.order_number,
+                    'customer_name': order.customer_name,
+                    'order_date': order.order_date,
+                    'ddt_number': order.ddt_number,
+                    'is_completed': order.is_completed,
+                    'is_cancelled': order.is_cancelled,
+                    'is_archived': order.is_archived,
+                    'product_sku': line.product_sku,
+                    'requested_quantity': line.requested_quantity,
+                    'picked_quantity': line.picked_quantity,
+                    'description': line.product.description if line.product else ""
+                })
+        
+        if not product_lines:
+            raise HTTPException(status_code=404, detail="Nessun prodotto trovato negli ordini del periodo specificato.")
+        
+        # Creazione del workbook Excel
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Prodotti per Ordine"
+        
+        # Intestazioni delle colonne
+        headers = [
+            "N° Ordine",
+            "Cliente",
+            "Data Ordine",
+            "DDT",
+            "SKU Prodotto",
+            "Descrizione Prodotto",
+            "Quantità Richiesta",
+            "Quantità Prelevata",
+            "Stato Riga",
+            "Stato Ordine"
+        ]
+        
+        # Scrivi le intestazioni con formattazione
+        for col, header in enumerate(headers, 1):
+            cell = worksheet.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="CCE5FF", end_color="CCE5FF", fill_type="solid")
+        
+        # Scrivi i dati delle righe prodotto
+        for row, product_line in enumerate(product_lines, 2):
+            # Determina lo stato della riga prodotto
+            if product_line['picked_quantity'] == 0:
+                riga_status = "Non Prelevato"
+            elif product_line['picked_quantity'] >= product_line['requested_quantity']:
+                riga_status = "Completo"
+            else:
+                riga_status = "Parziale"
+            
+            # Stato ordine (usa stessa logica dell'export ordini)
+            if product_line['is_cancelled']:
+                ordine_status = "Annullato"
+            elif product_line['is_archived']:
+                ordine_status = "Archiviato"
+            elif product_line['is_completed']:
+                ordine_status = "Completato"
+            else:
+                ordine_status = "Attivo"
+            
+            # Scrivi i dati della riga
+            data = [
+                product_line['order_number'],
+                product_line['customer_name'],
+                product_line['order_date'].strftime("%Y-%m-%d") if product_line['order_date'] else "",
+                product_line['ddt_number'] or "",
+                product_line['product_sku'],
+                product_line['description'] or "",
+                product_line['requested_quantity'],
+                product_line['picked_quantity'],
+                riga_status,
+                ordine_status
+            ]
+            
+            for col, value in enumerate(data, 1):
+                worksheet.cell(row=row, column=col, value=value)
+        
+        # Auto-dimensiona le colonne
+        for column in worksheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        # Salva in memory buffer
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        buffer.seek(0)
+        
+        # Genera nome file dinamico
+        filename = "export_prodotti_ordini"
+        if from_date or to_date:
+            filename += f"_{from_date or 'inizio'}_{to_date or 'fine'}"
+        filename += ".xlsx"
+        
+        headers = {
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+        
+        return Response(content=buffer.read(), headers=headers)
+        
+    except Exception as e:
+        logger.error(f"Errore nella generazione dell'Excel prodotti per ordine: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore interno del server")
+
+
+@router.get("/export-products-pdf")
+async def export_products_pdf(
+    from_date: Optional[date] = Query(None, description="Data inizio (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Data fine (YYYY-MM-DD)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Esporta i prodotti per ordine usciti in formato PDF con filtro per range di date.
+    Una riga per ogni prodotto-ordine con dettagli completi.
+    """
+    try:
+        # Query usando il pattern che funziona nel resto del sistema (stessa del Excel)
+        query = db.query(models.Order).options(
+            joinedload(models.Order.lines).joinedload(models.OrderLine.product)
+        )
+        
+        # Applica filtri date se forniti
+        if from_date:
+            query = query.filter(models.Order.order_date >= from_date)
+        if to_date:
+            query = query.filter(models.Order.order_date <= to_date)
+        
+        # Ordinamento per data decrescente
+        orders = query.order_by(models.Order.order_date.desc()).all()
+        
+        if not orders:
+            raise HTTPException(status_code=404, detail="Nessun ordine trovato per il periodo specificato.")
+        
+        # Estrai tutte le righe prodotto da tutti gli ordini
+        product_lines = []
+        for order in orders:
+            for line in order.lines:
+                product_lines.append({
+                    'order_number': order.order_number,
+                    'customer_name': order.customer_name,
+                    'order_date': order.order_date,
+                    'ddt_number': order.ddt_number,
+                    'is_completed': order.is_completed,
+                    'is_cancelled': order.is_cancelled,
+                    'is_archived': order.is_archived,
+                    'product_sku': line.product_sku,
+                    'requested_quantity': line.requested_quantity,
+                    'picked_quantity': line.picked_quantity,
+                    'description': line.product.description if line.product else ""
+                })
+        
+        if not product_lines:
+            raise HTTPException(status_code=404, detail="Nessun prodotto trovato negli ordini del periodo specificato.")
+        
+        # Creazione del PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=40, bottomMargin=40)
+        
+        # Stili
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=30,
+            alignment=1  # Center
+        )
+        
+        # Contenuto del PDF
+        story = []
+        
+        # Titolo
+        period_text = ""
+        if from_date or to_date:
+            period_text = f" ({from_date or 'inizio'} - {to_date or 'fine'})"
+        title = Paragraph(f"Report Prodotti per Ordine Usciti{period_text}", title_style)
+        story.append(title)
+        story.append(Spacer(1, 20))
+        
+        # Tabella con i dati
+        table_data = [
+            ['N° Ordine', 'Cliente', 'Data', 'SKU', 'Descrizione', 'Richiesto', 'Prelevato', 'Stato']
+        ]
+        
+        # Aggiungi le righe dei prodotti
+        for product_line in product_lines:
+            # Determina lo stato della riga prodotto
+            if product_line['picked_quantity'] == 0:
+                riga_status = "Non Prelevato"
+            elif product_line['picked_quantity'] >= product_line['requested_quantity']:
+                riga_status = "Completo"
+            else:
+                riga_status = "Parziale"
+            
+            # Formatta i dati per la tabella (accorcia per PDF)
+            row = [
+                product_line['order_number'][:12] + "..." if len(product_line['order_number']) > 15 else product_line['order_number'],
+                product_line['customer_name'][:15] + "..." if len(product_line['customer_name']) > 18 else product_line['customer_name'],
+                product_line['order_date'].strftime("%d/%m/%y") if product_line['order_date'] else "",
+                product_line['product_sku'][:12] + "..." if len(product_line['product_sku']) > 15 else product_line['product_sku'],
+                (product_line['description'][:20] + "..." if len(product_line['description'] or "") > 23 else product_line['description'] or ""),
+                str(product_line['requested_quantity']),
+                str(product_line['picked_quantity']),
+                riga_status[:8]
+            ]
+            table_data.append(row)
+        
+        # Crea la tabella
+        table = Table(table_data, colWidths=[60, 80, 45, 70, 100, 45, 45, 50])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        story.append(table)
+        
+        # Genera il PDF
+        doc.build(story)
+        pdf_content = buffer.getvalue()
+        buffer.close()
+        
+        # Genera nome file dinamico
+        filename = "export_prodotti_ordini"
+        if from_date or to_date:
+            filename += f"_{from_date or 'inizio'}_{to_date or 'fine'}"
+        filename += ".pdf"
+        
+        headers = {
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Type": "application/pdf"
+        }
+        
+        return Response(content=pdf_content, media_type="application/pdf", headers=headers)
+        
+    except Exception as e:
+        logger.error(f"Errore nella generazione del PDF prodotti per ordine: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore interno del server")
+
 
 # --- API Endpoints con parametri di percorso (devono essere definiti dopo le rotte generiche) ---
 
@@ -3034,3 +3330,5 @@ def get_order_pickup_locations(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore nel recupero posizioni prelievo: {str(e)}")
+
+
