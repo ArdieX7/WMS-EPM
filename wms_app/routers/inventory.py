@@ -1255,11 +1255,10 @@ async def parse_movements_file(file: UploadFile = File(...), db: Session = Depen
         })
         
         # Aggiorna i simulatori per il prossimo spostamento
-        # Rimuovi dall'origine in entrambi gli inventari (è stata spostata)
+        # Rimuovi dall'origine nel simulatore (è stata spostata)
+        # NOTA: original_inventory rimane immutabile per validazioni coerenti
         if from_location in simulated_inventory:
             del simulated_inventory[from_location]
-        if from_location in original_inventory:
-            del original_inventory[from_location]
         
         # Per la destinazione nel simulatore: gestisce correttamente TERRA che può contenere SKU multipli
         if to_location in simulated_inventory and simulated_inventory[to_location]['sku'] == origin_inventory['sku']:
