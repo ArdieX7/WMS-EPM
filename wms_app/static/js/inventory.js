@@ -512,7 +512,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Errore nella fetch per add-stock-manual:', error);
-                alert('Si è verificato un errore durante il carico manuale.');
+                alert(`❌ Errore carico manuale: ${error.message}`);
             });
         });
     }
@@ -546,7 +546,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Errore nella fetch per subtract-stock-manual:', error);
-                alert('Si è verificato un errore durante lo scarico manuale.');
+                alert(`❌ Errore scarico manuale: ${error.message}`);
             });
         });
     }
@@ -581,7 +581,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Errore nella fetch per move-stock-manual:', error);
-                alert('Si è verificato un errore durante lo spostamento manuale.');
+                alert(`❌ Errore spostamento manuale: ${error.message}`);
             });
         });
     }
@@ -1727,7 +1727,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Errore scarico container:', error);
-            alert('Si è verificato un errore durante lo scarico container.');
+            alert(`❌ Errore scarico container: ${error.message}`);
         });
     });
 
@@ -1822,7 +1822,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Errore ubicazione da terra:', error);
-            alert('Si è verificato un errore durante l\'ubicazione da terra.');
+            alert(`❌ Errore ubicazione da terra: ${error.message}`);
         });
     });
 
@@ -1902,24 +1902,32 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                product_sku: sku,
+                sku: sku,
                 quantity: quantity,
-                target_location: location
+                location: location
             })
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(errorData => {
+                    throw new Error(errorData.detail || 'Errore sconosciuto');
+                });
+            }
+            return response.json();
+        })
         .then(data => {
-            if (data.status === 'success') {
-                alert(`✅ Ubicazione completata: ${quantity}x ${sku} da TERRA a ${location}`);
+            console.log('Risposta server:', data);
+            if (data.message) {
+                alert(`✅ ${data.message}`);
                 closeOverlay('manual-operations-overlay');
-                location.reload();
+                window.location.reload();
             } else {
-                alert(`❌ Errore: ${data.message}`);
+                alert(`❌ Errore: ${JSON.stringify(data)}`);
             }
         })
         .catch(error => {
             console.error('Errore nella richiesta di ubicazione:', error);
-            alert('❌ Errore nella richiesta di ubicazione');
+            alert(`❌ Errore: ${error.message}`);
         })
         .finally(() => {
             submitBtn.disabled = false;

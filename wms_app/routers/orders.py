@@ -1732,14 +1732,23 @@ async def get_picking_list_print(order_id: int, db: Session = Depends(get_db)):
             # Converte il risultato nel formato per la stampa
             for allocation in allocations:
                 sku = allocation['sku']
-                
+
                 product_suggestions = []
                 for loc_allocation in allocation['allocations']:
+                    # Recupera la giacenza attuale nella locazione per controllo qualità
+                    current_stock_item = db.query(models.Inventory).filter(
+                        models.Inventory.location_name == loc_allocation['location_name'],
+                        models.Inventory.product_sku == sku
+                    ).first()
+
+                    current_stock = current_stock_item.quantity if current_stock_item else 0
+
                     product_suggestions.append({
                         "location_name": loc_allocation['location_name'],
-                        "quantity": loc_allocation['quantity']
+                        "quantity": loc_allocation['quantity'],
+                        "current_stock": current_stock
                     })
-                
+
                 suggestions[sku] = {
                     "needed": allocation['requested_quantity'],
                     "locations": product_suggestions
@@ -1765,11 +1774,12 @@ async def get_picking_list_print(order_id: int, db: Session = Depends(get_db)):
                 for item in available_stock:
                     if remaining_to_pick <= 0:
                         break
-                    
+
                     qty_from_location = min(remaining_to_pick, item.quantity)
                     product_suggestions.append({
                         "location_name": item.location_name,
-                        "quantity": qty_from_location
+                        "quantity": qty_from_location,
+                        "current_stock": item.quantity  # Giacenza attuale per controllo qualità
                     })
                     remaining_to_pick -= qty_from_location
                 
@@ -1841,10 +1851,11 @@ async def get_picking_list_print(order_id: int, db: Session = Depends(get_db)):
                 color: #000;
             }}
             
-            table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
-            th, td {{ border: 1px solid #000; padding: 8px; text-align: left; }}
-            th {{ background-color: #f0f0f0; }}
+            table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; }}
+            th, td {{ border: 1px solid #000; padding: 6px; text-align: left; }}
+            th {{ background-color: #f0f0f0; font-weight: bold; text-align: center; }}
             .location {{ font-weight: bold; }}
+            td:nth-child(3), td:nth-child(4), td:nth-child(5), td:nth-child(6) {{ text-align: center; }}
             @media print {{ 
                 body {{ margin: 0; }}
                 .no-print {{ display: none; }}
@@ -1893,19 +1904,30 @@ async def get_picking_list_print(order_id: int, db: Session = Depends(get_db)):
                     <th>SKU</th>
                     <th>Ubicazione</th>
                     <th>Quantità da Prelevare</th>
+                    <th>Qty in Locazione</th>
+                    <th>Qty Post Prelievo</th>
                     <th>☐ Prelevato</th>
                 </tr>
             </thead>
             <tbody>
     """
-    
+
     for sku, suggestion in suggestions.items():
         for location in suggestion["locations"]:
+            current_stock = location.get('current_stock', 0)
+            qty_to_pick = location['quantity']
+            qty_after_picking = current_stock - qty_to_pick
+
+            # Evidenzia in grassetto se la locazione andrà a 0
+            post_pick_style = "font-weight: bold; color: #FF5913;" if qty_after_picking == 0 else ""
+
             html_content += f"""
                 <tr>
                     <td>{sku}</td>
                     <td class="location">{location['location_name']}</td>
-                    <td>{location['quantity']}</td>
+                    <td style="text-align: center;">{qty_to_pick}</td>
+                    <td style="text-align: center; font-weight: bold;">{current_stock}</td>
+                    <td style="text-align: center; {post_pick_style}">{qty_after_picking}</td>
                     <td style="text-align: center; width: 50px;">☐</td>
                 </tr>
             """

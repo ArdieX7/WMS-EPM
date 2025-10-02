@@ -1224,10 +1224,11 @@ async def parse_movements_file(file: UploadFile = File(...), db: Session = Depen
             })
             continue
         
-        # Controlla conflitti nell'ubicazione di destinazione
+        # Controlla conflitti nell'ubicazione di destinazione (ECCEZIONE: TERRA può contenere SKU multipli)
         destination_inventory = simulated_inventory.get(to_location)
-        has_conflict = (destination_inventory and 
-                       destination_inventory['quantity'] > 0 and 
+        has_conflict = (to_location != "TERRA" and
+                       destination_inventory and
+                       destination_inventory['quantity'] > 0 and
                        destination_inventory['sku'] != origin_inventory['sku'])
         
         if has_conflict:
@@ -1254,19 +1255,24 @@ async def parse_movements_file(file: UploadFile = File(...), db: Session = Depen
         })
         
         # Aggiorna i simulatori per il prossimo spostamento
-        # Rimuovi dall'origine in entrambi gli inventari (è stata spostata)
+        # Rimuovi dall'origine nel simulatore (è stata spostata)
+        # NOTA: original_inventory rimane immutabile per validazioni coerenti
         if from_location in simulated_inventory:
             del simulated_inventory[from_location]
-        if from_location in original_inventory:
-            del original_inventory[from_location]
         
-        # Per la destinazione nel simulatore: se c'è conflitto, il prodotto esistente verrà sovrascritto
-        # Ma se non c'è conflitto (stesso SKU), aggiungi la quantità
+        # Per la destinazione nel simulatore: gestisce correttamente TERRA che può contenere SKU multipli
         if to_location in simulated_inventory and simulated_inventory[to_location]['sku'] == origin_inventory['sku']:
             # Stesso SKU: somma le quantità
             simulated_inventory[to_location]['quantity'] += origin_inventory['quantity']
+        elif to_location == "TERRA":
+            # TERRA è speciale: può contenere SKU multipli, ma nel simulatore teniamo solo l'ultimo per semplicità
+            # (il controllo conflitti per TERRA è già disabilitato quindi non influenza la validazione)
+            simulated_inventory[to_location] = {
+                'sku': origin_inventory['sku'],
+                'quantity': origin_inventory['quantity']
+            }
         else:
-            # SKU diverso o ubicazione vuota: sostituisci completamente
+            # SKU diverso in ubicazione normale: sostituisci completamente (conflitto gestito sopra)
             simulated_inventory[to_location] = {
                 'sku': origin_inventory['sku'],
                 'quantity': origin_inventory['quantity']
@@ -1339,8 +1345,9 @@ async def commit_movements(movements_data: dict, db: Session = Depends(get_db)):
                 models.Inventory.quantity > 0
             ).first()
             
-            if existing_in_destination:
+            if existing_in_destination and to_location != "TERRA":
                 # Se c'è un conflitto ma l'utente ha confermato, sovrascriviamo
+                # ECCEZIONE: TERRA può contenere SKU multipli, non eliminare mai contenuto esistente
                 # Elimina il contenuto esistente nella destinazione
                 db.delete(existing_in_destination)
             
