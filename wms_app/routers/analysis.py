@@ -58,21 +58,23 @@ def get_orders_statistics(db: Session = Depends(get_db), current_user = Depends(
         9: "Settembre", 10: "Ottobre", 11: "Novembre", 12: "Dicembre"
     }
     
-    # Count orders for current month (completed/archived orders)
+    # Count orders for current month (completed/archived orders, excluding cancelled)
     current_month_orders = db.query(func.count(Order.id)).filter(
         and_(
             extract('month', Order.archived_date) == current_month,
             extract('year', Order.archived_date) == current_year,
-            Order.is_archived == 1
+            Order.is_archived == 1,
+            Order.is_cancelled == 0
         )
     ).scalar() or 0
-    
+
     # Count orders for previous month
     previous_month_orders = db.query(func.count(Order.id)).filter(
         and_(
             extract('month', Order.archived_date) == previous_month,
             extract('year', Order.archived_date) == previous_year,
-            Order.is_archived == 1
+            Order.is_archived == 1,
+            Order.is_cancelled == 0
         )
     ).scalar() or 0
     
@@ -81,17 +83,19 @@ def get_orders_statistics(db: Session = Depends(get_db), current_user = Depends(
         and_(
             extract('month', Order.archived_date) == current_month,
             extract('year', Order.archived_date) == current_year,
-            Order.is_archived == 1
+            Order.is_archived == 1,
+            Order.is_cancelled == 0
         )
     )
     current_month_pieces = current_month_pieces_query.scalar() or 0
-    
+
     # Get total pieces shipped for previous month
     previous_month_pieces_query = db.query(func.sum(OrderLine.picked_quantity)).join(Order).filter(
         and_(
             extract('month', Order.archived_date) == previous_month,
             extract('year', Order.archived_date) == previous_year,
-            Order.is_archived == 1
+            Order.is_archived == 1,
+            Order.is_cancelled == 0
         )
     )
     previous_month_pieces = previous_month_pieces_query.scalar() or 0
@@ -105,7 +109,8 @@ def get_orders_statistics(db: Session = Depends(get_db), current_user = Depends(
         and_(
             extract('month', Order.archived_date) == current_month,
             extract('year', Order.archived_date) == current_year,
-            Order.is_archived == 1
+            Order.is_archived == 1,
+            Order.is_cancelled == 0
         )
     ).group_by(OrderLine.product_sku, Product.description).order_by(
         func.sum(OrderLine.picked_quantity).desc()
@@ -128,7 +133,8 @@ def get_orders_statistics(db: Session = Depends(get_db), current_user = Depends(
         and_(
             extract('month', Order.archived_date) == previous_month,
             extract('year', Order.archived_date) == previous_year,
-            Order.is_archived == 1
+            Order.is_archived == 1,
+            Order.is_cancelled == 0
         )
     ).group_by(OrderLine.product_sku, Product.description).order_by(
         func.sum(OrderLine.picked_quantity).desc()
