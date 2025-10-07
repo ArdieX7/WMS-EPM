@@ -40,9 +40,9 @@ class BackupService:
         self.metadata_dir = self.backup_root / "metadata"
         
         # Configurazione retention
-        self.daily_retention_days = 7
-        self.weekly_retention_weeks = 4
-        self.manual_retention_days = 30
+        self.daily_retention_days = 60      # 60 giorni (2 mesi)
+        self.weekly_retention_weeks = 26    # 26 settimane (6 mesi)
+        self.manual_retention_days = 365    # 365 giorni (1 anno)
         
         # Assicura che le directory esistano
         self._ensure_directories()
