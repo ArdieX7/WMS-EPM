@@ -1,3 +1,17 @@
+        // Funzione globale per rimuovere una riga ordine
+        function removeLine(button) {
+            const orderLine = button.closest('.order-line');
+            const container = document.getElementById('order-lines-container');
+
+            // Impedisci rimozione dell'ultima riga
+            if (container.querySelectorAll('.order-line').length <= 1) {
+                alert('Deve rimanere almeno una riga ordine!');
+                return;
+            }
+
+            orderLine.remove();
+        }
+
         document.addEventListener("DOMContentLoaded", function() {
             const createOrderForm = document.getElementById("create-order-form");
             const orderLinesContainer = document.getElementById("order-lines-container");
@@ -178,6 +192,7 @@
                                 <label for="line-quantity-${lineCounter}">Quantità Richiesta:</label>
                                 <input type="number" id="line-quantity-${lineCounter}" required>
                             </div>
+                            <button type="button" class="btn-remove-line" onclick="removeLine(this)" title="Rimuovi riga">✕</button>
                         </div>
                     </div>
                 `;

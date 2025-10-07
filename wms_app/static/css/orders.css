@@ -125,9 +125,43 @@ body {
 }
 
 .form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
     gap: 1rem;
+    align-items: flex-end;
+}
+
+/* Fix larghezza input nelle righe ordine */
+.order-line .form-group {
+    flex: 1;
+    min-width: 0;
+}
+
+.order-line .form-group input {
+    width: 100%;
+    max-width: 280px;
+}
+
+/* Pulsante rimozione riga */
+.btn-remove-line {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+    line-height: 1;
+    padding: 0;
+    margin-bottom: 0;
+}
+
+.btn-remove-line:hover {
+    background-color: #c82333;
+    transform: scale(1.1);
 }
 
 .form-actions {
