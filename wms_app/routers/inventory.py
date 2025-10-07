@@ -815,7 +815,7 @@ from fastapi.responses import StreamingResponse
 import io
 
 @router.get("/backup-stock")
-async def backup_stock(db: Session = Depends(get_db)):
+async def backup_stock(db: Session = Depends(get_db), current_user = Depends(require_permission("inventory_data_management"))):
     """
     Crea un backup di tutte le giacenze di magazzino in un file di testo.
     Il formato è: ubicazione,sku,quantità
@@ -835,7 +835,7 @@ async def backup_stock(db: Session = Depends(get_db)):
     )
 
 @router.post("/restore-stock")
-async def restore_stock(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def restore_stock(file: UploadFile = File(...), db: Session = Depends(get_db), current_user = Depends(require_permission("inventory_data_management"))):
     """
     Ripristina la giacenza da un file di backup, sovrascrivendo tutti i dati esistenti.
     """
@@ -872,7 +872,7 @@ async def restore_stock(file: UploadFile = File(...), db: Session = Depends(get_
 
 
 @router.delete("/delete-all-stock", status_code=200)
-async def delete_all_stock(db: Session = Depends(get_db)):
+async def delete_all_stock(db: Session = Depends(get_db), current_user = Depends(require_permission("inventory_data_management"))):
     """
     Elimina tutte le giacenze di magazzino.
     """
@@ -886,7 +886,7 @@ async def delete_all_stock(db: Session = Depends(get_db)):
 
 
 @router.delete("/delete-stock-by-row", status_code=200)
-async def delete_stock_by_row(row_prefix: str, db: Session = Depends(get_db)):
+async def delete_stock_by_row(row_prefix: str, db: Session = Depends(get_db), current_user = Depends(require_permission("inventory_data_management"))):
     """
     Elimina le giacenze per un range di file specifico (es. 'A01').
     """
@@ -2061,7 +2061,7 @@ async def commit_relocate_from_ground_operations(operations_data: dict, db: Sess
         raise HTTPException(status_code=500, detail=f"Errore durante l'operazione: {str(e)}")
 
 @router.post("/consolidate-ground-inventory")
-async def consolidate_ground_inventory(db: Session = Depends(get_db)):
+async def consolidate_ground_inventory(db: Session = Depends(get_db), current_user = Depends(require_permission("inventory_data_management"))):
     """
     Consolida i record duplicati dello stesso SKU in TERRA.
     """
