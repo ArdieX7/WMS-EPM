@@ -2190,68 +2190,105 @@ async def get_consolidation_suggestions(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Errore durante l'analisi consolidamenti: {str(e)}")
 
 
+def _parse_location_floor(location_name: str) -> int:
+    """
+    Estrae il numero del piano da una ubicazione.
+
+    Formato: [Fila][Campata][Piano]P[Posto]
+    Esempio: 16A1P4 → piano 1, 10A3P2 → piano 3
+
+    Returns:
+        int: Numero piano, oppure 999 se non parsabile (TERRA, ubicazioni speciali)
+    """
+    import re
+    pattern = r'^(\d+)([A-Z])(\d+)P(\d+)$'
+    match = re.match(pattern, location_name)
+
+    if match:
+        return int(match.group(3))  # Piano è il 3° gruppo
+    else:
+        # Ubicazioni speciali (TERRA, ecc.) → piano altissimo (bassa priorità)
+        return 999
+
+
 def _find_optimal_consolidation(locations, pallet_quantity):
     """
-    Trova il consolidamento ottimale per un SKU.
-    
-    Strategia migliorata:
-    1. Prova diverse combinazioni per trovare quella che libera più ubicazioni
-    2. Considera qualsiasi ubicazione come potenziale target
-    3. Verifica che il totale non superi pallet_quantity
-    
+    Trova il consolidamento ottimale per un SKU con priorità piano.
+
+    Strategia con priorità picking:
+    1. Preferisce piani bassi (1, 2) come target per il picking
+    2. Svuota piani alti (4, 3) per primi per liberare stoccaggio
+    3. Massimizza ubicazioni liberate considerando anche la qualità del target
+
     Args:
         locations: Lista di record Inventory ordinata per quantità decrescente
         pallet_quantity: Capacità massima del pallet
-        
+
     Returns:
         Dict con from_locations, to_location, to_quantity oppure None
     """
     if len(locations) < 2:
         return None
-    
+
     best_consolidation = None
-    max_locations_freed = 0
-    
-    # Prova ogni ubicazione come potenziale target
-    for i, target in enumerate(locations):
-        remaining_locations = locations[:i] + locations[i+1:]
-        
+    max_score = 0
+
+    # Ordina ubicazioni per priorità target: piano basso prima (1 > 2 > 3 > 4)
+    locations_sorted_for_target = sorted(
+        locations,
+        key=lambda x: (_parse_location_floor(x.location_name), -x.quantity)
+    )
+
+    # Prova ogni ubicazione come potenziale target (piano 1 per primo)
+    for i, target in enumerate(locations_sorted_for_target):
+        remaining_locations = locations_sorted_for_target[:i] + locations_sorted_for_target[i+1:]
+
         # Calcola spazio disponibile nel target
         available_space = pallet_quantity - target.quantity
-        
+
         if available_space <= 0:
             continue  # Target già pieno, prova il prossimo
-        
-        # Algoritmo greedy: seleziona ubicazioni da consolidare
+
+        # Algoritmo greedy: seleziona ubicazioni da svuotare
         selected_locations = []
         total_to_move = 0
-        
-        # Ordina per quantità crescente per ottimizzare lo spazio
-        remaining_sorted = sorted(remaining_locations, key=lambda x: x.quantity)
-        
+
+        # Ordina: piano alto prima (P4 > P3 > P2 > P1), poi quantità crescente
+        remaining_sorted = sorted(
+            remaining_locations,
+            key=lambda x: (-_parse_location_floor(x.location_name), x.quantity)
+        )
+
         for location in remaining_sorted:
             if total_to_move + location.quantity <= available_space:
                 selected_locations.append(location)
                 total_to_move += location.quantity
-        
-        # Verifica se questa combinazione è migliore
+
+        # Calcola score considerando ubicazioni liberate + priorità piano target
         locations_freed = len(selected_locations)
-        if locations_freed > max_locations_freed and locations_freed > 0:
-            max_locations_freed = locations_freed
-            best_consolidation = {
-                'from_locations': [
-                    {'location': loc.location_name, 'quantity': loc.quantity} 
-                    for loc in selected_locations
-                ],
-                'to_location': {
-                    'location': target.location_name,
-                    'quantity': target.quantity
-                },
-                'to_quantity': target.quantity,
-                'total_moved': total_to_move,
-                'locations_freed': locations_freed
-            }
-    
+        if locations_freed > 0:
+            target_floor = _parse_location_floor(target.location_name)
+            # Bonus piano: Piano 1 = +40, Piano 2 = +30, Piano 3 = +20, Piano 4 = +10
+            floor_bonus = max(0, (5 - target_floor) * 10)
+            score = (locations_freed * 100) + floor_bonus
+
+            # Verifica se questa combinazione è la migliore
+            if score > max_score:
+                max_score = score
+                best_consolidation = {
+                    'from_locations': [
+                        {'location': loc.location_name, 'quantity': loc.quantity}
+                        for loc in selected_locations
+                    ],
+                    'to_location': {
+                        'location': target.location_name,
+                        'quantity': target.quantity
+                    },
+                    'to_quantity': target.quantity,
+                    'total_moved': total_to_move,
+                    'locations_freed': locations_freed
+                }
+
     return best_consolidation
 
 
