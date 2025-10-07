@@ -432,7 +432,8 @@ async def export_logs_csv(
 @router.delete("/cleanup")
 async def cleanup_old_logs(
     db: Session = Depends(get_db),
-    days_to_keep: int = Query(90, ge=1, le=365)
+    days_to_keep: int = Query(90, ge=1, le=365),
+    current_user = Depends(require_permission("logs_cleanup"))
 ):
     """
     Pulisce logs più vecchi del periodo specificato.
