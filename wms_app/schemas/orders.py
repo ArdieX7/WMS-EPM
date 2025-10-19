@@ -64,6 +64,20 @@ class FulfillmentRequest(BaseModel):
     order_id: int
     ddt_number: Optional[str] = None
 
+# Schema per la Modifica Data Archiviazione
+class UpdateArchivedDateRequest(BaseModel):
+    new_archived_date: datetime
+
+    @validator('new_archived_date')
+    def validate_date_not_future(cls, v):
+        # Rimuovi timezone info per confronto
+        v_naive = v.replace(tzinfo=None) if v.tzinfo else v
+        now_naive = datetime.now()
+
+        if v_naive > now_naive:
+            raise ValueError('La data di archiviazione non può essere nel futuro')
+        return v
+
 # --- Nuovi Schemi per i Suggerimenti di Picking ---
 class PickingSuggestionItem(BaseModel):
     location_name: str

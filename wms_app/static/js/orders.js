@@ -1841,28 +1841,40 @@
             // Funzione per caricare gli ordini archiviati
             async function fetchArchivedOrders() {
                 try {
+                    console.log("📡 Fetching archived orders from /orders/archived...");
                     const response = await fetch("/orders/archived");
+                    console.log("📦 Response received, status:", response.status);
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
                     const data = await response.json();
-                    
+                    console.log("📊 Data parsed, orders count:", data.orders?.length || 0);
+
                     // Carica i dati originali e processa per ricerca/ordinamento
                     if (data.orders && data.orders.length > 0) {
                         originalArchivedData = data.orders.map(order => ({
                             ...order,
                             order_date_formatted: new Date(order.order_date).toLocaleDateString('it-IT'),
                             order_date_sort: new Date(order.order_date),
-                            archived_at_formatted: new Date(order.archived_at).toLocaleDateString('it-IT'),
-                            archived_at_sort: new Date(order.archived_at)
+                            archived_at_formatted: order.archived_date ? new Date(order.archived_date).toLocaleDateString('it-IT') : 'N/A',
+                            archived_at_sort: order.archived_date ? new Date(order.archived_date) : new Date(0)
                         }));
                     } else {
                         originalArchivedData = [];
                     }
-                    
+
+                    console.log("🔄 Sorting and rendering table...");
                     filteredArchivedData = [...originalArchivedData];
                     sortArchivedOrders('id', 'desc'); // Ordine di default: ID decrescente
                     renderArchivedOrdersTable();
-                    
+                    console.log("✅ Table rendered successfully");
+
                 } catch (error) {
-                    console.error("Errore nel caricamento degli ordini archiviati:", error);
+                    console.error("❌ Errore nel caricamento degli ordini archiviati:", error);
+                    // Re-throw per permettere al chiamante di gestire l'errore
+                    throw error;
                 }
             }
 
@@ -1885,7 +1897,19 @@
                                 <td>${order.order_number}</td>
                                 <td>${order.customer_name}</td>
                                 <td>${new Date(order.order_date).toLocaleDateString()}</td>
-                                <td>${order.archived_date ? new Date(order.archived_date).toLocaleDateString() : 'N/A'}</td>
+                                <td>
+                                    ${order.archived_date ? new Date(order.archived_date).toLocaleDateString() : 'N/A'}
+                                    <button class="edit-archived-date-button"
+                                            data-order-id="${order.id}"
+                                            data-order-number="${order.order_number}"
+                                            data-current-date="${order.archived_date || ''}"
+                                            style="background: none; border: none; cursor: pointer; margin-left: 5px; font-size: 1.1em; opacity: 0.6; transition: opacity 0.2s;"
+                                            onmouseover="this.style.opacity='1'"
+                                            onmouseout="this.style.opacity='0.6'"
+                                            title="Modifica data archiviazione">
+                                        ✏️
+                                    </button>
+                                </td>
                                 <td>${orderStatusText}</td>
                                 <td>${order.ddt_number || '-'}</td>
                                 <td style="text-align: center;">${formattedWeight}</td>
@@ -1926,6 +1950,17 @@
                                 if (order) {
                                     showOrderDetails(order.id, true);
                                 }
+                            });
+                        });
+
+                        // Gestore per modifica data archiviazione
+                        document.querySelectorAll(".edit-archived-date-button").forEach(button => {
+                            button.addEventListener("click", function(e) {
+                                e.stopPropagation(); // Previeni propagazione click
+                                const orderId = this.getAttribute("data-order-id");
+                                const orderNumber = this.getAttribute("data-order-number");
+                                const currentDate = this.getAttribute("data-current-date");
+                                showEditArchivedDateOverlay(orderId, orderNumber, currentDate);
                             });
                         });
                     } else {
@@ -4506,3 +4541,140 @@
         } else {
             initializeProductsExportDates();
         }
+
+        // ============== FUNZIONI MODIFICA DATA ARCHIVIAZIONE ==============
+
+        // Variabili globali per gestione modifica data
+        let currentEditOrderId = null;
+
+        // Funzione per mostrare l'overlay di modifica data archiviazione
+        function showEditArchivedDateOverlay(orderId, orderNumber, currentDate) {
+            currentEditOrderId = orderId;
+
+            // Popola i campi dell'overlay
+            document.getElementById('edit-date-order-number').textContent = orderNumber;
+
+            // Formatta la data attuale per visualizzazione
+            if (currentDate) {
+                const date = new Date(currentDate);
+                document.getElementById('edit-date-current').textContent = date.toLocaleString('it-IT');
+
+                // Pre-popola il campo datetime-local con la data attuale
+                // Converti in formato datetime-local (YYYY-MM-DDTHH:mm)
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const datetimeLocal = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+                document.getElementById('new-archived-date').value = datetimeLocal;
+            } else {
+                document.getElementById('edit-date-current').textContent = 'N/A';
+                // Imposta data/ora corrente come default
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                document.getElementById('new-archived-date').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+            }
+
+            // Mostra l'overlay
+            document.getElementById('edit-archived-date-overlay').style.display = 'flex';
+        }
+
+        // Funzione per chiudere l'overlay
+        function closeEditArchivedDateOverlay() {
+            document.getElementById('edit-archived-date-overlay').style.display = 'none';
+            currentEditOrderId = null;
+        }
+
+        // Funzione per confermare l'aggiornamento della data
+        async function confirmUpdateArchivedDate() {
+            if (!currentEditOrderId) {
+                alert('Errore: nessun ordine selezionato');
+                return;
+            }
+
+            const newDateInput = document.getElementById('new-archived-date').value;
+
+            if (!newDateInput) {
+                alert('Per favore seleziona una data valida');
+                return;
+            }
+
+            // Converti la data in formato ISO
+            const newDate = new Date(newDateInput);
+
+            // Validazione client-side: data non nel futuro
+            if (newDate > new Date()) {
+                alert('La data di archiviazione non può essere nel futuro');
+                return;
+            }
+
+            // Mostra loading
+            const overlay = document.getElementById('edit-archived-date-overlay');
+            const originalContent = overlay.innerHTML;
+            overlay.innerHTML = `
+                <div class="overlay-content">
+                    <div style="text-align: center; padding: 3rem;">
+                        <div class="spinner" style="margin: 0 auto 1rem;"></div>
+                        <p>⏳ Aggiornamento data in corso...</p>
+                    </div>
+                </div>
+            `;
+
+            try {
+                // Chiamata API
+                const response = await fetch(`/orders/${currentEditOrderId}/update-archived-date`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        new_archived_date: newDate.toISOString()
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Chiudi overlay
+                    closeEditArchivedDateOverlay();
+
+                    // Mostra messaggio di successo subito
+                    alert(`✅ ${result.message}\n\nNuova data: ${new Date(result.new_archived_date).toLocaleString('it-IT')}`);
+
+                    // Ricarica la tabella ordini archiviati in background
+                    console.log("🔄 Ricaricamento tabella ordini archiviati...");
+                    try {
+                        await fetchArchivedOrders();
+                        console.log("✅ Tabella ricaricata con successo");
+                    } catch (fetchError) {
+                        console.error("⚠️ Errore nel ricaricamento tabella (l'aggiornamento è stato salvato correttamente):", fetchError);
+                        // Non mostrare alert - l'operazione è riuscita, solo il refresh è fallito
+                        // L'utente può fare refresh manuale della pagina
+                    }
+                } else {
+                    // Errore dal server - mostra il dettaglio specifico
+                    const errorMessage = result.detail || result.message || 'Errore sconosciuto';
+                    alert(`❌ ${errorMessage}`);
+
+                    // Ripristina contenuto overlay
+                    overlay.innerHTML = originalContent;
+                }
+            } catch (error) {
+                console.error("Errore durante l'aggiornamento della data:", error);
+                alert(`❌ Errore di rete durante l'aggiornamento della data\n\nDettaglio: ${error.message || error}`);
+
+                // Chiudi overlay
+                closeEditArchivedDateOverlay();
+            }
+        }
+
+        // Esponi funzioni globalmente
+        window.showEditArchivedDateOverlay = showEditArchivedDateOverlay;
+        window.closeEditArchivedDateOverlay = closeEditArchivedDateOverlay;
+        window.confirmUpdateArchivedDate = confirmUpdateArchivedDate;

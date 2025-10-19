@@ -787,6 +787,33 @@
         </div>
     </div>
 
+    <!-- Overlay Modifica Data Archiviazione -->
+    <div id="edit-archived-date-overlay" class="overlay" style="display: none;">
+        <div class="overlay-content" style="max-width: 500px; width: 90%;">
+            <div class="overlay-header">
+                <h3>📅 Modifica Data Archiviazione</h3>
+                <button class="overlay-close" onclick="closeEditArchivedDateOverlay()">&times;</button>
+            </div>
+            <div class="overlay-body" style="padding: 1.5rem;">
+                <p style="margin-bottom: 0.5rem;">Ordine: <strong id="edit-date-order-number"></strong></p>
+                <p style="margin-bottom: 1rem;">Data attuale: <strong id="edit-date-current"></strong></p>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="new-archived-date" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Nuova data archiviazione:</label>
+                    <input type="datetime-local" id="new-archived-date" required style="width: 100%; padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem;">
+                </div>
+
+                <div style="background: #e7f3ff; padding: 0.75rem; border-radius: 6px; margin-top: 1rem; font-size: 0.85rem; color: #0066CC; line-height: 1.5;">
+                    <strong>ℹ️ Nota:</strong> Usa questa funzione per correggere la data quando l'ordine è stato consegnato in un giorno diverso dalla registrazione.
+                </div>
+            </div>
+            <div class="overlay-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding: 1rem 1.5rem; border-top: 1px solid #dee2e6; background: #f8f9fa;">
+                <button class="btn-secondary" onclick="closeEditArchivedDateOverlay()">Annulla</button>
+                <button class="btn-primary" onclick="confirmUpdateArchivedDate()">Aggiorna Data</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Libreria html5-qrcode per scanner barcode (più robusta) -->
             </div> <!-- Fine mobile-content -->
             </div> <!-- Fine protected-content -->

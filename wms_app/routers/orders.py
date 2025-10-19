@@ -2302,20 +2302,199 @@ def unarchive_order(order_id: int, db: Session = Depends(get_db)):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
     if not order.is_archived:
         raise HTTPException(status_code=400, detail="Order is not archived")
-    
+
     # Rimuovi dall'archivio
     order.is_archived = False
     order.archived_date = None
-    
+
     try:
         db.commit()
         return {"message": f"Order {order.order_number} removed from archive successfully"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error unarchiving order: {str(e)}")
+
+@router.put("/{order_id}/update-archived-date")
+def update_archived_date(
+    order_id: int,
+    request: schemas.UpdateArchivedDateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Modifica la data di archiviazione di un ordine archiviato.
+    Utile per correggere la data quando l'ordine è stato consegnato fisicamente
+    in un giorno diverso dalla registrazione nel sistema.
+    """
+    # LOGGING: Inizializza logger
+    logger = LoggingService(db)
+
+    try:
+        # Recupera ordine
+        order = db.query(models.Order).filter(models.Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        # Log stato iniziale
+        old_archived_date = order.archived_date
+        print(f"📅 UPDATE ARCHIVED DATE START: Order {order.order_number} (ID: {order_id}) - current_date={old_archived_date}")
+
+        # Validazione: ordine deve essere archiviato
+        if not order.is_archived:
+            error_msg = f"Order {order.order_number} is not archived"
+            print(f"❌ UPDATE ARCHIVED DATE FAILED: {error_msg}")
+
+            logger.log_error(
+                operation_type="UPDATE_ARCHIVED_DATE_FAILED",
+                error=error_msg,
+                operation_category=OperationCategory.MANUAL,
+                file_name=f"ORDER_{order.order_number}",
+                details={
+                    'order_id': order_id,
+                    'order_number': order.order_number,
+                    'is_archived': order.is_archived,
+                    'error_reason': 'order_not_archived',
+                    'operation_description': f"Tentativo fallito di modificare data archiviazione per ordine {order.order_number}: ordine non archiviato"
+                },
+                api_endpoint=f"/orders/{order_id}/update-archived-date"
+            )
+
+            raise HTTPException(
+                status_code=400,
+                detail=f"L'ordine {order.order_number} non è archiviato. Solo gli ordini archiviati possono avere la data modificata."
+            )
+
+        new_date = request.new_archived_date
+
+        # Normalizza date a naive datetime per confronti
+        new_date_naive = new_date.replace(tzinfo=None) if new_date.tzinfo else new_date
+        order_date_naive = order.order_date.replace(tzinfo=None) if (order.order_date and order.order_date.tzinfo) else order.order_date
+        old_archived_date_naive = old_archived_date.replace(tzinfo=None) if (old_archived_date and old_archived_date.tzinfo) else old_archived_date
+
+        # Validazione: data non può essere antecedente alla data ordine (confronta solo gg/mm/aaaa, ignora ore)
+        if order_date_naive and new_date_naive.date() < order_date_naive.date():
+            error_msg = f"New archived date ({new_date_naive.date()}) cannot be earlier than order date ({order_date_naive.date()})"
+            print(f"❌ UPDATE ARCHIVED DATE FAILED: {error_msg}")
+
+            logger.log_error(
+                operation_type="UPDATE_ARCHIVED_DATE_FAILED",
+                error=error_msg,
+                operation_category=OperationCategory.MANUAL,
+                file_name=f"ORDER_{order.order_number}",
+                details={
+                    'order_id': order_id,
+                    'order_number': order.order_number,
+                    'order_date': order.order_date.isoformat() if order.order_date else None,
+                    'new_archived_date': new_date.isoformat(),
+                    'error_reason': 'date_before_order_date',
+                    'operation_description': f"Tentativo fallito di modificare data archiviazione: data antecedente alla data ordine"
+                },
+                api_endpoint=f"/orders/{order_id}/update-archived-date"
+            )
+
+            raise HTTPException(
+                status_code=400,
+                detail=f"La data di archiviazione ({new_date_naive.strftime('%d/%m/%Y')}) non può essere antecedente alla data ordine ({order_date_naive.strftime('%d/%m/%Y')})"
+            )
+
+        # Validazione: data deve essere diversa dalla corrente
+        if old_archived_date_naive and old_archived_date_naive == new_date_naive:
+            print(f"⚠️  UPDATE ARCHIVED DATE SKIP: Date unchanged for order {order.order_number}")
+            return {
+                "message": "La data di archiviazione è già quella specificata",
+                "order_number": order.order_number,
+                "archived_date": old_archived_date.isoformat() if old_archived_date else None
+            }
+
+        # Aggiorna la data (usa versione naive per consistenza con il database)
+        order.archived_date = new_date_naive
+        print(f"✅ UPDATE ARCHIVED DATE VALIDATION PASSED: Order {order.order_number} - updating from {old_archived_date} to {new_date_naive}")
+
+        # COMMIT CON GESTIONE ERRORI
+        try:
+            print(f"💾 UPDATE ARCHIVED DATE COMMIT: Attempting database commit for order {order.order_number}")
+            db.commit()
+            print(f"✅ UPDATE ARCHIVED DATE SUCCESS: Order {order.order_number} - archived_date updated to {new_date_naive}")
+
+            # Log operazione di successo
+            logger.log_operation(
+                operation_type="ARCHIVED_DATE_UPDATED",
+                operation_category=OperationCategory.MANUAL,
+                status=OperationStatus.SUCCESS,
+                file_name=f"ORDER_{order.order_number}",
+                details={
+                    'order_id': order_id,
+                    'order_number': order.order_number,
+                    'customer_name': order.customer_name,
+                    'old_archived_date': old_archived_date.isoformat() if old_archived_date else None,
+                    'new_archived_date': new_date_naive.isoformat(),
+                    'operation_description': f"Data archiviazione ordine {order.order_number} modificata da {old_archived_date.strftime('%Y-%m-%d %H:%M:%S') if old_archived_date else 'N/A'} a {new_date_naive.strftime('%Y-%m-%d %H:%M:%S')}"
+                },
+                api_endpoint=f"/orders/{order_id}/update-archived-date"
+            )
+
+            return {
+                "message": f"Data di archiviazione aggiornata con successo per ordine {order.order_number}",
+                "order_number": order.order_number,
+                "old_archived_date": old_archived_date.isoformat() if old_archived_date else None,
+                "new_archived_date": new_date_naive.isoformat()
+            }
+
+        except Exception as commit_error:
+            # Rollback esplicito
+            db.rollback()
+
+            error_msg = f"Database commit failed for updating archived date: {str(commit_error)}"
+            print(f"❌ UPDATE ARCHIVED DATE COMMIT ERROR: {error_msg}")
+
+            logger.log_error(
+                operation_type="UPDATE_ARCHIVED_DATE_COMMIT_FAILED",
+                error=commit_error,
+                operation_category=OperationCategory.MANUAL,
+                file_name=f"ORDER_{order.order_number}",
+                details={
+                    'order_id': order_id,
+                    'order_number': order.order_number,
+                    'error_type': type(commit_error).__name__,
+                    'error_message': str(commit_error),
+                    'operation_description': f"Errore durante modifica data archiviazione ordine {order.order_number}"
+                },
+                api_endpoint=f"/orders/{order_id}/update-archived-date"
+            )
+
+            raise HTTPException(
+                status_code=500,
+                detail=f"Errore durante l'aggiornamento della data di archiviazione: {str(commit_error)}"
+            )
+
+    except HTTPException:
+        # Re-raise HTTPExceptions as-is
+        raise
+    except Exception as e:
+        db.rollback()
+
+        error_msg = f"Unexpected error updating archived date for order ID {order_id}: {str(e)}"
+        print(f"❌ UPDATE ARCHIVED DATE UNEXPECTED ERROR: {error_msg}")
+
+        logger.log_error(
+            operation_type="UPDATE_ARCHIVED_DATE_UNEXPECTED_ERROR",
+            error=e,
+            operation_category=OperationCategory.MANUAL,
+            details={
+                'order_id': order_id,
+                'error_type': type(e).__name__,
+                'error_message': str(e),
+                'operation_description': f"Errore imprevisto durante modifica data archiviazione ordine ID {order_id}"
+            },
+            api_endpoint=f"/orders/{order_id}/update-archived-date"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore durante l'aggiornamento della data: {str(e)}"
+        )
 
 # --- Sistema Import Automatico da Cartella ---
 
