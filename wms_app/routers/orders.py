@@ -1490,80 +1490,152 @@ def confirm_pick(order_id: int, pick_confirmation: schemas.PickConfirmation, db:
 
 @router.post("/{order_id}/fulfill", response_model=schemas.Order)
 def fulfill_order(order_id: int, db: Session = Depends(get_db)):
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    if order.is_completed:
-        raise HTTPException(status_code=400, detail="Order is already completed")
-
-    # Scala da OutgoingStock e completa l'ordine
-    for line in order.lines:
-        # FIX: Trova TUTTI i record OutgoingStock per questa linea d'ordine
-        # (può esserci più di un record se prelevato da posizioni multiple)
-        outgoing_items = db.query(models.OutgoingStock).filter(
-            models.OutgoingStock.order_line_id == line.id,
-            models.OutgoingStock.product_sku == line.product_sku
-        ).all()
-
-        # Verifica che la somma delle quantità in OutgoingStock corrisponda a picked_quantity
-        total_outgoing_quantity = sum(item.quantity for item in outgoing_items)
-        if total_outgoing_quantity != line.picked_quantity:
-            # Log del problema ma continua l'evasione (per compatibilità con dati esistenti)
-            print(f"WARNING: OutgoingStock mismatch for order {order.order_number}, line {line.id}: "
-                  f"total_outgoing={total_outgoing_quantity}, picked={line.picked_quantity}")
-        
-        # Cancella TUTTI i record OutgoingStock per questa linea
-        for outgoing_item in outgoing_items:
-            db.delete(outgoing_item)
-        
-        if line.requested_quantity != line.picked_quantity:
-            raise HTTPException(status_code=400, detail=f"Order line {line.id} not fully picked. Requested: {line.requested_quantity}, Picked: {line.picked_quantity}")
-
-    order.is_completed = True
-    
-    # LOGGING: Registra l'evasione dell'ordine
+    # LOGGING: Inizializza logger per tracciare tutto il processo
     logger = LoggingService(db)
-    
-    # Prepara dettagli per il log
-    order_summary = []
-    total_items_fulfilled = 0
-    
-    for line in order.lines:
-        order_summary.append({
-            'product_sku': line.product_sku,
-            'requested_quantity': line.requested_quantity,
-            'picked_quantity': line.picked_quantity
-        })
-        total_items_fulfilled += line.picked_quantity
-    
-    # Logga ogni prodotto evaso separatamente per visibilità nelle colonne SKU/Ubicazioni  
-    for line in order.lines:
-        logger.log_operation(
-            operation_type=OperationType.ORDINE_EVASO,
-            operation_category=OperationCategory.MANUAL,
-            status=OperationStatus.SUCCESS,
-            product_sku=line.product_sku,  # SKU del prodotto evaso
-            location_from="OUTGOING",  # Da giacenza in uscita
-            location_to=None,  # Evasione (esce dal magazzino)
-            quantity=line.picked_quantity,  # Quantità evasa
-            user_id="fulfill_user",  # TODO: Sostituire con sistema auth reale
-            file_name=f"ORDER_{order.order_number}",  # Numero ordine nella colonna Dettagli
-            details={
-                'order_number': order.order_number,  # Numero ordine nei dettagli JSON
-                'customer_name': order.customer_name,
-                'order_date': order.order_date.isoformat() if order.order_date else None,
-                'operation_description': f"Evasione ordine {order.order_number}: evaso {line.picked_quantity}x {line.product_sku} per cliente {order.customer_name}",
-                'fulfill_type': 'manual_fulfill',
-                'order_line_id': line.id,
+
+    try:
+        order = db.query(models.Order).filter(models.Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        if order.is_completed:
+            raise HTTPException(status_code=400, detail="Order is already completed")
+
+        # Log inizio evasione
+        print(f"🔄 FULFILL START: Order {order.order_number} (ID: {order_id}) - is_completed={order.is_completed}, is_archived={order.is_archived}")
+
+        # Scala da OutgoingStock e completa l'ordine
+        for line in order.lines:
+            # FIX: Trova TUTTI i record OutgoingStock per questa linea d'ordine
+            # (può esserci più di un record se prelevato da posizioni multiple)
+            outgoing_items = db.query(models.OutgoingStock).filter(
+                models.OutgoingStock.order_line_id == line.id,
+                models.OutgoingStock.product_sku == line.product_sku
+            ).all()
+
+            # Verifica che la somma delle quantità in OutgoingStock corrisponda a picked_quantity
+            total_outgoing_quantity = sum(item.quantity for item in outgoing_items)
+            if total_outgoing_quantity != line.picked_quantity:
+                # Log del problema ma continua l'evasione (per compatibilità con dati esistenti)
+                print(f"⚠️  WARNING: OutgoingStock mismatch for order {order.order_number}, line {line.id}: "
+                      f"total_outgoing={total_outgoing_quantity}, picked={line.picked_quantity}")
+
+            # Cancella TUTTI i record OutgoingStock per questa linea
+            for outgoing_item in outgoing_items:
+                db.delete(outgoing_item)
+
+            if line.requested_quantity != line.picked_quantity:
+                raise HTTPException(status_code=400, detail=f"Order line {line.id} not fully picked. Requested: {line.requested_quantity}, Picked: {line.picked_quantity}")
+
+        # Imposta ordine come completato
+        order.is_completed = True
+        print(f"✅ FULFILL VALIDATION PASSED: Order {order.order_number} - setting is_completed=True")
+
+        # Prepara dettagli per il log
+        order_summary = []
+        total_items_fulfilled = 0
+
+        for line in order.lines:
+            order_summary.append({
+                'product_sku': line.product_sku,
                 'requested_quantity': line.requested_quantity,
-                'total_order_items': total_items_fulfilled
+                'picked_quantity': line.picked_quantity
+            })
+            total_items_fulfilled += line.picked_quantity
+
+        # Logga ogni prodotto evaso separatamente per visibilità nelle colonne SKU/Ubicazioni
+        for line in order.lines:
+            logger.log_operation(
+                operation_type=OperationType.ORDINE_EVASO,
+                operation_category=OperationCategory.MANUAL,
+                status=OperationStatus.SUCCESS,
+                product_sku=line.product_sku,  # SKU del prodotto evaso
+                location_from="OUTGOING",  # Da giacenza in uscita
+                location_to=None,  # Evasione (esce dal magazzino)
+                quantity=line.picked_quantity,  # Quantità evasa
+                user_id="fulfill_user",  # TODO: Sostituire con sistema auth reale
+                file_name=f"ORDER_{order.order_number}",  # Numero ordine nella colonna Dettagli
+                details={
+                    'order_number': order.order_number,  # Numero ordine nei dettagli JSON
+                    'customer_name': order.customer_name,
+                    'order_date': order.order_date.isoformat() if order.order_date else None,
+                    'operation_description': f"Evasione ordine {order.order_number}: evaso {line.picked_quantity}x {line.product_sku} per cliente {order.customer_name}",
+                    'fulfill_type': 'manual_fulfill',
+                    'order_line_id': line.id,
+                    'requested_quantity': line.requested_quantity,
+                    'total_order_items': total_items_fulfilled
+                },
+                api_endpoint=f"/orders/{order_id}/fulfill"
+            )
+
+        # COMMIT CON GESTIONE ERRORI ROBUSTA
+        try:
+            print(f"💾 FULFILL COMMIT: Attempting database commit for order {order.order_number}")
+            db.commit()
+            print(f"✅ FULFILL SUCCESS: Order {order.order_number} committed successfully - is_completed=True")
+
+            db.refresh(order)
+            return order
+
+        except Exception as commit_error:
+            # Rollback esplicito in caso di errore commit
+            db.rollback()
+
+            # Log errore dettagliato
+            error_msg = f"Database commit failed for order {order.order_number}: {str(commit_error)}"
+            print(f"❌ FULFILL COMMIT ERROR: {error_msg}")
+
+            logger.log_error(
+                operation_type="FULFILL_COMMIT_FAILED",
+                error=commit_error,
+                operation_category=OperationCategory.MANUAL,
+                file_name=f"ORDER_{order.order_number}",
+                details={
+                    'order_id': order_id,
+                    'order_number': order.order_number,
+                    'customer_name': order.customer_name,
+                    'error_type': type(commit_error).__name__,
+                    'error_message': str(commit_error),
+                    'operation_description': f"ERRORE CRITICO: Commit fallito durante evasione ordine {order.order_number}. L'ordine NON è stato evaso."
+                },
+                api_endpoint=f"/orders/{order_id}/fulfill"
+            )
+
+            # Restituisci errore chiaro all'utente
+            raise HTTPException(
+                status_code=500,
+                detail=f"ERRORE CRITICO: Impossibile completare l'evasione dell'ordine {order.order_number}. "
+                       f"Il database ha rifiutato la transazione. L'ordine NON è stato evaso. "
+                       f"Contattare l'amministratore. Dettagli: {str(commit_error)}"
+            )
+
+    except HTTPException:
+        # Re-raise HTTPExceptions (errori di validazione)
+        raise
+
+    except Exception as e:
+        # Cattura qualsiasi altro errore imprevisto
+        db.rollback()
+
+        error_msg = f"Unexpected error during fulfill for order ID {order_id}: {str(e)}"
+        print(f"❌ FULFILL UNEXPECTED ERROR: {error_msg}")
+
+        logger.log_error(
+            operation_type="FULFILL_UNEXPECTED_ERROR",
+            error=e,
+            operation_category=OperationCategory.MANUAL,
+            details={
+                'order_id': order_id,
+                'error_type': type(e).__name__,
+                'error_message': str(e),
+                'operation_description': f"Errore imprevisto durante evasione ordine ID {order_id}"
             },
             api_endpoint=f"/orders/{order_id}/fulfill"
         )
-    
-    db.commit()
-    db.refresh(order)
-    return order
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore imprevisto durante l'evasione: {str(e)}"
+        )
 
 # --- Nuova Funzionalità: Picking da File TXT ---
 
@@ -1959,35 +2031,158 @@ async def get_picking_list_print(order_id: int, db: Session = Depends(get_db)):
 @router.post("/{order_id}/archive")
 def archive_order(order_id: int, fulfillment_request: schemas.FulfillmentRequest, db: Session = Depends(get_db)):
     """Archivia un ordine completato o annullato."""
+    # LOGGING: Inizializza logger
+    logger = LoggingService(db)
+
     try:
         order = db.query(models.Order).filter(models.Order.id == order_id).first()
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
-        
-        # Validazione stato ordine
-        
+
+        # Log stato iniziale
+        print(f"📦 ARCHIVE START: Order {order.order_number} (ID: {order_id}) - is_completed={order.is_completed}, is_cancelled={order.is_cancelled}, is_archived={order.is_archived}")
+
+        # Validazione stato ordine con log dettagliato
         if not order.is_completed and not order.is_cancelled:
-            raise HTTPException(status_code=400, detail="Can only archive completed or cancelled orders")
-        
+            error_msg = f"Cannot archive order {order.order_number}: not completed and not cancelled (is_completed={order.is_completed}, is_cancelled={order.is_cancelled})"
+            print(f"❌ ARCHIVE VALIDATION FAILED: {error_msg}")
+
+            logger.log_error(
+                operation_type="ARCHIVE_VALIDATION_FAILED",
+                error=error_msg,
+                operation_category=OperationCategory.MANUAL,
+                file_name=f"ORDER_{order.order_number}",
+                details={
+                    'order_id': order_id,
+                    'order_number': order.order_number,
+                    'is_completed': order.is_completed,
+                    'is_cancelled': order.is_cancelled,
+                    'is_archived': order.is_archived,
+                    'error_reason': 'order_not_ready_for_archive',
+                    'operation_description': f"Tentativo fallito di archiviare ordine {order.order_number}: l'ordine non è né completato né annullato"
+                },
+                api_endpoint=f"/orders/{order_id}/archive"
+            )
+
+            raise HTTPException(
+                status_code=400,
+                detail=f"L'ordine {order.order_number} non può essere archiviato perché non è stato completato o annullato. "
+                       f"Stato attuale: is_completed={order.is_completed}, is_cancelled={order.is_cancelled}"
+            )
+
         if order.is_archived:
-            raise HTTPException(status_code=400, detail="Order is already archived")
-        
+            print(f"⚠️  ARCHIVE SKIP: Order {order.order_number} già archiviato")
+            raise HTTPException(status_code=400, detail=f"Order {order.order_number} is already archived")
+
+        # Verifica ulteriore: se l'ordine è completato, assicurati che OutgoingStock sia stato pulito
+        if order.is_completed:
+            outgoing_check = db.query(models.OutgoingStock).join(models.OrderLine).filter(
+                models.OrderLine.order_id == order_id
+            ).count()
+
+            if outgoing_check > 0:
+                warning_msg = f"WARNING: Order {order.order_number} has {outgoing_check} outgoing stock items still present (should be 0 if fulfilled)"
+                print(f"⚠️  {warning_msg}")
+
+                logger.log_warning(
+                    operation_type="ARCHIVE_OUTGOING_WARNING",
+                    warning_message=warning_msg,
+                    operation_category=OperationCategory.MANUAL,
+                    file_name=f"ORDER_{order.order_number}",
+                    details={
+                        'order_id': order_id,
+                        'order_number': order.order_number,
+                        'outgoing_stock_count': outgoing_check,
+                        'operation_description': f"L'ordine {order.order_number} viene archiviato ma ha ancora {outgoing_check} record in OutgoingStock"
+                    }
+                )
+
         # Archivia l'ordine
         order.is_archived = True
         order.archived_date = datetime.utcnow()
-        
+
         # Salva il numero DDT se fornito
+        ddt_number = None
         if fulfillment_request.ddt_number:
-            order.ddt_number = fulfillment_request.ddt_number.strip()
-        
-        db.commit()
-        return {"message": f"Order {order.order_number} archived successfully"}
-        
+            ddt_number = fulfillment_request.ddt_number.strip()
+            order.ddt_number = ddt_number
+            print(f"📄 ARCHIVE DDT: DDT number {ddt_number} assigned to order {order.order_number}")
+
+        # COMMIT CON GESTIONE ERRORI
+        try:
+            print(f"💾 ARCHIVE COMMIT: Attempting database commit for order {order.order_number}")
+            db.commit()
+            print(f"✅ ARCHIVE SUCCESS: Order {order.order_number} archived successfully - is_archived=True, DDT={ddt_number or 'none'}")
+
+            # Log operazione di successo
+            logger.log_operation(
+                operation_type="ORDINE_ARCHIVIATO",
+                operation_category=OperationCategory.MANUAL,
+                status=OperationStatus.SUCCESS,
+                file_name=f"ORDER_{order.order_number}",
+                details={
+                    'order_id': order_id,
+                    'order_number': order.order_number,
+                    'customer_name': order.customer_name,
+                    'ddt_number': ddt_number,
+                    'is_completed': order.is_completed,
+                    'is_cancelled': order.is_cancelled,
+                    'operation_description': f"Ordine {order.order_number} archiviato con successo" + (f" (DDT: {ddt_number})" if ddt_number else "")
+                },
+                api_endpoint=f"/orders/{order_id}/archive"
+            )
+
+            return {"message": f"Order {order.order_number} archived successfully"}
+
+        except Exception as commit_error:
+            # Rollback esplicito
+            db.rollback()
+
+            error_msg = f"Database commit failed for archiving order {order.order_number}: {str(commit_error)}"
+            print(f"❌ ARCHIVE COMMIT ERROR: {error_msg}")
+
+            logger.log_error(
+                operation_type="ARCHIVE_COMMIT_FAILED",
+                error=commit_error,
+                operation_category=OperationCategory.MANUAL,
+                file_name=f"ORDER_{order.order_number}",
+                details={
+                    'order_id': order_id,
+                    'order_number': order.order_number,
+                    'error_type': type(commit_error).__name__,
+                    'error_message': str(commit_error),
+                    'operation_description': f"Errore durante archiviazione ordine {order.order_number}"
+                },
+                api_endpoint=f"/orders/{order_id}/archive"
+            )
+
+            raise HTTPException(
+                status_code=500,
+                detail=f"Errore durante l'archiviazione dell'ordine {order.order_number}: {str(commit_error)}"
+            )
+
     except HTTPException:
         # Re-raise HTTPExceptions as-is
         raise
     except Exception as e:
         db.rollback()
+
+        error_msg = f"Unexpected error archiving order ID {order_id}: {str(e)}"
+        print(f"❌ ARCHIVE UNEXPECTED ERROR: {error_msg}")
+
+        logger.log_error(
+            operation_type="ARCHIVE_UNEXPECTED_ERROR",
+            error=e,
+            operation_category=OperationCategory.MANUAL,
+            details={
+                'order_id': order_id,
+                'error_type': type(e).__name__,
+                'error_message': str(e),
+                'operation_description': f"Errore imprevisto durante archiviazione ordine ID {order_id}"
+            },
+            api_endpoint=f"/orders/{order_id}/archive"
+        )
+
         raise HTTPException(status_code=500, detail=f"Error archiving order: {str(e)}")
 
 @router.post("/{order_id}/cancel")
@@ -2107,20 +2302,199 @@ def unarchive_order(order_id: int, db: Session = Depends(get_db)):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
     if not order.is_archived:
         raise HTTPException(status_code=400, detail="Order is not archived")
-    
+
     # Rimuovi dall'archivio
     order.is_archived = False
     order.archived_date = None
-    
+
     try:
         db.commit()
         return {"message": f"Order {order.order_number} removed from archive successfully"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error unarchiving order: {str(e)}")
+
+@router.put("/{order_id}/update-archived-date")
+def update_archived_date(
+    order_id: int,
+    request: schemas.UpdateArchivedDateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Modifica la data di archiviazione di un ordine archiviato.
+    Utile per correggere la data quando l'ordine è stato consegnato fisicamente
+    in un giorno diverso dalla registrazione nel sistema.
+    """
+    # LOGGING: Inizializza logger
+    logger = LoggingService(db)
+
+    try:
+        # Recupera ordine
+        order = db.query(models.Order).filter(models.Order.id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        # Log stato iniziale
+        old_archived_date = order.archived_date
+        print(f"📅 UPDATE ARCHIVED DATE START: Order {order.order_number} (ID: {order_id}) - current_date={old_archived_date}")
+
+        # Validazione: ordine deve essere archiviato
+        if not order.is_archived:
+            error_msg = f"Order {order.order_number} is not archived"
+            print(f"❌ UPDATE ARCHIVED DATE FAILED: {error_msg}")
+
+            logger.log_error(
+                operation_type="UPDATE_ARCHIVED_DATE_FAILED",
+                error=error_msg,
+                operation_category=OperationCategory.MANUAL,
+                file_name=f"ORDER_{order.order_number}",
+                details={
+                    'order_id': order_id,
+                    'order_number': order.order_number,
+                    'is_archived': order.is_archived,
+                    'error_reason': 'order_not_archived',
+                    'operation_description': f"Tentativo fallito di modificare data archiviazione per ordine {order.order_number}: ordine non archiviato"
+                },
+                api_endpoint=f"/orders/{order_id}/update-archived-date"
+            )
+
+            raise HTTPException(
+                status_code=400,
+                detail=f"L'ordine {order.order_number} non è archiviato. Solo gli ordini archiviati possono avere la data modificata."
+            )
+
+        new_date = request.new_archived_date
+
+        # Normalizza date a naive datetime per confronti
+        new_date_naive = new_date.replace(tzinfo=None) if new_date.tzinfo else new_date
+        order_date_naive = order.order_date.replace(tzinfo=None) if (order.order_date and order.order_date.tzinfo) else order.order_date
+        old_archived_date_naive = old_archived_date.replace(tzinfo=None) if (old_archived_date and old_archived_date.tzinfo) else old_archived_date
+
+        # Validazione: data non può essere antecedente alla data ordine (confronta solo gg/mm/aaaa, ignora ore)
+        if order_date_naive and new_date_naive.date() < order_date_naive.date():
+            error_msg = f"New archived date ({new_date_naive.date()}) cannot be earlier than order date ({order_date_naive.date()})"
+            print(f"❌ UPDATE ARCHIVED DATE FAILED: {error_msg}")
+
+            logger.log_error(
+                operation_type="UPDATE_ARCHIVED_DATE_FAILED",
+                error=error_msg,
+                operation_category=OperationCategory.MANUAL,
+                file_name=f"ORDER_{order.order_number}",
+                details={
+                    'order_id': order_id,
+                    'order_number': order.order_number,
+                    'order_date': order.order_date.isoformat() if order.order_date else None,
+                    'new_archived_date': new_date.isoformat(),
+                    'error_reason': 'date_before_order_date',
+                    'operation_description': f"Tentativo fallito di modificare data archiviazione: data antecedente alla data ordine"
+                },
+                api_endpoint=f"/orders/{order_id}/update-archived-date"
+            )
+
+            raise HTTPException(
+                status_code=400,
+                detail=f"La data di archiviazione ({new_date_naive.strftime('%d/%m/%Y')}) non può essere antecedente alla data ordine ({order_date_naive.strftime('%d/%m/%Y')})"
+            )
+
+        # Validazione: data deve essere diversa dalla corrente
+        if old_archived_date_naive and old_archived_date_naive == new_date_naive:
+            print(f"⚠️  UPDATE ARCHIVED DATE SKIP: Date unchanged for order {order.order_number}")
+            return {
+                "message": "La data di archiviazione è già quella specificata",
+                "order_number": order.order_number,
+                "archived_date": old_archived_date.isoformat() if old_archived_date else None
+            }
+
+        # Aggiorna la data (usa versione naive per consistenza con il database)
+        order.archived_date = new_date_naive
+        print(f"✅ UPDATE ARCHIVED DATE VALIDATION PASSED: Order {order.order_number} - updating from {old_archived_date} to {new_date_naive}")
+
+        # COMMIT CON GESTIONE ERRORI
+        try:
+            print(f"💾 UPDATE ARCHIVED DATE COMMIT: Attempting database commit for order {order.order_number}")
+            db.commit()
+            print(f"✅ UPDATE ARCHIVED DATE SUCCESS: Order {order.order_number} - archived_date updated to {new_date_naive}")
+
+            # Log operazione di successo
+            logger.log_operation(
+                operation_type="ARCHIVED_DATE_UPDATED",
+                operation_category=OperationCategory.MANUAL,
+                status=OperationStatus.SUCCESS,
+                file_name=f"ORDER_{order.order_number}",
+                details={
+                    'order_id': order_id,
+                    'order_number': order.order_number,
+                    'customer_name': order.customer_name,
+                    'old_archived_date': old_archived_date.isoformat() if old_archived_date else None,
+                    'new_archived_date': new_date_naive.isoformat(),
+                    'operation_description': f"Data archiviazione ordine {order.order_number} modificata da {old_archived_date.strftime('%Y-%m-%d %H:%M:%S') if old_archived_date else 'N/A'} a {new_date_naive.strftime('%Y-%m-%d %H:%M:%S')}"
+                },
+                api_endpoint=f"/orders/{order_id}/update-archived-date"
+            )
+
+            return {
+                "message": f"Data di archiviazione aggiornata con successo per ordine {order.order_number}",
+                "order_number": order.order_number,
+                "old_archived_date": old_archived_date.isoformat() if old_archived_date else None,
+                "new_archived_date": new_date_naive.isoformat()
+            }
+
+        except Exception as commit_error:
+            # Rollback esplicito
+            db.rollback()
+
+            error_msg = f"Database commit failed for updating archived date: {str(commit_error)}"
+            print(f"❌ UPDATE ARCHIVED DATE COMMIT ERROR: {error_msg}")
+
+            logger.log_error(
+                operation_type="UPDATE_ARCHIVED_DATE_COMMIT_FAILED",
+                error=commit_error,
+                operation_category=OperationCategory.MANUAL,
+                file_name=f"ORDER_{order.order_number}",
+                details={
+                    'order_id': order_id,
+                    'order_number': order.order_number,
+                    'error_type': type(commit_error).__name__,
+                    'error_message': str(commit_error),
+                    'operation_description': f"Errore durante modifica data archiviazione ordine {order.order_number}"
+                },
+                api_endpoint=f"/orders/{order_id}/update-archived-date"
+            )
+
+            raise HTTPException(
+                status_code=500,
+                detail=f"Errore durante l'aggiornamento della data di archiviazione: {str(commit_error)}"
+            )
+
+    except HTTPException:
+        # Re-raise HTTPExceptions as-is
+        raise
+    except Exception as e:
+        db.rollback()
+
+        error_msg = f"Unexpected error updating archived date for order ID {order_id}: {str(e)}"
+        print(f"❌ UPDATE ARCHIVED DATE UNEXPECTED ERROR: {error_msg}")
+
+        logger.log_error(
+            operation_type="UPDATE_ARCHIVED_DATE_UNEXPECTED_ERROR",
+            error=e,
+            operation_category=OperationCategory.MANUAL,
+            details={
+                'order_id': order_id,
+                'error_type': type(e).__name__,
+                'error_message': str(e),
+                'operation_description': f"Errore imprevisto durante modifica data archiviazione ordine ID {order_id}"
+            },
+            api_endpoint=f"/orders/{order_id}/update-archived-date"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore durante l'aggiornamento della data: {str(e)}"
+        )
 
 # --- Sistema Import Automatico da Cartella ---
 
