@@ -622,6 +622,465 @@
         text-overflow: ellipsis;
     }
 
+    /* ========================================
+       INVENTORY PAGE - MOBILE OPTIMIZATIONS FOR HANDHELD SCANNER (480x800px)
+       ======================================== */
+
+    /* Nascondi elementi con classe helper mobile-hide */
+    .mobile-content .mobile-hide {
+        display: none !important;
+    }
+
+    /* Nascondi bottoni specifici per funzioni non operative su palmare */
+    .mobile-content button[onclick*="file-operations-overlay"],
+    .mobile-content button[onclick*="manage-data-overlay"],
+    .mobile-content #consolidation-suggestions-btn,
+    .mobile-content #reset-sort-btn {
+        display: none !important;
+    }
+
+    /* Nascondi tab "da file" negli overlay container/ubicazione */
+    .mobile-content button[onclick*="switchUnloadTab('unload-file-tab')"],
+    .mobile-content button[onclick*="switchRelocateTab('relocate-file-tab')"],
+    .mobile-content #unload-file-tab,
+    .mobile-content #relocate-file-tab {
+        display: none !important;
+    }
+
+    /* Nascondi sezioni istruzioni collapsible e template download */
+    .mobile-content .collapsible-section,
+    .mobile-content .btn-template {
+        display: none !important;
+    }
+
+    /* Ottimizza bottoni azione per touch (50px min per dita con guanti) */
+    .mobile-content .action-btn {
+        min-height: 50px;
+        font-size: 16px;
+        padding: 12px 20px;
+        width: 100%;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+    }
+
+    /* Ottimizza form inputs per touch e leggibilità */
+    .mobile-content input[type="text"],
+    .mobile-content input[type="number"],
+    .mobile-content select {
+        min-height: 48px;
+        font-size: 16px; /* Evita auto-zoom iOS */
+        padding: 12px 16px;
+        border-radius: 8px;
+        border: 2px solid #ddd;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Focus states più visibili per usabilità palmare */
+    .mobile-content input[type="text"]:focus,
+    .mobile-content input[type="number"]:focus,
+    .mobile-content select:focus {
+        border-color: #0097E0;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(0, 151, 224, 0.1);
+    }
+
+    /* Ottimizza label form */
+    .mobile-content .form-group label {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        display: block;
+        color: #333;
+    }
+
+    /* Ottimizza help text */
+    .mobile-content .help-text {
+        font-size: 13px;
+        margin-top: 4px;
+        color: #666;
+        line-height: 1.4;
+    }
+
+    /* Ottimizza form actions (bottoni conferma/annulla) - ORIZZONTALI su mobile */
+    .mobile-content .form-actions {
+        display: flex;
+        flex-direction: row; /* Affiancati orizzontalmente */
+        gap: 10px;
+        margin-top: 16px;
+    }
+
+    .mobile-content .form-actions button {
+        flex: 1; /* Distribuisci equamente larghezza */
+        min-height: 48px;
+        font-size: 15px;
+        border-radius: 8px;
+        white-space: nowrap;
+    }
+
+    /* Semplifica testo bottoni submit solo su mobile - "Conferma" invece di testi lunghi */
+    .mobile-content .form-actions button[type="submit"],
+    .mobile-content .form-actions button.btn-primary {
+        font-size: 0; /* Nascondi testo originale */
+    }
+
+    .mobile-content .form-actions button[type="submit"]::before,
+    .mobile-content .form-actions button.btn-primary::before {
+        content: "Conferma"; /* Testo semplificato */
+        font-size: 15px; /* Ripristina font-size */
+        font-weight: 600;
+    }
+
+    /* Ottimizza search controls - stack verticale */
+    .mobile-content .search-field-wrapper {
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .mobile-content .search-field {
+        width: 100%;
+        margin-bottom: 0;
+    }
+
+    .mobile-content .search-field input {
+        width: 100%;
+    }
+
+    /* Ottimizza tabella inventory per 480px width */
+    .mobile-content #inventory-table-content {
+        font-size: 14px;
+        border-collapse: collapse;
+    }
+
+    .mobile-content #inventory-table-content th,
+    .mobile-content #inventory-table-content td {
+        padding: 12px 8px;
+        min-height: 50px; /* Touch-friendly row height */
+        vertical-align: middle;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    /* Distribuisci larghezza colonne ottimale per 480px (3 colonne: Ubicazione, SKU, Qty) */
+    .mobile-content #inventory-table-content th:nth-child(1),
+    .mobile-content #inventory-table-content td:nth-child(1) {
+        width: 30%; /* Ubicazione */
+        font-weight: 500;
+    }
+
+    .mobile-content #inventory-table-content th:nth-child(2),
+    .mobile-content #inventory-table-content td:nth-child(2) {
+        width: 45%; /* SKU */
+    }
+
+    .mobile-content #inventory-table-content th:nth-child(4),
+    .mobile-content #inventory-table-content td:nth-child(4) {
+        width: 25%; /* Quantità */
+        text-align: center;
+        font-weight: 600;
+        color: #0097E0;
+    }
+
+    /* Ottimizza table header per palmare */
+    .mobile-content #inventory-table-content thead th {
+        background-color: #f5f5f5;
+        font-weight: 700;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    /* Ottimizza overlay header per palmare */
+    .mobile-content .overlay-header {
+        padding: 16px 20px;
+        border-bottom: 2px solid #e0e0e0;
+    }
+
+    .mobile-content .overlay-header h3 {
+        font-size: 18px;
+        margin: 0;
+        font-weight: 700;
+    }
+
+    .mobile-content .overlay-close {
+        font-size: 32px;
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Ottimizza tab buttons per touch */
+    .mobile-content .tab-btn {
+        min-height: 44px;
+        font-size: 14px;
+        padding: 10px 12px;
+        border-radius: 6px;
+        flex: 1;
+    }
+
+    .mobile-content .tab-buttons {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    /* Compatta section title */
+    .mobile-content .section-title {
+        font-size: 18px;
+        margin-bottom: 12px;
+        font-weight: 700;
+    }
+
+    /* Ottimizza inventory sections layout */
+    .mobile-content .inventory-sections {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .mobile-content .inventory-section {
+        background: #f9f9f9;
+        padding: 16px;
+        border-radius: 8px;
+        border-left: 4px solid #0097E0;
+    }
+
+    /* Ottimizza action-buttons container */
+    .mobile-content .action-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    /* ========================================
+       FIX OVERLAY CENTRATURA E DIMENSIONI
+       ======================================== */
+
+    /* Fix overlay-content per essere centrato usando position + transform */
+    /* NON tocchiamo .overlay display per non renderli tutti visibili! */
+    .mobile-content .overlay-content {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        max-height: calc(100vh - 140px); /* Sottrai header (60px) + navbar (80px) */
+        max-width: calc(100vw - 20px); /* Margini laterali */
+        overflow-y: auto;
+        margin: 0;
+        border-radius: 12px;
+        z-index: 1001; /* Sopra l'overlay backdrop */
+    }
+
+    /* Compatta padding overlay per massimizzare spazio */
+    .mobile-content .tab-content {
+        padding: 16px;
+    }
+
+    .mobile-content .form-group {
+        margin-bottom: 12px; /* Ridotto da default per compattezza */
+    }
+
+    /* ========================================
+       OTTIMIZZAZIONI TAB SPOSTAMENTI - LAYOUT COMPATTO
+       ======================================== */
+
+    /* Imposta il form come flex container per controllare meglio il layout */
+    .mobile-content #move-stock-manual-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0;
+    }
+
+    /* Prodotto (SKU) - full width */
+    .mobile-content #move-stock-manual-form .form-group:nth-child(1) {
+        width: 100%;
+        margin-bottom: 12px;
+    }
+
+    /* Da Ubicazione - 50% left */
+    .mobile-content #move-stock-manual-form .form-group:nth-child(2) {
+        width: calc(50% - 6px);
+        margin-right: 12px;
+        margin-bottom: 12px;
+    }
+
+    /* A Ubicazione - 50% right */
+    .mobile-content #move-stock-manual-form .form-group:nth-child(3) {
+        width: calc(50% - 6px);
+        margin-bottom: 12px;
+    }
+
+    /* Quantità da spostare - inline con label più compatto */
+    .mobile-content #move-stock-manual-form .form-group:nth-child(4) {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
+    .mobile-content #move-stock-manual-form .form-group:nth-child(4) label {
+        white-space: nowrap;
+        margin-bottom: 0;
+        min-width: fit-content;
+    }
+
+    .mobile-content #move-stock-manual-form .form-group:nth-child(4) input {
+        max-width: 100px;
+    }
+
+    .mobile-content #move-stock-manual-form .form-group:nth-child(4) .help-text {
+        display: none; /* Nascondi help text per risparmiare spazio */
+    }
+
+    /* Form actions - full width */
+    .mobile-content #move-stock-manual-form .form-actions {
+        width: 100%;
+    }
+
+    /* ========================================
+       OTTIMIZZAZIONI GENERALI FORM PER EVITARE SCROLL
+       ======================================== */
+
+    /* Riduci padding generale per compattezza */
+    .mobile-content .form-group label {
+        margin-bottom: 4px;
+        font-size: 13px;
+    }
+
+    .mobile-content .help-text {
+        font-size: 11px;
+        margin-top: 2px;
+        line-height: 1.3;
+    }
+
+    /* Compatta input height quando possibile */
+    .mobile-content input[type="text"],
+    .mobile-content input[type="number"] {
+        min-height: 44px; /* Ridotto da 48px ma ancora touch-friendly */
+        font-size: 15px;
+        padding: 10px 12px;
+    }
+
+    /* Compatta tab buttons */
+    .mobile-content .tab-btn {
+        min-height: 40px;
+        font-size: 13px;
+        padding: 8px 10px;
+    }
+
+    .mobile-content .tab-buttons {
+        margin-bottom: 12px;
+    }
+
+    /* Ottimizza overlay header - più compatto */
+    .mobile-content .overlay-header {
+        padding: 12px 16px;
+    }
+
+    .mobile-content .overlay-header h3 {
+        font-size: 16px;
+    }
+
+    /* ========================================
+       OTTIMIZZAZIONI ALTRI TAB - LAYOUT COMPATTO
+       ======================================== */
+
+    /* Tab Carico/Scarico - Quantità inline con label */
+    .mobile-content #add-stock-manual-tab .form-group:nth-child(3),
+    .mobile-content #subtract-stock-manual-tab .form-group:nth-child(3) {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .mobile-content #add-stock-manual-tab .form-group:nth-child(3) label,
+    .mobile-content #subtract-stock-manual-tab .form-group:nth-child(3) label {
+        white-space: nowrap;
+        margin-bottom: 0;
+        min-width: fit-content;
+        font-size: 13px;
+    }
+
+    .mobile-content #add-stock-manual-tab .form-group:nth-child(3) input,
+    .mobile-content #subtract-stock-manual-tab .form-group:nth-child(3) input {
+        max-width: 100px;
+    }
+
+    /* Tab Ubicazione da Terra - Quantità inline */
+    .mobile-content #relocate-ground-manual-tab .form-group:nth-child(2) {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .mobile-content #relocate-ground-manual-tab .form-group:nth-child(2) label {
+        white-space: nowrap;
+        margin-bottom: 0;
+        min-width: fit-content;
+        font-size: 13px;
+    }
+
+    .mobile-content #relocate-ground-manual-tab .form-group:nth-child(2) input {
+        max-width: 100px;
+    }
+
+    /* Overlay Scarico Container - Quantità inline */
+    .mobile-content #unload-manual-tab .form-group:nth-child(2) {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .mobile-content #unload-manual-tab .form-group:nth-child(2) label {
+        white-space: nowrap;
+        margin-bottom: 0;
+        min-width: fit-content;
+        font-size: 13px;
+    }
+
+    .mobile-content #unload-manual-tab .form-group:nth-child(2) input {
+        max-width: 100px;
+    }
+
+    /* Overlay Ubicazione da Terra (altro) - Quantità inline */
+    .mobile-content #relocate-manual-tab .form-group:nth-child(2) {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .mobile-content #relocate-manual-tab .form-group:nth-child(2) label {
+        white-space: nowrap;
+        margin-bottom: 0;
+        min-width: fit-content;
+        font-size: 13px;
+    }
+
+    .mobile-content #relocate-manual-tab .form-group:nth-child(2) input {
+        max-width: 100px;
+    }
+
+    /* Nascondi help-text per risparmiare spazio verticale su tutti i form */
+    .mobile-content .overlay .help-text {
+        display: none;
+    }
+
+    /* Datalist (dropdown SKU) - mantieni visibile ma compatto */
+    .mobile-content datalist {
+        max-height: 200px;
+    }
+
     /* Mobile responsive fixes for all pages */
     body {
         overflow-x: hidden;
