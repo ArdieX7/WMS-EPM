@@ -26,8 +26,8 @@ class EnhancedUpload {
         };
 
         this.currentFile = null;
-        this.currentMode = 'file';
-        
+        this.currentMode = 'scanner';  // Default a Scanner per palmare
+
         this.init();
     }
 
@@ -65,17 +65,17 @@ class EnhancedUpload {
                         📤 Caricamento File
                     </h4>
                     <div class="upload-mode-toggle">
-                        <button class="mode-button active" data-mode="file">
+                        <button class="mode-button" data-mode="file">
                             📁 File
                         </button>
-                        <button class="mode-button" data-mode="scanner">
+                        <button class="mode-button active" data-mode="scanner">
                             🔫 Scanner
                         </button>
                     </div>
                 </div>
 
                 <!-- Modalità File Upload -->
-                <div class="upload-mode active" data-mode="file">
+                <div class="upload-mode" data-mode="file">
                     ${this.options.enableDragDrop ? this.createDragDropZone() : ''}
                     ${this.createFileInput()}
                 </div>
@@ -122,7 +122,7 @@ class EnhancedUpload {
 
     createScannerInput() {
         return `
-            <div class="upload-mode" data-mode="scanner">
+            <div class="upload-mode active" data-mode="scanner">
                 <div class="scanner-input-zone">
                     <textarea 
                         class="scanner-textarea" 

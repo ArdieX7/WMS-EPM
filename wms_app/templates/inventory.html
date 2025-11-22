@@ -41,7 +41,6 @@
         <div class="inventory-section mobile-hide" data-permission="inventory_internal_movements">
             <h2 class="section-title">📦 Movimenti Interni</h2>
             <div class="action-buttons">
-                <button class="action-btn" onclick="openOverlay('file-operations-overlay')" data-permission="inventory_manage">📁 Operazioni da File</button>
                 <button class="action-btn danger" onclick="openOverlay('manage-data-overlay')" data-permission="inventory_data_management">⚙️ Gestione Dati</button>
             </div>
         </div>
@@ -51,6 +50,7 @@
             <h2 class="section-title">🚛 Gestione Scarico Mezzi</h2>
             <div class="action-buttons">
                 <button class="action-btn" onclick="openOverlay('manual-operations-overlay')" data-permission="inventory_manage">⚙️ Operazioni Manuali</button>
+                <button class="action-btn" onclick="openOverlay('file-operations-overlay')" data-permission="inventory_manage">📁 Operazioni da File</button>
                 <button class="action-btn truck" onclick="openOverlay('unload-container-overlay')" data-permission="warehouse_manage">📦 Scarico Container</button>
                 <button class="action-btn relocate" onclick="openOverlay('ground-to-location-overlay')" data-permission="warehouse_manage">🏗️ Ubicazione da Terra</button>
             </div>
@@ -177,7 +177,7 @@
     </div>
 
     <!-- Overlay Unificato per Operazioni da File -->
-    <div id="file-operations-overlay" class="overlay mobile-hide">
+    <div id="file-operations-overlay" class="overlay">
         <div class="overlay-content">
             <div class="overlay-header">
                 <h3>Operazioni da File</h3>

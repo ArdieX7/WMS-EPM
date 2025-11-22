@@ -12,28 +12,28 @@
     /* Reset body padding for mobile */
     body {
         padding-top: 0 !important;
-        padding-bottom: 80px; /* Space for bottom navbar */
+        padding-bottom: 55px; /* Space for bottom navbar - ridotto da 80px */
     }
 
-    /* Mobile Header */
+    /* Mobile Header - COMPATTO per palmare */
     .mobile-header {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        height: 60px;
+        height: 40px; /* Ridotto da 60px per massimizzare spazio */
         background-color: #00516E;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 0 1rem;
+        padding: 0 0.5rem; /* Ridotto padding */
         z-index: 1001;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
     .mobile-logo {
         color: #F2F2F2;
-        font-size: 1.5rem;
+        font-size: 1.1rem; /* Ridotto da 1.5rem */
         font-weight: bold;
         text-decoration: none;
     }
@@ -41,7 +41,7 @@
     .mobile-user-area {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.4rem;
         color: #F2F2F2;
     }
 
@@ -49,7 +49,7 @@
         display: flex;
         flex-direction: column;
         align-items: flex-end;
-        font-size: 0.8rem;
+        font-size: 0.7rem; /* Ridotto da 0.8rem */
     }
 
     .mobile-user-name {
@@ -58,7 +58,7 @@
 
     .mobile-user-role {
         opacity: 0.8;
-        font-size: 0.7rem;
+        font-size: 0.6rem; /* Ridotto da 0.7rem */
         text-transform: capitalize;
     }
 
@@ -66,10 +66,10 @@
         background: rgba(255, 255, 255, 0.1);
         border: 1px solid rgba(255, 255, 255, 0.2);
         color: #F2F2F2;
-        padding: 0.3rem 0.6rem;
+        padding: 0.2rem 0.5rem; /* Ridotto */
         border-radius: 4px;
         cursor: pointer;
-        font-size: 0.8rem;
+        font-size: 0.7rem; /* Ridotto da 0.8rem */
         transition: all 0.3s ease;
     }
 
@@ -79,37 +79,37 @@
 
     /* Content wrapper with top padding */
     .mobile-content {
-        padding-top: 60px;
-        min-height: calc(100vh - 140px);
+        padding-top: 42px; /* Ridotto da 60px (header ora 40px) */
+        min-height: calc(100vh - 100px); /* Aggiustato per nuove altezze */
     }
 
-    /* Bottom Navigation Bar */
+    /* Bottom Navigation Bar - COMPATTA per palmare */
     .bottom-navbar {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
-        height: 80px;
+        height: 55px; /* Ridotto da 80px per massimizzare spazio */
         background: #00516E;
         border-top: 1px solid #006a8d;
         display: flex;
         justify-content: space-around;
         align-items: center;
         z-index: 1000;
-        padding: 0 0.5rem;
+        padding: 0 0.25rem;
     }
 
     .nav-item {
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 0.5rem;
+        padding: 0.25rem; /* Ridotto da 0.5rem */
         color: #F2F2F2;
         text-decoration: none;
-        border-radius: 8px;
+        border-radius: 6px;
         transition: all 0.3s ease;
         position: relative;
-        min-width: 60px;
+        min-width: 50px; /* Ridotto da 60px */
         opacity: 0.7;
         background: transparent;
         border: none;
@@ -146,9 +146,9 @@
     }
 
     .nav-icon {
-        width: 24px;
-        height: 24px;
-        margin-bottom: 0.25rem;
+        width: 18px; /* Ridotto da 24px */
+        height: 18px; /* Ridotto da 24px */
+        margin-bottom: 0.1rem; /* Ridotto da 0.25rem */
         position: relative;
         display: flex;
         align-items: center;
@@ -277,7 +277,7 @@
     }
 
     .nav-label {
-        font-size: 0.85rem;
+        font-size: 0.65rem; /* Ridotto da 0.85rem per compattezza */
         font-weight: 500;
         text-align: center;
     }
@@ -591,7 +591,7 @@
         }
         
         body {
-            padding-bottom: calc(80px + env(safe-area-inset-bottom));
+            padding-bottom: calc(55px + env(safe-area-inset-bottom));
         }
     }
 
@@ -631,13 +631,47 @@
         display: none !important;
     }
 
+    /* Nascondi titolo h1 su mobile per massimizzare spazio */
+    .mobile-content h1 {
+        display: none !important;
+    }
+
+    /* Compatta le sezioni inventory */
+    .mobile-content .inventory-sections {
+        gap: 8px !important;
+        margin-bottom: 12px !important;
+        padding: 0 8px;
+    }
+
+    .mobile-content .inventory-section {
+        padding: 10px 12px !important;
+        margin-bottom: 0 !important;
+    }
+
+    .mobile-content .section-title {
+        font-size: 14px !important;
+        margin-bottom: 8px !important;
+    }
+
+    /* Riduci spazio tra i bottoni azione */
+    .mobile-content .action-buttons {
+        gap: 6px !important;
+    }
+
+    .mobile-content .action-btn {
+        min-height: 44px !important; /* Ridotto da 50px */
+        padding: 8px 16px !important;
+        font-size: 14px !important;
+        margin-bottom: 0 !important;
+    }
+
     /* Nascondi bottoni specifici per funzioni non operative su palmare */
-    .mobile-content button[onclick*="file-operations-overlay"],
     .mobile-content button[onclick*="manage-data-overlay"],
     .mobile-content #consolidation-suggestions-btn,
     .mobile-content #reset-sort-btn {
         display: none !important;
     }
+    /* Bottone "file-operations-overlay" ora visibile per uso con scanner palmare */
 
     /* Nascondi tab "da file" negli overlay container/ubicazione */
     .mobile-content button[onclick*="switchUnloadTab('unload-file-tab')"],
@@ -709,16 +743,17 @@
     .mobile-content .form-actions {
         display: flex;
         flex-direction: row; /* Affiancati orizzontalmente */
-        gap: 10px;
-        margin-top: 16px;
+        gap: 8px; /* Ridotto da 10px */
+        margin-top: 8px; /* Ridotto da 16px */
     }
 
     .mobile-content .form-actions button {
         flex: 1; /* Distribuisci equamente larghezza */
-        min-height: 48px;
-        font-size: 15px;
-        border-radius: 8px;
+        min-height: 42px; /* Ridotto da 48px */
+        font-size: 14px; /* Ridotto da 15px */
+        border-radius: 6px; /* Ridotto da 8px */
         white-space: nowrap;
+        padding: 8px 12px; /* Aggiungo padding specifico */
     }
 
     /* Semplifica testo bottoni submit solo su mobile - "Conferma" invece di testi lunghi */
@@ -873,7 +908,7 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        max-height: calc(100vh - 140px); /* Sottrai header (60px) + navbar (80px) */
+        max-height: calc(100vh - 95px); /* Sottrai header (40px) + navbar (55px) */
         max-width: calc(100vw - 20px); /* Margini laterali */
         overflow-y: auto;
         margin: 0;
@@ -883,11 +918,11 @@
 
     /* Compatta padding overlay per massimizzare spazio */
     .mobile-content .tab-content {
-        padding: 16px;
+        padding: 8px 12px; /* Ridotto da 16px */
     }
 
     .mobile-content .form-group {
-        margin-bottom: 12px; /* Ridotto da default per compattezza */
+        margin-bottom: 6px; /* Ridotto da 12px per ultra-compattezza */
     }
 
     /* ========================================
@@ -952,44 +987,101 @@
        OTTIMIZZAZIONI GENERALI FORM PER EVITARE SCROLL
        ======================================== */
 
-    /* Riduci padding generale per compattezza */
+    /* Riduci padding generale per compattezza - ULTRA */
     .mobile-content .form-group label {
-        margin-bottom: 4px;
-        font-size: 13px;
+        margin-bottom: 2px; /* Ridotto da 4px */
+        font-size: 12px; /* Ridotto da 13px */
+        font-weight: 600;
     }
 
     .mobile-content .help-text {
-        font-size: 11px;
-        margin-top: 2px;
-        line-height: 1.3;
+        font-size: 10px; /* Ridotto da 11px */
+        margin-top: 1px; /* Ridotto da 2px */
+        line-height: 1.2;
     }
 
-    /* Compatta input height quando possibile */
+    /* Compatta input height quando possibile - ULTRA */
     .mobile-content input[type="text"],
     .mobile-content input[type="number"] {
-        min-height: 44px; /* Ridotto da 48px ma ancora touch-friendly */
-        font-size: 15px;
-        padding: 10px 12px;
+        min-height: 38px; /* Ridotto da 44px - ancora touch-friendly */
+        font-size: 14px; /* Ridotto da 15px */
+        padding: 8px 10px; /* Ridotto padding */
     }
 
-    /* Compatta tab buttons */
+    /* Compatta tab buttons - ULTRA */
     .mobile-content .tab-btn {
-        min-height: 40px;
-        font-size: 13px;
-        padding: 8px 10px;
+        min-height: 32px; /* Ridotto da 40px */
+        font-size: 11px; /* Ridotto da 12px per layout 2x2 */
+        padding: 6px 4px; /* Ridotto padding */
+        text-align: center;
     }
 
+    /* Layout 2x2 per tab buttons (2 colonne) - Risparmio spazio verticale */
     .mobile-content .tab-buttons {
-        margin-bottom: 12px;
+        margin-bottom: 6px; /* Ridotto da 12px */
+        gap: 4px; /* Gap tra tab */
+        display: grid !important;
+        grid-template-columns: 1fr 1fr; /* 2 colonne uguali */
+        grid-template-rows: auto auto; /* 2 righe auto-size */
     }
 
-    /* Ottimizza overlay header - più compatto */
+    /* Layout 3x2 per overlay "Operazioni da File" (5 tab) */
+    .mobile-content #file-operations-overlay .tab-buttons {
+        grid-template-columns: 1fr 1fr 1fr !important; /* 3 colonne per 5 tab */
+        grid-template-rows: auto auto !important; /* 2 righe */
+    }
+
+    /* Tab più piccoli per layout 3x2 */
+    .mobile-content #file-operations-overlay .tab-btn {
+        font-size: 10px !important; /* Ancora più piccolo per 3 colonne */
+        padding: 5px 2px !important;
+    }
+
+    /* Riduce bottoni e spazi in file-operations-overlay */
+    .mobile-content #file-operations-overlay .form-actions {
+        margin-top: 2px !important; /* Ridotto ulteriormente */
+        margin-bottom: 6px !important; /* Spazio con upload component */
+    }
+
+    .mobile-content #file-operations-overlay .form-actions button {
+        min-height: 36px !important; /* Ridotto da 42px */
+        padding: 6px 10px !important; /* Ridotto padding */
+    }
+
+    /* Nascondi testo originale e mostra solo "Conferma" */
+    .mobile-content #file-operations-overlay .form-actions button[type="submit"],
+    .mobile-content #file-operations-overlay .form-actions button.btn-primary {
+        font-size: 0 !important; /* Nascondi testo originale */
+    }
+
+    .mobile-content #file-operations-overlay .form-actions button[type="submit"]::before,
+    .mobile-content #file-operations-overlay .form-actions button.btn-primary::before {
+        content: "Conferma";
+        font-size: 13px !important; /* Testo semplificato */
+    }
+
+    /* Bottone Annulla */
+    .mobile-content #file-operations-overlay .form-actions button.btn-secondary {
+        font-size: 13px !important;
+    }
+
+    /* Riduce padding del tab-content in file-operations-overlay */
+    .mobile-content #file-operations-overlay .tab-content {
+        padding: 4px 8px !important; /* Ridotto ulteriormente */
+    }
+
+    /* Nascondi sezione istruzioni collassabile su mobile in file-operations */
+    .mobile-content #file-operations-overlay .collapsible-section {
+        display: none !important; /* Risparmia spazio verticale */
+    }
+
+    /* Ottimizza overlay header - ULTRA compatto */
     .mobile-content .overlay-header {
-        padding: 12px 16px;
+        padding: 8px 12px; /* Ridotto da 12px 16px */
     }
 
     .mobile-content .overlay-header h3 {
-        font-size: 16px;
+        font-size: 14px; /* Ridotto da 16px */
     }
 
     /* ========================================
@@ -1170,12 +1262,96 @@
     }
 
     /* ==============================================
-       ORDERS PAGE MOBILE OPTIMIZATIONS  
+       ORDERS PAGE MOBILE OPTIMIZATIONS
        ============================================== */
-    
-    /* Hide action buttons on mobile (orders page) - SAFE VERSION */
-    .mobile-content .action-buttons[data-permission="orders_management_section"] {
-        display: none;
+
+    /* Compact orders sections on mobile */
+    .mobile-content h1 {
+        font-size: 1.2rem !important; /* Ridotto da ~1.5rem */
+        margin-bottom: 0.5rem !important;
+    }
+
+    .mobile-content h2 {
+        font-size: 1.1rem !important; /* Ridotto da ~1.3rem */
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* Riduce gap e padding sezioni Orders */
+    .mobile-content > div[style*="gap: 2rem"] {
+        gap: 0.5rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .mobile-content .action-buttons {
+        gap: 0.5rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* Compatta campo ricerca ordini */
+    .mobile-content .search-field label {
+        font-size: 0.85rem !important;
+        margin-bottom: 0.25rem !important;
+    }
+
+    .mobile-content .search-field input {
+        padding: 0.5rem !important;
+        font-size: 0.9rem !important;
+        min-height: 38px !important;
+    }
+
+    /* Riduce spazio orders-header */
+    .mobile-content .orders-header {
+        margin-bottom: 0.5rem !important;
+    }
+
+    .mobile-content .title-and-search {
+        gap: 0.5rem !important;
+    }
+
+    /* Nascondi indicatore "In uscita" su mobile per risparmiare spazio */
+    .mobile-content .outgoing-stock-indicator {
+        display: none !important;
+    }
+
+    /* Compatta overlay picking e recap per Orders */
+    .mobile-content #picking-file-overlay .overlay-content,
+    .mobile-content #picking-validation-overlay,
+    .mobile-content #picking-recap-overlay .recap-content {
+        max-height: calc(100vh - 95px) !important;
+        padding: 0 !important;
+    }
+
+    .mobile-content #picking-file-overlay .overlay-header,
+    .mobile-content #picking-validation-overlay .overlay-header,
+    .mobile-content #picking-recap-overlay .recap-header {
+        padding: 8px 12px !important;
+    }
+
+    .mobile-content #picking-file-overlay h3,
+    .mobile-content #picking-validation-overlay h3,
+    .mobile-content #picking-recap-overlay h3 {
+        font-size: 14px !important;
+    }
+
+    /* Compatta tabelle recap picking */
+    .mobile-content .recap-table {
+        font-size: 0.7rem !important;
+    }
+
+    .mobile-content .recap-table th,
+    .mobile-content .recap-table td {
+        padding: 4px 2px !important;
+    }
+
+    /* Compatta recap stats grid */
+    .mobile-content .recap-stats-grid {
+        gap: 4px !important;
+        margin-bottom: 6px !important;
+    }
+
+    .mobile-content .recap-stat {
+        padding: 6px !important;
+        font-size: 0.75rem !important;
     }
 
     /* Fix 'Prodotti in uscita' text size */
@@ -1359,7 +1535,7 @@
             padding: 1rem !important;
             box-sizing: border-box !important;
             max-width: 100vw !important;
-            max-height: calc(100vh - 140px) !important;
+            max-height: calc(100vh - 95px) !important; /* header 40px + navbar 55px */
         }
         
         /* Ensure all content inside details container fits - more restrictive */

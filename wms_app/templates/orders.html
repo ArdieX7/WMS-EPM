@@ -42,14 +42,14 @@
         <div style="flex: 1; min-width: 300px;">
             <h2 style="color: #0066CC; margin-bottom: 1rem; font-size: 1.3rem;">📋 Gestione Ordini</h2>
             <div class="action-buttons" data-permission="orders_management_section">
-                <button class="action-btn" onclick="openOverlay('import-orders-overlay')">📁 Import Ordini</button>
-                <button class="action-btn" onclick="openOverlay('create-order-overlay')">➕ Crea Nuovo Ordine</button>
+                <button class="action-btn mobile-hide" onclick="openOverlay('import-orders-overlay')">📁 Import Ordini</button>
+                <button class="action-btn mobile-hide" onclick="openOverlay('create-order-overlay')">➕ Crea Nuovo Ordine</button>
                 <button class="action-btn" onclick="openOverlay('picking-file-overlay')">📋 Prelievo da File</button>
             </div>
         </div>
         
         <!-- Nuova Sezione Export Prodotti per Ordine -->
-    <div style="display: flex; justify-content: center; margin-bottom: 2rem;">
+    <div class="mobile-hide" style="display: flex; justify-content: center; margin-bottom: 2rem;">
         <div style="min-width: 300px; max-width: 600px;">
             <h2 style="color: #0066CC; text-align: left; margin-bottom: 1rem; font-size: 1.3rem;">📦 Export Prodotti per Ordine Usciti</h2>
             <div class="export-section" style="background: #e8f4f8; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #0066CC; text-align: center;">
@@ -80,7 +80,7 @@
         </div>
     </div>
         <!-- Sezione Export Ordini -->
-        <div style="min-width: 300px; text-align: right;">
+        <div class="mobile-hide" style="min-width: 300px; text-align: right;">
             <h2 style="color: #0066CC; text-align: left; margin-bottom: 1rem; font-size: 1.3rem;">📈 Export Dati Ordini</h2>
             <div class="export-section" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #0066CC; text-align: right; display: inline-block; min-width: 400px;">
                 <div style="display: flex; gap: 0.75rem; align-items: end; flex-wrap: wrap; justify-content: flex-end;">
@@ -113,7 +113,7 @@
     
 
     <!-- Overlay Import Ordini Unificato -->
-    <div id="import-orders-overlay" class="overlay">
+    <div id="import-orders-overlay" class="overlay mobile-hide">
         <div class="overlay-content">
             <div class="overlay-header">
                 <h3>Import Ordini</h3>
@@ -209,7 +209,7 @@
     </div>
 
     <!-- Overlay Crea Nuovo Ordine -->
-    <div id="create-order-overlay" class="overlay">
+    <div id="create-order-overlay" class="overlay mobile-hide">
         <div class="overlay-content">
             <div class="overlay-header">
                 <h3>Crea Nuovo Ordine</h3>
@@ -303,19 +303,19 @@
                         <label for="search-order-number">Cerca per Numero Ordine:</label>
                         <input type="text" id="search-order-number" placeholder="Inserisci numero ordine...">
                     </div>
-                    <div class="search-field">
+                    <div class="search-field mobile-hide">
                         <label for="search-customer">Cerca per Cliente:</label>
                         <input type="text" id="search-customer" placeholder="Inserisci cliente...">
                     </div>
-                    <div class="search-field">
+                    <div class="search-field mobile-hide">
                         <label for="search-date">Cerca per Data:</label>
                         <input type="date" id="search-date">
                     </div>
-                    <div class="search-field">
+                    <div class="search-field mobile-hide">
                         <label for="search-ddt">Cerca per DDT:</label>
                         <input type="text" id="search-ddt" placeholder="Inserisci numero DDT...">
                     </div>
-                        <button id="reset-orders-sort-btn" class="reset-sort-inline-btn" title="Reset Ordinamento">🔄</button>
+                        <button id="reset-orders-sort-btn" class="reset-sort-inline-btn mobile-hide" title="Reset Ordinamento">🔄</button>
                     </div>
                 </div>
                 <div class="outgoing-stock-indicator" style="display: flex; align-items: center;">
@@ -713,7 +713,7 @@
     </div>
 
     <!-- Overlay Recap Excel Import -->
-    <div id="excel-recap-overlay" class="recap-overlay" style="display: none;">
+    <div id="excel-recap-overlay" class="recap-overlay mobile-hide" style="display: none;">
         <div class="recap-content">
             <div class="recap-header">
                 <h3 id="excel-recap-title">📊 Riepilogo Import Excel</h3>
@@ -788,7 +788,7 @@
     </div>
 
     <!-- Overlay Modifica Data Archiviazione -->
-    <div id="edit-archived-date-overlay" class="overlay" style="display: none;">
+    <div id="edit-archived-date-overlay" class="overlay mobile-hide" style="display: none;">
         <div class="overlay-content" style="max-width: 500px; width: 90%;">
             <div class="overlay-header">
                 <h3>📅 Modifica Data Archiviazione</h3>
