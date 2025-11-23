@@ -198,7 +198,13 @@
                     <div class="row">
                         {% for order in orders_without_ddt %}
                         <div class="col-md-6 col-lg-4 mb-3">
-                            <div class="order-item" onclick="openDDTModal('{{ order.order_number }}', '{{ order.customer_name }}')">
+                            {% set total_weight = namespace(value=0) %}
+                            {% for line in order.lines %}
+                                {% if line.product and line.product.weight %}
+                                    {% set total_weight.value = total_weight.value + (line.product.weight * line.requested_quantity) %}
+                                {% endif %}
+                            {% endfor %}
+                            <div class="order-item" onclick="openDDTModal('{{ order.order_number }}', '{{ order.customer_name }}', '{% if total_weight.value > 0 %}{{ "%.1f"|format(total_weight.value) }} kg{% endif %}')">
                                 <div class="order-header">
                                     <span class="order-number">{{ order.order_number }}</span>
                                     <small class="text-muted">{{ order.order_date.strftime('%d/%m/%Y') }}</small>
@@ -260,11 +266,10 @@
                                     <strong>Cliente:</strong> {{ ddt.customer_name }}
                                 </div>
                                 <div class="col-md-4">
-                                    <strong>Data Emissione:</strong> {{ ddt.issue_date.strftime('%d/%m/%Y') }}<br>
-                                    <strong>Causale:</strong> {{ ddt.transport_reason }}
+                                    <strong>Data Emissione:</strong> {{ ddt.issue_date.strftime('%d/%m/%Y') }}
                                 </div>
                                 <div class="col-md-4">
-                                    <strong>N. Colli:</strong> {{ ddt.total_packages }}<br>
+                                    <strong>N. PLT:</strong> {{ ddt.total_packages }}<br>
                                     {% if ddt.total_weight %}
                                         <strong>Peso:</strong> {{ ddt.total_weight }}
                                     {% endif %}
@@ -295,74 +300,80 @@
                 </div>
                 <div class="modal-body">
                     <form id="ddtForm">
-                        <div class="row">
+                        <!-- Layout a 2 colonne: Mittente e Destinatario -->
+                        <div class="row mb-3">
+                            <!-- COLONNA SINISTRA - MITTENTE (non editabile) -->
                             <div class="col-md-6">
-                                <div class="form-floating">
-                                    <input type="text" class="form-control" id="orderNumber" readonly>
-                                    <label for="orderNumber">Numero Ordine</label>
+                                <div style="background-color: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 4px solid #0066CC;">
+                                    <h6 style="color: #0066CC; margin-bottom: 0.75rem; font-weight: 600;">📦 MITTENTE</h6>
+                                    <div style="margin-bottom: 0.5rem;">
+                                        <strong>Rag. Soc.:</strong> LD Tyres srl
+                                    </div>
+                                    <div style="margin-bottom: 0.5rem;">
+                                        <strong>Indirizzo:</strong> Via Campobello 20/22
+                                    </div>
+                                    <div>
+                                        <strong>Città:</strong> 00071 Pomezia (RM)
+                                    </div>
                                 </div>
-                                <div class="form-floating">
+                            </div>
+
+                            <!-- COLONNA DESTRA - DESTINATARIO (campi editabili) -->
+                            <div class="col-md-6">
+                                <h6 style="color: #0066CC; margin-bottom: 0.75rem; font-weight: 600;">📍 DESTINATARIO</h6>
+                                <div class="form-floating mb-2">
                                     <input type="text" class="form-control" id="customerName" required>
-                                    <label for="customerName">Nome Cliente</label>
+                                    <label for="customerName">Rag. Soc. Destinatario *</label>
                                 </div>
-                                <div class="form-floating">
+                                <div class="form-floating mb-2">
                                     <input type="text" class="form-control" id="customerAddress">
                                     <label for="customerAddress">Indirizzo</label>
                                 </div>
-                                <div class="form-floating">
-                                    <input type="text" class="form-control" id="customerCity">
-                                    <label for="customerCity">Città</label>
-                                </div>
                                 <div class="row">
-                                    <div class="col-6">
-                                        <div class="form-floating">
+                                    <div class="col-4">
+                                        <div class="form-floating mb-2">
                                             <input type="text" class="form-control" id="customerCap">
                                             <label for="customerCap">CAP</label>
                                         </div>
                                     </div>
-                                    <div class="col-6">
-                                        <div class="form-floating">
+                                    <div class="col-5">
+                                        <div class="form-floating mb-2">
+                                            <input type="text" class="form-control" id="customerCity">
+                                            <label for="customerCity">Città</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-3">
+                                        <div class="form-floating mb-2">
                                             <input type="text" class="form-control" id="customerProvince" maxlength="2">
-                                            <label for="customerProvince">Provincia</label>
+                                            <label for="customerProvince">Prov.</label>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-floating">
-                                    <input type="text" class="form-control" id="transporterName">
-                                    <label for="transporterName">Nome Trasportatore</label>
-                                </div>
-                                <div class="form-floating">
-                                    <select class="form-select" id="transportReason">
-                                        <option value="Vendita">Vendita</option>
-                                        <option value="Conto Lavorazione">Conto Lavorazione</option>
-                                        <option value="Riparazione">Riparazione</option>
-                                        <option value="Comodato">Comodato</option>
-                                        <option value="Reso">Reso</option>
-                                    </select>
-                                    <label for="transportReason">Causale Trasporto</label>
-                                </div>
-                                <div class="row">
-                                    <div class="col-6">
-                                        <div class="form-floating">
-                                            <input type="number" class="form-control" id="totalPackages" value="1" min="1">
-                                            <label for="totalPackages">N. Colli</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-6">
-                                        <div class="form-floating">
-                                            <input type="text" class="form-control" id="totalWeight" placeholder="es. 25.5 kg">
-                                            <label for="totalWeight">Peso Totale</label>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="form-floating">
-                                    <textarea class="form-control" id="transporterNotes" style="height: 80px"></textarea>
-                                    <label for="transporterNotes">Note Trasportatore</label>
                                 </div>
                             </div>
                         </div>
+
+                        <!-- CAMPI SOTTO LE COLONNE -->
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-floating mb-3">
+                                    <input type="text" class="form-control" id="orderNumber" readonly>
+                                    <label for="orderNumber">Ordine di Riferimento</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-floating mb-3">
+                                    <input type="number" class="form-control" id="totalPackages" value="1" min="1">
+                                    <label for="totalPackages">N. PLT</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-floating mb-3">
+                                    <input type="text" class="form-control" id="totalWeight" placeholder="es. 25.5 kg">
+                                    <label for="totalWeight">Peso Totale (opz.)</label>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="form-floating">
                             <textarea class="form-control" id="notes" style="height: 60px"></textarea>
                             <label for="notes">Note Aggiuntive</label>
@@ -444,22 +455,22 @@
             }
         }
 
-        function openDDTModal(orderNumber, customerName) {
+        function openDDTModal(orderNumber, customerName, totalWeight = '') {
             document.getElementById('orderNumber').value = orderNumber;
             document.getElementById('customerName').value = customerName;
-            
+
             // Reset altri campi
             document.getElementById('customerAddress').value = '';
             document.getElementById('customerCity').value = '';
             document.getElementById('customerCap').value = '';
             document.getElementById('customerProvince').value = '';
-            document.getElementById('transporterName').value = '';
-            document.getElementById('transportReason').value = 'Vendita';
             document.getElementById('totalPackages').value = '1';
-            document.getElementById('totalWeight').value = '';
-            document.getElementById('transporterNotes').value = '';
+
+            // Imposta peso automaticamente dall'ordine
+            document.getElementById('totalWeight').value = totalWeight || '';
+
             document.getElementById('notes').value = '';
-            
+
             new bootstrap.Modal(document.getElementById('generateDDTModal')).show();
         }
 
@@ -472,9 +483,6 @@
                     customer_city: document.getElementById('customerCity').value || null,
                     customer_cap: document.getElementById('customerCap').value || null,
                     customer_province: document.getElementById('customerProvince').value || null,
-                    transporter_name: document.getElementById('transporterName').value || null,
-                    transporter_notes: document.getElementById('transporterNotes').value || null,
-                    transport_reason: document.getElementById('transportReason').value,
                     total_packages: parseInt(document.getElementById('totalPackages').value),
                     total_weight: document.getElementById('totalWeight').value || null,
                     notes: document.getElementById('notes').value || null
@@ -510,26 +518,36 @@
 
                 if (response.ok) {
                     let detailsHtml = `
-                        <div class="row">
+                        <div class="row mb-3">
                             <div class="col-md-6">
-                                <h6>Informazioni DDT</h6>
-                                <table class="table table-sm">
-                                    <tr><td><strong>Numero DDT:</strong></td><td>${ddt.ddt_number}</td></tr>
-                                    <tr><td><strong>Ordine:</strong></td><td>${ddt.order_number}</td></tr>
-                                    <tr><td><strong>Cliente:</strong></td><td>${ddt.customer_name}</td></tr>
-                                    <tr><td><strong>Data Emissione:</strong></td><td>${new Date(ddt.issue_date).toLocaleDateString()}</td></tr>
-                                    <tr><td><strong>Causale:</strong></td><td>${ddt.transport_reason}</td></tr>
-                                    <tr><td><strong>N. Colli:</strong></td><td>${ddt.total_packages}</td></tr>
-                                    ${ddt.total_weight ? `<tr><td><strong>Peso:</strong></td><td>${ddt.total_weight}</td></tr>` : ''}
-                                    ${ddt.transporter_name ? `<tr><td><strong>Trasportatore:</strong></td><td>${ddt.transporter_name}</td></tr>` : ''}
-                                </table>
+                                <div style="background-color: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 4px solid #0066CC;">
+                                    <h6 style="color: #0066CC; font-weight: 600;">📦 MITTENTE</h6>
+                                    <p style="margin-bottom: 0;">
+                                        <strong>LD Tyres srl</strong><br>
+                                        Via Campobello 20/22<br>
+                                        00071 Pomezia (RM)
+                                    </p>
+                                </div>
                             </div>
                             <div class="col-md-6">
-                                ${ddt.customer_address ? `<h6>Indirizzo Destinatario</h6><p>${ddt.customer_address}<br>` : ''}
-                                ${ddt.customer_city || ddt.customer_cap || ddt.customer_province ? 
-                                    `${ddt.customer_cap || ''} ${ddt.customer_city || ''} ${ddt.customer_province ? '(' + ddt.customer_province + ')' : ''}</p>` : ''}
-                                ${ddt.notes ? `<h6>Note</h6><p>${ddt.notes}</p>` : ''}
-                                ${ddt.transporter_notes ? `<h6>Note Trasportatore</h6><p>${ddt.transporter_notes}</p>` : ''}
+                                <h6 style="color: #0066CC; font-weight: 600;">📍 DESTINATARIO</h6>
+                                <p>
+                                    <strong>${ddt.customer_name}</strong><br>
+                                    ${ddt.customer_address || ''}<br>
+                                    ${ddt.customer_cap || ''} ${ddt.customer_city || ''} ${ddt.customer_province ? '(' + ddt.customer_province + ')' : ''}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <table class="table table-sm">
+                                    <tr><td><strong>Numero DDT:</strong></td><td>${ddt.ddt_number}</td></tr>
+                                    <tr><td><strong>Ordine Riferimento:</strong></td><td>${ddt.order_number}</td></tr>
+                                    <tr><td><strong>Data Emissione:</strong></td><td>${new Date(ddt.issue_date).toLocaleDateString()}</td></tr>
+                                    <tr><td><strong>N. PLT:</strong></td><td>${ddt.total_packages}</td></tr>
+                                    ${ddt.total_weight ? `<tr><td><strong>Peso Totale:</strong></td><td>${ddt.total_weight}</td></tr>` : ''}
+                                    ${ddt.notes ? `<tr><td><strong>Note:</strong></td><td>${ddt.notes}</td></tr>` : ''}
+                                </table>
                             </div>
                         </div>
                         <h6>Prodotti</h6>

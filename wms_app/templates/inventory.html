@@ -38,11 +38,9 @@
     <!-- Layout a 2 colonne per separare le funzioni -->
     <div class="inventory-sections">
         <!-- Sezione Movimenti Interni -->
-        <div class="inventory-section" data-permission="inventory_internal_movements">
+        <div class="inventory-section mobile-hide" data-permission="inventory_internal_movements">
             <h2 class="section-title">📦 Movimenti Interni</h2>
             <div class="action-buttons">
-                <button class="action-btn" onclick="openOverlay('manual-operations-overlay')" data-permission="inventory_manage">⚙️ Operazioni Manuali</button>
-                <button class="action-btn" onclick="openOverlay('file-operations-overlay')" data-permission="inventory_manage">📁 Operazioni da File</button>
                 <button class="action-btn danger" onclick="openOverlay('manage-data-overlay')" data-permission="inventory_data_management">⚙️ Gestione Dati</button>
             </div>
         </div>
@@ -51,6 +49,8 @@
         <div class="inventory-section" data-permission="inventory_vehicle_unload">
             <h2 class="section-title">🚛 Gestione Scarico Mezzi</h2>
             <div class="action-buttons">
+                <button class="action-btn" onclick="openOverlay('manual-operations-overlay')" data-permission="inventory_manage">⚙️ Operazioni Manuali</button>
+                <button class="action-btn" onclick="openOverlay('file-operations-overlay')" data-permission="inventory_manage">📁 Operazioni da File</button>
                 <button class="action-btn truck" onclick="openOverlay('unload-container-overlay')" data-permission="warehouse_manage">📦 Scarico Container</button>
                 <button class="action-btn relocate" onclick="openOverlay('ground-to-location-overlay')" data-permission="warehouse_manage">🏗️ Ubicazione da Terra</button>
             </div>
@@ -381,7 +381,7 @@
     </div>
 
     <!-- Overlay per Gestione Dati -->
-    <div id="manage-data-overlay" class="overlay">
+    <div id="manage-data-overlay" class="overlay mobile-hide">
         <div class="overlay-content">
             <div class="overlay-header">
                 <h3>Gestione Dati Giacenze</h3>
@@ -701,7 +701,7 @@
     </div>
 
     <!-- Overlay Consigli di Consolidamento -->
-    <div id="consolidation-suggestions-overlay" class="overlay">
+    <div id="consolidation-suggestions-overlay" class="overlay mobile-hide">
         <div class="overlay-content">
             <div class="overlay-header">
                 <h3>🧩 Consigli di Consolidamento</h3>
@@ -764,7 +764,7 @@
     </div>
 
     <!-- Modal di Conferma Importazione (aggiornato) -->
-    <div id="confirmation-modal" class="modal">
+    <div id="confirmation-modal" class="modal mobile-hide">
         <div class="modal-content">
             <h2>Riepilogo Importazione <span class="close-button">&times;</span></h2>
             <div id="modal-body"></div>
