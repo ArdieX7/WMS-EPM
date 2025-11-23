@@ -64,13 +64,15 @@ async def get_ddt_management_page(request: Request, db: Session = Depends(get_db
         joinedload(DDT.order)
     ).order_by(DDT.issue_date.desc()).all()
     
-    # Ordini completati senza DDT
-    orders_without_ddt = db.query(models.Order).filter(
+    # Ordini completati senza DDT (con righe e prodotti per calcolo peso)
+    orders_without_ddt = db.query(models.Order).options(
+        joinedload(models.Order.lines).joinedload(models.OrderLine.product)
+    ).filter(
         models.Order.is_completed == True,
         ~models.Order.order_number.in_(
             db.query(DDT.order_number).subquery()
         )
-    ).all()
+    ).order_by(models.Order.order_date.desc()).all()
     
     return get_templates().TemplateResponse("ddt.html", {
         "request": request,
@@ -112,9 +114,10 @@ def generate_ddt_from_order(ddt_request: schemas.ddt.DDTGenerateRequest, db: Ses
         customer_city=ddt_request.customer_city,
         customer_cap=ddt_request.customer_cap,
         customer_province=ddt_request.customer_province,
-        transporter_name=ddt_request.transporter_name,
-        transporter_notes=ddt_request.transporter_notes,
-        transport_reason=ddt_request.transport_reason,
+        # Campi deprecati - non più usati nei nuovi DDT
+        # transporter_name=ddt_request.transporter_name,
+        # transporter_notes=ddt_request.transporter_notes,
+        # transport_reason=ddt_request.transport_reason,
         total_packages=ddt_request.total_packages,
         total_weight=ddt_request.total_weight,
         notes=ddt_request.notes
@@ -200,49 +203,72 @@ def generate_ddt_pdf(ddt_number: str, db: Session = Depends(get_db)):
     # Contenuto documento
     story = []
     
-    # Titolo
-    story.append(Paragraph("DOCUMENTO DI TRASPORTO", title_style))
-    story.append(Spacer(1, 20))
-    
-    # Informazioni DDT - Layout a due colonne
-    ddt_info_data = [
-        ["Numero DDT:", ddt.ddt_number, "Data Emissione:", ddt.issue_date.strftime("%d/%m/%Y")],
-        ["Ordine Rif.:", ddt.order_number, "Causale:", ddt.transport_reason],
-        ["Cliente:", ddt.customer_name, "N. Colli:", str(ddt.total_packages)]
-    ]
-    
-    if ddt.customer_address:
-        ddt_info_data.append(["Indirizzo:", ddt.customer_address, "", ""])
-    
+    # Titolo con numero DDT
+    header_text = f"DOCUMENTO DI TRASPORTO N. {ddt.ddt_number}"
+    story.append(Paragraph(header_text, title_style))
+    story.append(Spacer(1, 15))
+
+    # Layout Mittente e Destinatario a due colonne
+    # Mittente (colonna sinistra - hardcoded)
+    mittente_text = """
+    <b>MITTENTE</b><br/>
+    LD Tyres srl<br/>
+    Via Campobello 20/22<br/>
+    00071 Pomezia (RM)
+    """
+
+    # Destinatario (colonna destra - da DDT)
+    city_info = ""
     if ddt.customer_city:
         city_info = ddt.customer_city
         if ddt.customer_cap:
             city_info = f"{ddt.customer_cap} {city_info}"
         if ddt.customer_province:
             city_info = f"{city_info} ({ddt.customer_province})"
-        ddt_info_data.append(["Città:", city_info, "", ""])
-    
-    if ddt.transporter_name:
-        ddt_info_data.append(["Trasportatore:", ddt.transporter_name, "", ""])
-    
-    if ddt.total_weight:
-        ddt_info_data.append(["Peso Totale:", ddt.total_weight, "", ""])
-    
-    info_table = Table(ddt_info_data, colWidths=[3*cm, 6*cm, 3*cm, 4*cm])
-    info_table.setStyle(TableStyle([
+
+    destinatario_text = f"""
+    <b>DESTINATARIO</b><br/>
+    {ddt.customer_name}<br/>
+    {ddt.customer_address or ''}<br/>
+    {city_info}
+    """
+
+    # Tabella a 2 colonne per Mittente/Destinatario
+    mittente_destinatario_data = [[Paragraph(mittente_text, styles['Normal']), Paragraph(destinatario_text, styles['Normal'])]]
+    mittente_table = Table(mittente_destinatario_data, colWidths=[8.5*cm, 8.5*cm])
+    mittente_table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),  # Prima colonna in grassetto
-        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),  # Terza colonna in grassetto
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOX', (0, 0), (-1, -1), 1, colors.grey),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+    ]))
+
+    story.append(mittente_table)
+    story.append(Spacer(1, 15))
+
+    # Informazioni DDT (ordine, data, colli, peso)
+    ddt_details_data = [
+        ["Ordine Riferimento:", ddt.order_number, "Data Emissione:", ddt.issue_date.strftime("%d/%m/%Y")],
+        ["N. PLT:", str(ddt.total_packages), "Peso Totale:", ddt.total_weight or "N/D"]
+    ]
+
+    details_table = Table(ddt_details_data, colWidths=[4*cm, 4*cm, 4*cm, 4.5*cm])
+    details_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
     ]))
-    
-    story.append(info_table)
-    story.append(Spacer(1, 30))
+
+    story.append(details_table)
+    story.append(Spacer(1, 20))
     
     # Tabella prodotti
     story.append(Paragraph("DETTAGLIO PRODOTTI", styles['Heading2']))
@@ -260,9 +286,9 @@ def generate_ddt_pdf(ddt_number: str, db: Session = Depends(get_db)):
             line.unit_measure
         ])
     
-    # Calcola totale quantità
+    # Calcola totale quantità (TOTALE COLLI)
     total_qty = sum(line.quantity for line in ddt.lines)
-    product_data.append(["", "TOTALE", str(total_qty), ""])
+    product_data.append(["", "TOTALE COLLI", str(total_qty), ""])
     
     product_table = Table(product_data, colWidths=[4*cm, 8*cm, 2*cm, 2*cm])
     product_table.setStyle(TableStyle([

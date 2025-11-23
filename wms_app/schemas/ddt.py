@@ -25,9 +25,9 @@ class DDTBase(BaseModel):
     customer_city: Optional[str] = None
     customer_cap: Optional[str] = None
     customer_province: Optional[str] = None
-    transporter_name: Optional[str] = None
-    transporter_notes: Optional[str] = None
-    transport_reason: str = "Vendita"
+    transporter_name: Optional[str] = None  # Deprecato - mantenuto per compatibility
+    transporter_notes: Optional[str] = None  # Deprecato - mantenuto per compatibility
+    transport_reason: Optional[str] = None  # Deprecato - mantenuto per compatibility
     total_packages: int = 1
     total_weight: Optional[str] = None
     notes: Optional[str] = None
@@ -54,9 +54,9 @@ class DDTGenerateRequest(BaseModel):
     customer_city: Optional[str] = None
     customer_cap: Optional[str] = None
     customer_province: Optional[str] = None
-    transporter_name: Optional[str] = None
-    transporter_notes: Optional[str] = None
-    transport_reason: str = "Vendita"
+    transporter_name: Optional[str] = None  # Deprecato - ignorato
+    transporter_notes: Optional[str] = None  # Deprecato - ignorato
+    transport_reason: Optional[str] = None  # Deprecato - ignorato
     total_packages: int = 1
     total_weight: Optional[str] = None
     notes: Optional[str] = None
