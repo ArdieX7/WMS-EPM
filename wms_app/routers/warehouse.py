@@ -40,7 +40,8 @@ class LocationsToDelete(BaseModel):
     locations: List[str]
 
 class LabelGenerationRequest(BaseModel):
-    fila: int
+    fila_start: int
+    fila_end: int
     campata_start: int
     campata_end: int
 
@@ -483,16 +484,18 @@ async def generate_labels_pdf_endpoint(
     db: Session = Depends(get_db)
 ):
     """
-    Genera PDF con etichette per le campate specificate.
-    Input: fila, campata_start (1=A, 2=B, ...), campata_end
+    Genera PDF con etichette per le file e campate specificate.
+    Input: fila_start, fila_end, campata_start (1=A, 2=B, ...), campata_end
     """
     # Validazione input
     if request_data.campata_start < 1 or request_data.campata_end < 1:
         raise HTTPException(status_code=400, detail="Le campate devono essere >= 1")
     if request_data.campata_start > request_data.campata_end:
         raise HTTPException(status_code=400, detail="Campata iniziale deve essere <= campata finale")
-    if request_data.fila < 1:
-        raise HTTPException(status_code=400, detail="La fila deve essere >= 1")
+    if request_data.fila_start < 1 or request_data.fila_end < 1:
+        raise HTTPException(status_code=400, detail="Le file devono essere >= 1")
+    if request_data.fila_start > request_data.fila_end:
+        raise HTTPException(status_code=400, detail="Fila iniziale deve essere <= fila finale")
 
     # Converti i numeri delle campate in lettere
     campate_letters = []
@@ -509,7 +512,9 @@ async def generate_labels_pdf_endpoint(
         loc_name = loc[0]
         try:
             fila, lettera, piano, posizione = parse_location(loc_name)
-            if fila == request_data.fila and lettera in campate_letters:
+            # Controlla se fila e campata sono nel range
+            if (request_data.fila_start <= fila <= request_data.fila_end and
+                lettera in campate_letters):
                 matching_locations.append(loc_name)
         except ValueError:
             continue
@@ -517,7 +522,7 @@ async def generate_labels_pdf_endpoint(
     if not matching_locations:
         raise HTTPException(
             status_code=404,
-            detail=f"Nessuna ubicazione trovata per Fila {request_data.fila}, Campate {campate_letters}"
+            detail=f"Nessuna ubicazione trovata per File {request_data.fila_start}-{request_data.fila_end}, Campate {campate_letters}"
         )
 
     # Raggruppa per campata
@@ -527,8 +532,39 @@ async def generate_labels_pdf_endpoint(
     pdf_buffer = generate_labels_pdf(grouped)
 
     # Nome file
+    file_range = f"{request_data.fila_start}-{request_data.fila_end}" if request_data.fila_start != request_data.fila_end else str(request_data.fila_start)
     campate_range = f"{campate_letters[0]}-{campate_letters[-1]}" if len(campate_letters) > 1 else campate_letters[0]
-    filename = f"etichette_fila{request_data.fila}_campate{campate_range}.pdf"
+    filename = f"etichette_file{file_range}_campate{campate_range}.pdf"
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/generate-all-labels-pdf")
+async def generate_all_labels_pdf_endpoint(db: Session = Depends(get_db)):
+    """
+    Genera PDF con etichette per TUTTE le ubicazioni del magazzino.
+    """
+    # Query tutte le ubicazioni
+    all_locations_query = db.query(models.Location.name).all()
+    all_locations = [loc[0] for loc in all_locations_query]
+
+    if not all_locations:
+        raise HTTPException(status_code=404, detail="Nessuna ubicazione trovata nel database")
+
+    # Raggruppa per campata
+    grouped = group_locations_by_campata(all_locations)
+
+    # Genera PDF
+    pdf_buffer = generate_labels_pdf(grouped)
+
+    # Nome file con timestamp
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"etichette_magazzino_completo_{timestamp}.pdf"
 
     return StreamingResponse(
         pdf_buffer,

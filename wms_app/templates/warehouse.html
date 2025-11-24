@@ -255,14 +255,31 @@
             <div style="padding: 1.5rem;">
                 <div style="background-color: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #0097E0;">
                     <strong>ℹ️ Informazioni:</strong><br>
-                    Genera etichette stampabili formato A4 per le tue campate. Ogni foglio contiene 2 campate con codici ubicazione e barcode.<br>
-                    <small>Esempio: Campata 1 = A, Campata 2 = B, ecc.</small>
+                    Genera etichette stampabili formato A4. Ogni foglio contiene 2 piani della stessa campata con codici ubicazione e barcode.<br>
+                    <small>Esempio: Campata 1 = A, Campata 2 = B, ecc. Ogni striscia va su una colonna dello scaffale.</small>
+                </div>
+
+                <!-- Tasto Genera Tutto (grande e in evidenza) -->
+                <div style="margin-bottom: 1.5rem; text-align: center;">
+                    <button type="button" class="btn-primary" onclick="generateAllLabels()" style="width: 100%; padding: 1rem; font-size: 1.1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        🏭 Genera TUTTE le Etichette del Magazzino
+                    </button>
+                </div>
+
+                <div style="border-top: 2px solid #e0e0e0; margin: 1.5rem 0; padding-top: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem; color: #666;">📍 Oppure genera per range specifico:</h4>
                 </div>
 
                 <form id="labels-form">
-                    <div class="form-group">
-                        <label for="label_fila">Fila:</label>
-                        <input type="number" id="label_fila" name="fila" min="1" placeholder="Es. 1" required style="width: 100px;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="label_fila_start">Fila Da:</label>
+                            <input type="number" id="label_fila_start" name="fila_start" min="1" placeholder="Es. 1" required style="width: 100px;">
+                        </div>
+                        <div class="form-group">
+                            <label for="label_fila_end">Fila A:</label>
+                            <input type="number" id="label_fila_end" name="fila_end" min="1" placeholder="Es. 5" required style="width: 100px;">
+                        </div>
                     </div>
 
                     <div class="form-row">
@@ -278,7 +295,7 @@
 
                     <div class="form-actions">
                         <button type="button" class="btn-secondary" onclick="closeOverlay('labels-overlay')">Annulla</button>
-                        <button type="button" class="btn-primary" onclick="generateLabels()">🏷️ Genera PDF Etichette</button>
+                        <button type="button" class="btn-primary" onclick="generateLabels()">🏷️ Genera PDF per Range</button>
                     </div>
                 </form>
             </div>
@@ -714,7 +731,7 @@
             }
         }
 
-        // Funzione per generare etichette PDF
+        // Funzione per generare etichette PDF per range specifico
         async function generateLabels() {
             const form = document.getElementById('labels-form');
             if (!form.checkValidity()) {
@@ -724,12 +741,17 @@
 
             const formData = new FormData(form);
             const data = {
-                fila: parseInt(formData.get('fila')),
+                fila_start: parseInt(formData.get('fila_start')),
+                fila_end: parseInt(formData.get('fila_end')),
                 campata_start: parseInt(formData.get('campata_start')),
                 campata_end: parseInt(formData.get('campata_end'))
             };
 
             // Validazioni client-side
+            if (data.fila_start > data.fila_end) {
+                alert('La fila iniziale deve essere minore o uguale alla fila finale');
+                return;
+            }
             if (data.campata_start > data.campata_end) {
                 alert('La campata iniziale deve essere minore o uguale alla campata finale');
                 return;
@@ -749,34 +771,65 @@
                 }
 
                 // Scarica il PDF
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-
-                // Estrai il nome del file dal header Content-Disposition
-                const contentDisposition = response.headers.get('Content-Disposition');
-                let filename = 'etichette_magazzino.pdf';
-                if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename=(.+)/);
-                    if (filenameMatch) {
-                        filename = filenameMatch[1];
-                    }
-                }
-
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-
+                await downloadPDF(response);
                 alert('Etichette generate con successo!');
                 closeOverlay('labels-overlay');
             } catch (error) {
                 alert('Errore di connessione durante la generazione delle etichette');
                 console.error(error);
             }
+        }
+
+        // Funzione per generare TUTTE le etichette del magazzino
+        async function generateAllLabels() {
+            if (!confirm('Vuoi generare etichette per TUTTE le ubicazioni del magazzino? Questo potrebbe richiedere alcuni minuti.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/warehouse/generate-all-labels-pdf', {
+                    method: 'GET'
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    alert(`Errore: ${errorData.detail}`);
+                    return;
+                }
+
+                // Scarica il PDF
+                await downloadPDF(response);
+                alert('Etichette complete generate con successo!');
+                closeOverlay('labels-overlay');
+            } catch (error) {
+                alert('Errore di connessione durante la generazione delle etichette');
+                console.error(error);
+            }
+        }
+
+        // Funzione helper per scaricare PDF
+        async function downloadPDF(response) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+
+            // Estrai il nome del file dal header Content-Disposition
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'etichette_magazzino.pdf';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename=(.+)/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            }
+
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
         }
 
         // Funzioni per gestire gli overlay moderni
