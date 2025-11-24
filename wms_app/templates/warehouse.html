@@ -31,6 +31,7 @@
         <button class="action-btn" onclick="openOverlay('add-location-overlay')">📍 Aggiungi Ubicazione</button>
         <button class="action-btn" onclick="openOverlay('bulk-locations-overlay')">🏗️ Gestione Massiva</button>
         <button class="action-btn" onclick="openOverlay('availability-overlay')">🔓 Gestione Disponibilità</button>
+        <button class="action-btn" onclick="openOverlay('labels-overlay')">🏷️ Genera Etichette</button>
     </div>
 
     <!-- Overlay Aggiungi Ubicazione -->
@@ -239,6 +240,47 @@
                 <div id="availability-preview" style="margin-top: 15px; display: none;">
                     <!-- Contenuto dinamico dell'anteprima -->
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay Genera Etichette -->
+    <div id="labels-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>🏷️ Genera Etichette Magazzino</h3>
+                <button class="overlay-close" onclick="closeOverlay('labels-overlay')">&times;</button>
+            </div>
+
+            <div style="padding: 1.5rem;">
+                <div style="background-color: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #0097E0;">
+                    <strong>ℹ️ Informazioni:</strong><br>
+                    Genera etichette stampabili formato A4 per le tue campate. Ogni foglio contiene 2 campate con codici ubicazione e barcode.<br>
+                    <small>Esempio: Campata 1 = A, Campata 2 = B, ecc.</small>
+                </div>
+
+                <form id="labels-form">
+                    <div class="form-group">
+                        <label for="label_fila">Fila:</label>
+                        <input type="number" id="label_fila" name="fila" min="1" placeholder="Es. 1" required style="width: 100px;">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="label_campata_start">Campata Da (numero):</label>
+                            <input type="number" id="label_campata_start" name="campata_start" min="1" placeholder="1=A, 2=B..." required style="width: 100px;">
+                        </div>
+                        <div class="form-group">
+                            <label for="label_campata_end">Campata A (numero):</label>
+                            <input type="number" id="label_campata_end" name="campata_end" min="1" placeholder="1=A, 2=B..." required style="width: 100px;">
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="closeOverlay('labels-overlay')">Annulla</button>
+                        <button type="button" class="btn-primary" onclick="generateLabels()">🏷️ Genera PDF Etichette</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -668,6 +710,71 @@
                 window.location.reload();
             } catch (error) {
                 alert('Errore di connessione');
+                console.error(error);
+            }
+        }
+
+        // Funzione per generare etichette PDF
+        async function generateLabels() {
+            const form = document.getElementById('labels-form');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(form);
+            const data = {
+                fila: parseInt(formData.get('fila')),
+                campata_start: parseInt(formData.get('campata_start')),
+                campata_end: parseInt(formData.get('campata_end'))
+            };
+
+            // Validazioni client-side
+            if (data.campata_start > data.campata_end) {
+                alert('La campata iniziale deve essere minore o uguale alla campata finale');
+                return;
+            }
+
+            try {
+                const response = await fetch('/warehouse/generate-labels-pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    alert(`Errore: ${errorData.detail}`);
+                    return;
+                }
+
+                // Scarica il PDF
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+
+                // Estrai il nome del file dal header Content-Disposition
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'etichette_magazzino.pdf';
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename=(.+)/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1];
+                    }
+                }
+
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                alert('Etichette generate con successo!');
+                closeOverlay('labels-overlay');
+            } catch (error) {
+                alert('Errore di connessione durante la generazione delle etichette');
                 console.error(error);
             }
         }
