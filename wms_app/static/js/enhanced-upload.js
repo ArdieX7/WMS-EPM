@@ -211,10 +211,10 @@ class EnhancedUpload {
         const processButton = this.container.querySelector(`#${this.containerId}-process-scanner`);
         const clearButton = this.container.querySelector(`#${this.containerId}-clear-scanner`);
         const scannerInput = this.container.querySelector(`#${this.containerId}-scanner-input`);
-        
+
         if (processButton && scannerInput) {
             processButton.addEventListener('click', () => this.processScanner());
-            
+
             // Auto-resize textarea
             scannerInput.addEventListener('input', (e) => {
                 e.target.style.height = 'auto';
@@ -228,6 +228,57 @@ class EnhancedUpload {
                     this.processScanner();
                 }
             });
+
+            // NUOVO: Modalità scanner-friendly per mobile
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                             || window.innerWidth < 768;
+
+            if (isMobile && this.options.enableScanner) {
+                // Impedisce tastiera virtuale
+                scannerInput.readOnly = true;
+                scannerInput.setAttribute('inputmode', 'none');
+
+                // Autofocus immediato quando viene mostrato
+                setTimeout(() => {
+                    if (this.currentMode === 'scanner') {
+                        scannerInput.focus();
+                    }
+                }, 150);
+
+                // Toggle readonly al primo input (per permettere digitazione manuale se necessario)
+                scannerInput.addEventListener('keydown', function(e) {
+                    if (this.readOnly && e.key !== 'Tab') {
+                        this.readOnly = false;
+                    }
+                });
+
+                // Auto-refocus quando perde focus (per scanner continuo)
+                scannerInput.addEventListener('blur', function() {
+                    setTimeout(() => {
+                        const modeElement = this.closest('.upload-mode');
+                        if (modeElement && modeElement.classList.contains('active')) {
+                            this.focus();
+                            // Mantieni readonly se campo vuoto
+                            if (!this.value) {
+                                this.readOnly = true;
+                            }
+                        }
+                    }, 100);
+                });
+
+                // Click per abilitare input manuale temporaneo
+                scannerInput.addEventListener('click', function() {
+                    if (this.readOnly) {
+                        this.readOnly = false;
+                        // Rimetti readonly dopo 5 secondi di inattività
+                        setTimeout(() => {
+                            if (!this.value) {
+                                this.readOnly = true;
+                            }
+                        }, 5000);
+                    }
+                });
+            }
         }
 
         if (clearButton) {

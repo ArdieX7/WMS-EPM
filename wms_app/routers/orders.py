@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.sql import func
+from sqlalchemy import and_
 from typing import List, Dict, Tuple, Any, Optional
 from collections import defaultdict
 from datetime import datetime, date
@@ -3086,7 +3087,37 @@ async def scan_product_real_time(
                 quantity=actual_quantity
             )
             db.add(new_outgoing_item)
-        
+
+        # 11.5. NUOVO: Completa le prenotazioni relative a questo picking
+        from wms_app.services.reservation_service import ReservationService
+        from wms_app.models.reservations import InventoryReservation
+
+        reservation_service = ReservationService(db)
+
+        # Cerca prenotazioni attive per questo ordine/sku/location
+        active_reservations = db.query(InventoryReservation).filter(
+            and_(
+                InventoryReservation.order_id == str(order.order_number),
+                InventoryReservation.product_sku == product_sku,
+                InventoryReservation.location_name == location_name,
+                InventoryReservation.status == 'active'
+            )
+        ).all()
+
+        # Completa le prenotazioni proporzionalmente alla quantità prelevata
+        remaining_to_release = actual_quantity
+        for reservation in active_reservations:
+            if remaining_to_release <= 0:
+                break
+
+            # Quantità da rilasciare per questa prenotazione
+            to_release = min(remaining_to_release, reservation.reserved_quantity)
+
+            # Marca prenotazione come completata
+            reservation_service.complete_reservation(reservation.id, to_release)
+
+            remaining_to_release -= to_release
+
         # 12. LOGGING: Registra l'operazione di picking in tempo reale
         logger = LoggingService(db)
         logger.log_operation(

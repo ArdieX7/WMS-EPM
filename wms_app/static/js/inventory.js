@@ -208,6 +208,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // Funzioni per gestione overlay
     window.openOverlay = function(overlayId) {
         document.getElementById(overlayId).style.display = 'block';
+
+        // NUOVO: Autofocus su campo scanner per mobile quando si apre file-operations
+        if (overlayId === 'file-operations-overlay') {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                             || window.innerWidth < 768;
+
+            if (isMobile) {
+                // Aspetta che il tab attivo sia completamente renderizzato
+                setTimeout(() => {
+                    // Cerca il primo textarea scanner visibile nel tab attivo
+                    const activeTab = document.querySelector('.tab-content.active');
+                    if (activeTab) {
+                        const scannerInput = activeTab.querySelector('.scanner-textarea');
+                        if (scannerInput) {
+                            scannerInput.focus();
+                        }
+                    }
+                }, 200);  // Delay maggiore per dare tempo al tab system
+            }
+        }
     };
 
     window.closeOverlay = function(overlayId) {
