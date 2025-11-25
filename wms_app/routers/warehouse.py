@@ -45,6 +45,12 @@ class LabelGenerationRequest(BaseModel):
     campata_start: int
     campata_end: int
 
+class FrontViewGenerationRequest(BaseModel):
+    fila_start: int
+    fila_end: int
+    campata_start: int  # 1=A, 2=B, etc.
+    campata_end: int
+
 
 @router.get("/manage", response_class=HTMLResponse)
 async def get_warehouse_management_page(request: Request, db: Session = Depends(get_db)):
@@ -334,6 +340,69 @@ def group_locations_by_campata(locations: List[str]) -> Dict[Tuple[int, str], Di
     return grouped
 
 
+def build_campata_grid(fila: int, lettera: str, all_locations: List[str]) -> Dict:
+    """
+    Costruisce una griglia [piani x posizioni] per una campata specifica.
+
+    Args:
+        fila: Numero fila
+        lettera: Lettera campata (A, B, C, ...)
+        all_locations: Lista di tutte le ubicazioni
+
+    Returns:
+        {
+            'fila': int,
+            'lettera': str,
+            'max_piani': int,
+            'max_posizioni': int,
+            'grid': {(piano, posizione): location_name | None}
+        }
+
+    Raises:
+        ValueError: Se la campata non contiene ubicazioni valide
+    """
+    # Filtra ubicazioni per questa campata
+    campata_locations = []
+    for loc_name in all_locations:
+        try:
+            loc_fila, loc_lettera, loc_piano, loc_posizione = parse_location(loc_name)
+            if loc_fila == fila and loc_lettera == lettera:
+                campata_locations.append({
+                    'name': loc_name,
+                    'piano': loc_piano,
+                    'posizione': loc_posizione
+                })
+        except ValueError:
+            continue
+
+    if not campata_locations:
+        raise ValueError(f"Campata {fila}{lettera} non contiene ubicazioni valide")
+
+    # Determina dimensioni griglia
+    max_piani = max(loc['piano'] for loc in campata_locations)
+    max_posizioni = max(loc['posizione'] for loc in campata_locations)
+
+    # Costruisce dizionario griglia con tutte le celle (incluse quelle vuote)
+    grid = {}
+    for piano in range(1, max_piani + 1):
+        for posizione in range(1, max_posizioni + 1):
+            # Cerca se esiste l'ubicazione per questa cella
+            location_name = None
+            for loc in campata_locations:
+                if loc['piano'] == piano and loc['posizione'] == posizione:
+                    location_name = loc['name']
+                    break
+            grid[(piano, posizione)] = location_name
+
+    return {
+        'fila': fila,
+        'lettera': lettera,
+        'max_piani': max_piani,
+        'max_posizioni': max_posizioni,
+        'grid': grid
+    }
+
+
 def generate_barcode_image(location_name: str) -> io.BytesIO:
     """
     Genera un'immagine barcode Code128 per l'ubicazione.
@@ -410,6 +479,114 @@ def generate_labels_pdf(grouped_locations: Dict[Tuple[int, str], Dict[int, List[
             if piano2:
                 _draw_piano_labels(c, campata_key, piano2, margin * 2 + column_width,
                                   margin, column_width, cell_height, page_height, max_positions)
+
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+
+def generate_front_view_pdf(campate_grids: List[Dict]) -> io.BytesIO:
+    """
+    Genera PDF con vista frontale di ogni campata (griglia [piani x posizioni]).
+
+    Args:
+        campate_grids: Lista di dizionari da build_campata_grid()
+
+    Returns:
+        BytesIO buffer con PDF generato
+    """
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    page_width, page_height = A4
+
+    first_page = True
+
+    for campata_data in campate_grids:
+        if not first_page:
+            c.showPage()
+        first_page = False
+
+        fila = campata_data['fila']
+        lettera = campata_data['lettera']
+        max_piani = campata_data['max_piani']
+        max_posizioni = campata_data['max_posizioni']
+        grid = campata_data['grid']
+
+        # Margini e dimensioni
+        margin_top = 2 * cm
+        margin_side = 1.5 * cm
+        margin_bottom = 1 * cm
+
+        # Titolo campata
+        title = f"Campata {fila}{lettera}"
+        c.setFont("Helvetica-Bold", 24)
+        title_width = c.stringWidth(title, "Helvetica-Bold", 24)
+        title_x = (page_width - title_width) / 2
+        c.drawString(title_x, page_height - margin_top + 0.5 * cm, title)
+
+        # Calcola dimensioni griglia
+        grid_width = page_width - 2 * margin_side
+        grid_height = page_height - margin_top - margin_bottom - 1 * cm
+
+        cell_width = grid_width / max_posizioni
+        cell_height = grid_height / max_piani
+
+        # Calcola font size dinamico (molto più grande per leggibilità)
+        font_size = min(32, cell_height * 0.55 / cm)  # Converti in punti
+        font_size = max(20, font_size)  # Minimo 6pt
+
+        # Calcola dimensioni barcode dinamiche
+        barcode_width = cell_width * 0.8
+        barcode_height = cell_height * 0.3
+
+        # Y iniziale per griglia (dall'alto verso il basso)
+        grid_start_y = page_height - margin_top - 1 * cm
+
+        # Disegna griglia (piano alto in alto, piano basso in basso)
+        for piano in range(max_piani, 0, -1):  # Da max_piani a 1
+            for posizione in range(1, max_posizioni + 1):  # Da 1 a max_posizioni
+                # Calcola posizione cella
+                x = margin_side + (posizione - 1) * cell_width
+                y = grid_start_y - (max_piani - piano + 1) * cell_height
+
+                location_name = grid.get((piano, posizione))
+
+                # Disegna bordo cella
+                c.setStrokeColor(colors.black)
+                c.setLineWidth(1)
+                c.rect(x, y, cell_width, cell_height)
+
+                if location_name:
+                    # CELLA PIENA: Testo + Barcode
+                    # Testo ubicazione centrato
+                    c.setFont("Helvetica-Bold", font_size)
+                    c.setFillColor(colors.black)
+                    text_width = c.stringWidth(location_name, "Helvetica-Bold", font_size)
+                    text_x = x + (cell_width - text_width) / 2
+                    text_y = y + cell_height * 0.65
+                    c.drawString(text_x, text_y, location_name)
+
+                    # Barcode centrato in basso
+                    try:
+                        barcode_buffer = generate_barcode_image(location_name)
+                        barcode_image = ImageReader(barcode_buffer)
+                        barcode_x = x + (cell_width - barcode_width) / 2
+                        barcode_y = y + cell_height * 0.05
+
+                        c.drawImage(barcode_image, barcode_x, barcode_y,
+                                   width=barcode_width, height=barcode_height,
+                                   preserveAspectRatio=True, mask='auto')
+                    except Exception as e:
+                        print(f"Errore barcode per {location_name}: {e}")
+                        # Continua senza barcode
+                else:
+                    # CELLA VUOTA: Sfondo grigio chiaro
+                    c.setFillColor(colors.Color(0.9, 0.9, 0.9))  # Grigio chiaro
+                    c.rect(x, y, cell_width, cell_height, fill=1, stroke=0)
+                    # Ridisegna bordo sopra
+                    c.setStrokeColor(colors.black)
+                    c.setLineWidth(1)
+                    c.rect(x, y, cell_width, cell_height, fill=0, stroke=1)
 
     c.save()
     buffer.seek(0)
@@ -565,6 +742,117 @@ async def generate_all_labels_pdf_endpoint(db: Session = Depends(get_db)):
     from datetime import datetime
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"etichette_magazzino_completo_{timestamp}.pdf"
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.post("/generate-front-view-pdf")
+async def generate_front_view_pdf_endpoint(
+    request_data: FrontViewGenerationRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Genera PDF con vista frontale per le file e campate specificate.
+    Input: fila_start, fila_end, campata_start (1=A, 2=B, ...), campata_end
+    """
+    # Validazione input
+    if request_data.campata_start < 1 or request_data.campata_end < 1:
+        raise HTTPException(status_code=400, detail="Le campate devono essere >= 1")
+    if request_data.campata_start > request_data.campata_end:
+        raise HTTPException(status_code=400, detail="Campata iniziale deve essere <= campata finale")
+    if request_data.fila_start < 1 or request_data.fila_end < 1:
+        raise HTTPException(status_code=400, detail="Le file devono essere >= 1")
+    if request_data.fila_start > request_data.fila_end:
+        raise HTTPException(status_code=400, detail="Fila iniziale deve essere <= fila finale")
+
+    # Converti i numeri delle campate in lettere
+    campate_letters = []
+    for campata_num in range(request_data.campata_start, request_data.campata_end + 1):
+        letter = chr(ord('A') + campata_num - 1)
+        campate_letters.append(letter)
+
+    # Query per trovare tutte le ubicazioni
+    all_locations_query = db.query(models.Location.name).all()
+    all_locations = [loc[0] for loc in all_locations_query]
+
+    # Costruisce griglie per ogni campata nel range
+    campate_grids = []
+    for fila in range(request_data.fila_start, request_data.fila_end + 1):
+        for lettera in campate_letters:
+            try:
+                grid_data = build_campata_grid(fila, lettera, all_locations)
+                campate_grids.append(grid_data)
+            except ValueError:
+                # Campata vuota, skip
+                continue
+
+    if not campate_grids:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Nessuna campata valida trovata per File {request_data.fila_start}-{request_data.fila_end}, Campate {campate_letters}"
+        )
+
+    # Genera PDF
+    pdf_buffer = generate_front_view_pdf(campate_grids)
+
+    # Nome file
+    file_range = f"{request_data.fila_start}-{request_data.fila_end}" if request_data.fila_start != request_data.fila_end else str(request_data.fila_start)
+    campate_range = f"{campate_letters[0]}-{campate_letters[-1]}" if len(campate_letters) > 1 else campate_letters[0]
+    filename = f"vista_frontale_file{file_range}_campate{campate_range}.pdf"
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/generate-all-front-views-pdf")
+async def generate_all_front_views_pdf_endpoint(db: Session = Depends(get_db)):
+    """
+    Genera PDF con vista frontale per TUTTE le campate del magazzino.
+    """
+    # Query tutte le ubicazioni
+    all_locations_query = db.query(models.Location.name).all()
+    all_locations = [loc[0] for loc in all_locations_query]
+
+    if not all_locations:
+        raise HTTPException(status_code=404, detail="Nessuna ubicazione trovata nel database")
+
+    # Estrae tutte le campate uniche
+    campate_set = set()
+    for loc_name in all_locations:
+        try:
+            fila, lettera, piano, posizione = parse_location(loc_name)
+            campate_set.add((fila, lettera))
+        except ValueError:
+            continue
+
+    if not campate_set:
+        raise HTTPException(status_code=404, detail="Nessuna campata valida trovata")
+
+    # Ordina campate e costruisce griglie
+    sorted_campate = sorted(campate_set)
+    campate_grids = []
+
+    for fila, lettera in sorted_campate:
+        try:
+            grid_data = build_campata_grid(fila, lettera, all_locations)
+            campate_grids.append(grid_data)
+        except ValueError:
+            continue
+
+    # Genera PDF
+    pdf_buffer = generate_front_view_pdf(campate_grids)
+
+    # Nome file con timestamp
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"vista_frontale_completa_{timestamp}.pdf"
 
     return StreamingResponse(
         pdf_buffer,

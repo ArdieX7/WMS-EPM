@@ -32,6 +32,7 @@
         <button class="action-btn" onclick="openOverlay('bulk-locations-overlay')">🏗️ Gestione Massiva</button>
         <button class="action-btn" onclick="openOverlay('availability-overlay')">🔓 Gestione Disponibilità</button>
         <button class="action-btn" onclick="openOverlay('labels-overlay')">🏷️ Genera Etichette</button>
+        <button class="action-btn" onclick="openOverlay('front-view-overlay')">🖼️ Vista Frontale Campata</button>
     </div>
 
     <!-- Overlay Aggiungi Ubicazione -->
@@ -296,6 +297,66 @@
                     <div class="form-actions">
                         <button type="button" class="btn-secondary" onclick="closeOverlay('labels-overlay')">Annulla</button>
                         <button type="button" class="btn-primary" onclick="generateLabels()">🏷️ Genera PDF per Range</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay Vista Frontale Campata -->
+    <div id="front-view-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>🖼️ Vista Frontale Campata</h3>
+                <button class="overlay-close" onclick="closeOverlay('front-view-overlay')">&times;</button>
+            </div>
+
+            <div style="padding: 1.5rem;">
+                <div style="background-color: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #28a745;">
+                    <strong>ℹ️ Informazioni:</strong><br>
+                    Genera vista frontale completa di ogni campata in formato PDF. Ogni foglio mostra una griglia con tutti i piani e posizioni della campata.<br>
+                    <small>Diverso dalle etichette: mostra l'intera campata in un unico foglio come riferimento visivo.</small>
+                </div>
+
+                <!-- Tasto Genera Tutto (grande e in evidenza) -->
+                <button
+                    type="button"
+                    class="btn-primary"
+                    onclick="generateAllFrontViews()"
+                    style="width: 100%; padding: 1.2rem; font-size: 1.1rem; margin-bottom: 2rem; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border: none; box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);">
+                    🖼️ Genera TUTTE le Viste Frontali
+                </button>
+
+                <div style="text-align: center; margin: 1.5rem 0; color: #6c757d; font-weight: 500;">
+                    ━━━━━━━ oppure specifica un range ━━━━━━━
+                </div>
+
+                <form id="front-view-form">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                        <div class="form-group">
+                            <label for="frontview_fila_start">Fila Da:</label>
+                            <input type="number" id="frontview_fila_start" name="fila_start" min="1" placeholder="Es. 1" required style="width: 100px;">
+                        </div>
+                        <div class="form-group">
+                            <label for="frontview_fila_end">Fila A:</label>
+                            <input type="number" id="frontview_fila_end" name="fila_end" min="1" placeholder="Es. 10" required style="width: 100px;">
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                        <div class="form-group">
+                            <label for="frontview_campata_start">Campata Da (numero):</label>
+                            <input type="number" id="frontview_campata_start" name="campata_start" min="1" placeholder="1=A, 2=B..." required style="width: 100px;">
+                        </div>
+                        <div class="form-group">
+                            <label for="frontview_campata_end">Campata A (numero):</label>
+                            <input type="number" id="frontview_campata_end" name="campata_end" min="1" placeholder="1=A, 2=B..." required style="width: 100px;">
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="closeOverlay('front-view-overlay')">Annulla</button>
+                        <button type="button" class="btn-primary" onclick="generateFrontView()" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border: none;">🖼️ Genera Vista per Range</button>
                     </div>
                 </form>
             </div>
@@ -803,6 +864,86 @@
                 closeOverlay('labels-overlay');
             } catch (error) {
                 alert('Errore di connessione durante la generazione delle etichette');
+                console.error(error);
+            }
+        }
+
+        // Funzione per generare Vista Frontale per range
+        async function generateFrontView() {
+            const form = document.getElementById('front-view-form');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const filaStart = parseInt(document.getElementById('frontview_fila_start').value);
+            const filaEnd = parseInt(document.getElementById('frontview_fila_end').value);
+            const campataStart = parseInt(document.getElementById('frontview_campata_start').value);
+            const campataEnd = parseInt(document.getElementById('frontview_campata_end').value);
+
+            // Validazioni client-side
+            if (filaStart > filaEnd) {
+                alert('Errore: Fila Da non può essere maggiore di Fila A');
+                return;
+            }
+            if (campataStart > campataEnd) {
+                alert('Errore: Campata Da non può essere maggiore di Campata A');
+                return;
+            }
+
+            try {
+                const response = await fetch('/warehouse/generate-front-view-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        fila_start: filaStart,
+                        fila_end: filaEnd,
+                        campata_start: campataStart,
+                        campata_end: campataEnd
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    alert(`Errore: ${errorData.detail}`);
+                    return;
+                }
+
+                // Scarica il PDF
+                await downloadPDF(response);
+                alert('Vista frontale generata con successo!');
+                closeOverlay('front-view-overlay');
+            } catch (error) {
+                alert('Errore di connessione durante la generazione della vista frontale');
+                console.error(error);
+            }
+        }
+
+        // Funzione per generare TUTTE le viste frontali del magazzino
+        async function generateAllFrontViews() {
+            if (!confirm('Vuoi generare viste frontali per TUTTE le campate del magazzino? Questo potrebbe richiedere alcuni minuti.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/warehouse/generate-all-front-views-pdf', {
+                    method: 'GET'
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    alert(`Errore: ${errorData.detail}`);
+                    return;
+                }
+
+                // Scarica il PDF
+                await downloadPDF(response);
+                alert('Viste frontali complete generate con successo!');
+                closeOverlay('front-view-overlay');
+            } catch (error) {
+                alert('Errore di connessione durante la generazione delle viste frontali');
                 console.error(error);
             }
         }
