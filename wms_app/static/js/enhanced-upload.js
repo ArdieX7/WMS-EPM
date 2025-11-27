@@ -94,6 +94,12 @@ class EnhancedUpload {
 
     createDragDropZone() {
         return `
+            <!-- Pulsante Mobile (visibile solo su mobile) -->
+            <button type="button" class="mobile-file-select-btn" id="${this.containerId}-mobile-browse">
+                📂 Seleziona File da Dispositivo
+            </button>
+
+            <!-- Drag & Drop Zone (nascosta su mobile) -->
             <div class="drag-drop-zone" id="${this.containerId}-dropzone">
                 <div class="drag-drop-content">
                     <div class="drag-drop-icon">📁</div>
@@ -161,10 +167,18 @@ class EnhancedUpload {
             fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         }
 
-        // Browse Button
+        // Browse Button (Desktop)
         const browseButton = this.container.querySelector(`#${this.containerId}-browse`);
         if (browseButton && fileInput) {
             browseButton.addEventListener('click', () => fileInput.click());
+        }
+
+        // Mobile Browse Button
+        const mobileBrowseButton = this.container.querySelector(`#${this.containerId}-mobile-browse`);
+        if (mobileBrowseButton && fileInput) {
+            mobileBrowseButton.addEventListener('click', () => {
+                fileInput.click();
+            });
         }
 
         // Drag & Drop
@@ -234,9 +248,31 @@ class EnhancedUpload {
                              || window.innerWidth < 768;
 
             if (isMobile && this.options.enableScanner) {
-                // Impedisce tastiera virtuale
-                scannerInput.readOnly = true;
+                // SOLO inputmode="none" per bloccare tastiera, NO readOnly
+                // Questo permette input da scanner hardware mantenendo la tastiera chiusa
                 scannerInput.setAttribute('inputmode', 'none');
+                scannerInput.removeAttribute('readonly');
+
+                // Visual feedback: mostra quando scanner è attivo
+                scannerInput.addEventListener('focus', function() {
+                    this.style.borderColor = '#28a745';
+                    this.style.background = '#f0fff4';
+                });
+
+                // Auto-refocus quando perde focus (mantiene scanner sempre pronto)
+                scannerInput.addEventListener('blur', function() {
+                    // Reset colori
+                    this.style.borderColor = '#007bff';
+                    this.style.background = '#f8f9ff';
+
+                    // Auto-refocus se modalità scanner ancora attiva
+                    setTimeout(() => {
+                        const modeElement = this.closest('.upload-mode');
+                        if (modeElement && modeElement.classList.contains('active')) {
+                            this.focus();
+                        }
+                    }, 100);
+                });
 
                 // Autofocus immediato quando viene mostrato
                 setTimeout(() => {
@@ -245,38 +281,9 @@ class EnhancedUpload {
                     }
                 }, 150);
 
-                // Toggle readonly al primo input (per permettere digitazione manuale se necessario)
-                scannerInput.addEventListener('keydown', function(e) {
-                    if (this.readOnly && e.key !== 'Tab') {
-                        this.readOnly = false;
-                    }
-                });
-
-                // Auto-refocus quando perde focus (per scanner continuo)
-                scannerInput.addEventListener('blur', function() {
-                    setTimeout(() => {
-                        const modeElement = this.closest('.upload-mode');
-                        if (modeElement && modeElement.classList.contains('active')) {
-                            this.focus();
-                            // Mantieni readonly se campo vuoto
-                            if (!this.value) {
-                                this.readOnly = true;
-                            }
-                        }
-                    }, 100);
-                });
-
-                // Click per abilitare input manuale temporaneo
+                // Click/tap: assicura focus
                 scannerInput.addEventListener('click', function() {
-                    if (this.readOnly) {
-                        this.readOnly = false;
-                        // Rimetti readonly dopo 5 secondi di inattività
-                        setTimeout(() => {
-                            if (!this.value) {
-                                this.readOnly = true;
-                            }
-                        }, 5000);
-                    }
+                    this.focus();
                 });
             }
         }

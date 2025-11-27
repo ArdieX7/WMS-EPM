@@ -23,6 +23,40 @@ router = APIRouter(
 
 logger = logging.getLogger(__name__)
 
+
+def _convert_ean_to_sku(barcode: str, db: Session) -> str:
+    """
+    Converte EAN code in SKU prodotto.
+    Se il barcode è già un SKU, lo ritorna così com'è.
+    Se è un EAN, cerca il prodotto associato e ritorna lo SKU.
+
+    Args:
+        barcode: Codice barcode (può essere SKU o EAN)
+        db: Sessione database
+
+    Returns:
+        SKU prodotto o None se non trovato
+    """
+    # 1. Prova come SKU diretto
+    product = db.query(models.Product).filter(
+        models.Product.sku == barcode
+    ).first()
+
+    if product:
+        return product.sku
+
+    # 2. Prova come EAN code
+    ean_code = db.query(models.EanCode).filter(
+        models.EanCode.ean == barcode
+    ).first()
+
+    if ean_code:
+        return ean_code.product_sku
+
+    # 3. Non trovato
+    return None
+
+
 async def _parse_movement_file(file: UploadFile, db: Session) -> Dict[str, Dict[str, int]]:
     content = await file.read()
     try:
@@ -61,15 +95,8 @@ async def _parse_movement_file(file: UploadFile, db: Session) -> Dict[str, Dict[
                 errors.append(f"Riga {i+1}: Formato EAN/SKU_Quantità non valido: '{line}'")
                 continue
 
-        sku_found = None
-
-        ean_code = db.query(models.EanCode).filter(models.EanCode.ean == ean_or_sku).first()
-        if ean_code:
-            sku_found = ean_code.product_sku
-        else:
-            product = db.query(models.Product).filter(models.Product.sku == ean_or_sku).first()
-            if product:
-                sku_found = product.sku
+        # Converti EAN o SKU in SKU definitivo
+        sku_found = _convert_ean_to_sku(ean_or_sku, db)
 
         if sku_found:
             parsed_data[current_location][sku_found] += quantity
@@ -150,22 +177,14 @@ async def parse_add_stock_file(file: UploadFile = File(...), db: Session = Depen
                 })
                 continue
 
-        # Trova SKU dal database
-        sku_found = None
+        # Converti EAN o SKU in SKU definitivo
+        sku_found = _convert_ean_to_sku(ean_or_sku, db)
         product_description = ""
 
-        ean_code = db.query(models.EanCode).filter(models.EanCode.ean == ean_or_sku).first()
-        if ean_code:
-            sku_found = ean_code.product_sku
+        if sku_found:
             product = db.query(models.Product).filter(models.Product.sku == sku_found).first()
             product_description = product.description if product else ""
         else:
-            product = db.query(models.Product).filter(models.Product.sku == ean_or_sku).first()
-            if product:
-                sku_found = product.sku
-                product_description = product.description
-
-        if not sku_found:
             errors.append({
                 "line": i+1,
                 "type": "product_not_found",
@@ -389,22 +408,14 @@ async def parse_subtract_stock_file(file: UploadFile = File(...), db: Session = 
                 })
                 continue
 
-        # Trova SKU dal database
-        sku_found = None
+        # Converti EAN o SKU in SKU definitivo
+        sku_found = _convert_ean_to_sku(ean_or_sku, db)
         product_description = ""
 
-        ean_code = db.query(models.EanCode).filter(models.EanCode.ean == ean_or_sku).first()
-        if ean_code:
-            sku_found = ean_code.product_sku
+        if sku_found:
             product = db.query(models.Product).filter(models.Product.sku == sku_found).first()
             product_description = product.description if product else ""
         else:
-            product = db.query(models.Product).filter(models.Product.sku == ean_or_sku).first()
-            if product:
-                sku_found = product.sku
-                product_description = product.description
-
-        if not sku_found:
             errors.append({
                 "line": i+1,
                 "type": "product_not_found",
@@ -1544,32 +1555,21 @@ async def parse_unload_container_file(file: UploadFile = File(...), db: Session 
             })
             continue
         
-        # Verifica che il prodotto esista - supporta sia EAN code che SKU
-        sku_found = None
-        product = None
+        # Converti EAN o SKU in SKU definitivo
         input_code = sku  # Conserva il codice originale dal file per il logging
-        
-        # Prima prova a cercare come EAN code
-        ean_code = db.query(models.EanCode).filter(models.EanCode.ean == sku).first()
-        if ean_code:
-            sku_found = ean_code.product_sku
-            product = db.query(models.Product).filter(models.Product.sku == sku_found).first()
-        else:
-            # Altrimenti prova a cercare come SKU diretto
-            product = db.query(models.Product).filter(models.Product.sku == sku).first()
-            if product:
-                sku_found = product.sku
-        
-        if not product or not sku_found:
+        sku_found = _convert_ean_to_sku(sku, db)
+
+        if not sku_found:
             errors.append({
                 'line': line_num,
                 'input': line,
                 'error': f"Prodotto con codice '{sku}' non trovato (né come EAN né come SKU)"
             })
             continue
-            
+
         # Usa lo SKU risolto per il resto della logica
         sku = sku_found
+        product = db.query(models.Product).filter(models.Product.sku == sku).first()
         
         # Traccia il primo codice originale per questo SKU (per il recap)
         if sku not in sku_original_codes:
@@ -2666,15 +2666,17 @@ async def finalize_carico_realtime(request_data: dict, db: Session = Depends(get
 
         # 3. CONTROLLO UNICITÀ SKU (se location != TERRA)
         if location != "TERRA":
+            # IMPORTANTE: Ignora record con quantity <= 0 (record fantasma)
             existing_inventory = db.query(models.Inventory).filter(
-                models.Inventory.location_name == location
+                models.Inventory.location_name == location,
+                models.Inventory.quantity > 0
             ).first()
 
             if existing_inventory:
                 # Verifica che tutti i prodotti da aggiungere abbiano lo stesso SKU dell'esistente
                 unique_skus = set([op['product_sku'] for op in operations])
                 if existing_inventory.product_sku not in unique_skus or len(unique_skus) > 1:
-                    return {"success": False, "message": f"Ubicazione {location} contiene già {existing_inventory.product_sku}"}
+                    return {"success": False, "message": f"Ubicazione {location} contiene già {existing_inventory.product_sku} (qty: {existing_inventory.quantity})"}
 
         # 4. ESECUZIONE OPERAZIONI
         logging_service = LoggingService(db)
@@ -2984,8 +2986,10 @@ async def finalize_ubicazione_terra_realtime(
 
         # Verifica unicità SKU nella destinazione (se non è TERRA)
         if destination != "TERRA":
+            # IMPORTANTE: Ignora record con quantity <= 0 (record fantasma)
             existing_inventory = db.query(models.Inventory).filter(
-                models.Inventory.location_name == destination
+                models.Inventory.location_name == destination,
+                models.Inventory.quantity > 0
             ).first()
 
             if existing_inventory:
@@ -2998,7 +3002,7 @@ async def finalize_ubicazione_terra_realtime(
                         status_code=400,
                         content={
                             "success": False,
-                            "message": f"Ubicazione {destination} contiene già {existing_inventory.product_sku}. Non puoi posizionare altri SKU."
+                            "message": f"Ubicazione {destination} contiene già {existing_inventory.product_sku} (qty: {existing_inventory.quantity}). Non puoi posizionare altri SKU."
                         }
                     )
 
@@ -3095,3 +3099,273 @@ async def finalize_ubicazione_terra_realtime(
         db.rollback()
         logger.error(f"Errore finalizzazione ubicazione terra realtime: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Errore durante il posizionamento: {str(e)}")
+
+
+@router.post("/realtime/spostamento/finalize")
+async def finalize_spostamento_realtime(
+    request_data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Finalizza operazione Spostamento in tempo reale
+
+    Modalità:
+    - TOTAL: Sposta tutti i prodotti da origine a destinazione
+    - PARTIAL: Sposta solo prodotti specificati
+
+    Flow:
+    1. Valida ubicazioni esistono
+    2. Valida prodotti (se modalità PARTIAL)
+    3. Verifica giacenze sufficienti
+    4. Verifica unicità SKU destinazione (se non TERRA)
+    5. Sposta prodotti da origine a destinazione
+    6. Aggiorna disponibilità ubicazioni
+    7. Logga operazioni
+    """
+    try:
+        location_from = request_data.get("location_from", "").upper()
+        location_to = request_data.get("location_to", "").upper()
+        move_mode = request_data.get("move_mode", "TOTAL")
+        operations = request_data.get("operations", [])
+
+        if not location_from or not location_to:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Ubicazioni origine e destinazione richieste"}
+            )
+
+        if location_from == location_to:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "Origine e destinazione non possono essere uguali"}
+            )
+
+        # Valida ubicazione origine esiste
+        location_from_obj = db.query(models.Location).filter(
+            models.Location.name == location_from
+        ).first()
+
+        if not location_from_obj:
+            return JSONResponse(
+                status_code=404,
+                content={"success": False, "message": f"Ubicazione origine {location_from} non trovata"}
+            )
+
+        # Valida ubicazione destinazione esiste
+        location_to_obj = db.query(models.Location).filter(
+            models.Location.name == location_to
+        ).first()
+
+        if not location_to_obj:
+            return JSONResponse(
+                status_code=404,
+                content={"success": False, "message": f"Ubicazione destinazione {location_to} non trovata"}
+            )
+
+        # Query inventario origine
+        inventory_from = db.query(models.Inventory).filter(
+            models.Inventory.location_name == location_from
+        ).all()
+
+        if not inventory_from:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": f"Ubicazione {location_from} è vuota"}
+            )
+
+        # Determina prodotti da spostare
+        if move_mode == "TOTAL":
+            # Modalità totale: sposta tutto
+            products_to_move = [
+                {"product_sku": inv.product_sku, "quantity": inv.quantity}
+                for inv in inventory_from
+            ]
+        else:
+            # Modalità parziale: sposta solo prodotti specificati
+            if not operations:
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "message": "Nessun prodotto specificato per spostamento parziale"}
+                )
+
+            # Valida prodotti esistono
+            for op in operations:
+                product = db.query(models.Product).filter(
+                    models.Product.sku == op['product_sku']
+                ).first()
+
+                if not product:
+                    return JSONResponse(
+                        status_code=404,
+                        content={"success": False, "message": f"Prodotto {op['product_sku']} non trovato"}
+                    )
+
+            # Verifica giacenze sufficienti
+            for op in operations:
+                inv_record = db.query(models.Inventory).filter(
+                    models.Inventory.location_name == location_from,
+                    models.Inventory.product_sku == op['product_sku']
+                ).first()
+
+                if not inv_record:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "success": False,
+                            "message": f"Prodotto {op['product_sku']} non presente in {location_from}"
+                        }
+                    )
+
+                if inv_record.quantity < op['quantity']:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "success": False,
+                            "message": f"Giacenza insufficiente per {op['product_sku']} in {location_from}. Disponibile: {inv_record.quantity}, richiesto: {op['quantity']}"
+                        }
+                    )
+
+            products_to_move = operations
+
+        # Verifica unicità SKU destinazione (se non TERRA)
+        if location_to != "TERRA":
+            # IMPORTANTE: Ignora record con quantity <= 0 (record fantasma)
+            existing_inventory = db.query(models.Inventory).filter(
+                models.Inventory.location_name == location_to,
+                models.Inventory.quantity > 0
+            ).first()
+
+            if existing_inventory:
+                # C'è già un prodotto nella destinazione
+                unique_skus = set([p['product_sku'] for p in products_to_move])
+
+                # Se il prodotto esistente non è tra quelli che stiamo spostando, errore
+                if existing_inventory.product_sku not in unique_skus:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "success": False,
+                            "message": f"Ubicazione {location_to} contiene già {existing_inventory.product_sku} (qty: {existing_inventory.quantity}). Non puoi spostare altri SKU."
+                        }
+                    )
+
+                # Se stiamo spostando più di un SKU, errore
+                if len(unique_skus) > 1:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "success": False,
+                            "message": f"Non puoi spostare più SKU diversi nella stessa ubicazione {location_to}"
+                        }
+                    )
+
+        # Esegui spostamenti
+        logging_service = LoggingService(db)
+
+        for product_data in products_to_move:
+            product_sku = product_data['product_sku']
+            quantity = product_data['quantity']
+
+            # STEP 1: Rimuovi da origine
+            inv_from = db.query(models.Inventory).filter(
+                models.Inventory.location_name == location_from,
+                models.Inventory.product_sku == product_sku
+            ).first()
+
+            inv_from.quantity -= quantity
+
+            if inv_from.quantity == 0:
+                db.delete(inv_from)
+
+            # STEP 2: Aggiungi a destinazione
+            # Per TERRA, gestisci consolidamento automatico
+            if location_to == "TERRA":
+                terra_records = db.query(models.Inventory).filter(
+                    models.Inventory.location_name == "TERRA",
+                    models.Inventory.product_sku == product_sku
+                ).all()
+
+                if terra_records:
+                    # Consolida in primo record
+                    primary = terra_records[0]
+                    total_qty = sum(r.quantity for r in terra_records) + quantity
+                    primary.quantity = total_qty
+
+                    # Elimina duplicati
+                    for record in terra_records[1:]:
+                        db.delete(record)
+                else:
+                    # Crea nuovo record TERRA
+                    new_inv = models.Inventory(
+                        location_name="TERRA",
+                        product_sku=product_sku,
+                        quantity=quantity
+                    )
+                    db.add(new_inv)
+            else:
+                # Ubicazione normale
+                inv_to = db.query(models.Inventory).filter(
+                    models.Inventory.location_name == location_to,
+                    models.Inventory.product_sku == product_sku
+                ).first()
+
+                if inv_to:
+                    inv_to.quantity += quantity
+                else:
+                    inv_to = models.Inventory(
+                        location_name=location_to,
+                        product_sku=product_sku,
+                        quantity=quantity
+                    )
+                    db.add(inv_to)
+
+            # Log operazione
+            logging_service.log_operation(
+                operation_type=OperationType.SPOSTAMENTO_TEMPO_REALE,
+                operation_category=OperationCategory.MANUAL,
+                status=OperationStatus.SUCCESS,
+                product_sku=product_sku,
+                location_from=location_from,
+                location_to=location_to,
+                quantity=quantity,
+                details={
+                    'realtime_operation': True,
+                    'scanner_mode': True,
+                    'move_mode': move_mode
+                },
+                api_endpoint="/inventory/realtime/spostamento/finalize"
+            )
+
+        # Aggiorna disponibilità ubicazioni
+        # Origine: se vuota, marca come non disponibile
+        remaining_inventory = db.query(models.Inventory).filter(
+            models.Inventory.location_name == location_from
+        ).count()
+
+        if remaining_inventory == 0:
+            location_from_obj.available = False
+
+        # Destinazione: marca come disponibile
+        if not location_to_obj.available:
+            location_to_obj.available = True
+
+        db.commit()
+
+        total_qty = sum(p['quantity'] for p in products_to_move)
+        total_skus = len(products_to_move)
+        mode_text = "TOTALE" if move_mode == "TOTAL" else "PARZIALE"
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "message": f"Spostamento {mode_text} completato: {total_qty} pezzi ({total_skus} SKU) da {location_from} a {location_to}"
+            }
+        )
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Errore finalizzazione spostamento realtime: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore durante lo spostamento: {str(e)}")

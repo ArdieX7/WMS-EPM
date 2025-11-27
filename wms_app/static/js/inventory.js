@@ -2524,19 +2524,44 @@ function parseProductBarcode(barcodeValue) {
  * @returns {Promise<boolean>} - true se è ubicazione valida
  */
 async function validateLocation(barcodeValue) {
-    try {
-        const response = await fetch('/inventory/validate-location', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({location: barcodeValue.toUpperCase()})
-        });
+    const maxRetries = 2;
+    let lastError;
 
-        const result = await response.json();
-        return result.is_location || false;
-    } catch (error) {
-        console.error('❌ Errore validazione ubicazione:', error);
-        return false;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 sec timeout
+
+            const response = await fetch('/inventory/validate-location', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({location: barcodeValue.toUpperCase()}),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+            return result.is_location || false;
+        } catch (error) {
+            lastError = error;
+            console.warn(`⚠️ Tentativo ${attempt + 1}/${maxRetries + 1} validazione ubicazione fallito:`, error.message);
+
+            // Se non è l'ultimo tentativo, aspetta un po' prima di riprovare
+            if (attempt < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+        }
     }
+
+    // Tutti i tentativi falliti
+    console.error('❌ Validazione ubicazione fallita dopo tutti i tentativi:', lastError);
+    showRealtimeFeedback('⚠️ Errore di rete. Riprova la scansione.', '#ffc107');
+    return false;
 }
 
 /**
@@ -2545,19 +2570,50 @@ async function validateLocation(barcodeValue) {
  * @returns {Promise<string|null>} - SKU prodotto o null se non trovato
  */
 async function validateProductBarcode(barcodeValue) {
-    try {
-        const response = await fetch('/inventory/validate-barcode', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({barcode: barcodeValue})
-        });
+    const maxRetries = 2;
+    let lastError;
 
-        const result = await response.json();
-        return result.found ? result.product_sku : null;
-    } catch (error) {
-        console.error('❌ Errore validazione barcode:', error);
-        return null;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 sec timeout
+
+            const response = await fetch('/inventory/validate-barcode', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({barcode: barcodeValue}),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            // Se prodotto non trovato (ma risposta OK), ritorna subito null
+            if (!result.found) {
+                return null;
+            }
+
+            return result.product_sku;
+        } catch (error) {
+            lastError = error;
+            console.warn(`⚠️ Tentativo ${attempt + 1}/${maxRetries + 1} validazione prodotto fallito:`, error.message);
+
+            // Se non è l'ultimo tentativo, aspetta un po' prima di riprovare
+            if (attempt < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+        }
     }
+
+    // Tutti i tentativi falliti - errore di rete
+    console.error('❌ Validazione prodotto fallita dopo tutti i tentativi:', lastError);
+    showRealtimeFeedback('⚠️ Errore di rete. Riprova la scansione.', '#ffc107');
+    return null;
 }
 
 /**
@@ -2676,11 +2732,16 @@ function setupRealtimeScannerInput(inputId) {
     input.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
-            const value = this.value.trim();
-            if (value) {
-                processRealtimeBarcode(value);
-                this.value = '';
-            }
+
+            // Piccolo delay per assicurarsi che lo scanner finisca di scrivere
+            // Prima di processare il barcode
+            setTimeout(() => {
+                const value = this.value.trim();
+                if (value) {
+                    processRealtimeBarcode(value);
+                    this.value = '';
+                }
+            }, 50); // 50ms di delay
         }
     });
 }
@@ -2987,31 +3048,26 @@ function resetScaricoContainerSession() {
 // ========================================================================
 
 /**
- * Processa barcode per carico (prodotti → ubicazione)
+ * CARICO - Scansiona ubicazione → Scansiona prodotti → Premi Finalizza (come Scarico)
  * @param {string} barcodeValue - Barcode scansionato
  */
 async function processCaricoBarcode(barcodeValue) {
-    // STEP 1: Verifica se è ubicazione (trigger finalizzazione)
-    if (!realtimeSessionData.awaitingLocation) {
+    // STEP 1: Prima scansione deve essere l'ubicazione
+    if (!realtimeSessionData.location) {
         const isLocation = await validateLocation(barcodeValue);
 
-        if (isLocation) {
-            // È un'ubicazione → Finalizza
-            realtimeSessionData.awaitingLocation = true;
-            realtimeSessionData.location = barcodeValue.toUpperCase();
-
-            if (realtimeProducts.length === 0) {
-                showRealtimeFeedback('❌ Scansiona prima dei prodotti!', '#dc3545');
-                realtimeSessionData.awaitingLocation = false;
-                realtimeSessionData.location = null;
-                return;
-            }
-
-            return finalizeCarico();
+        if (!isLocation) {
+            showRealtimeFeedback('❌ Prima scansione deve essere un\'ubicazione valida!', '#dc3545');
+            return;
         }
+
+        // Salva ubicazione
+        realtimeSessionData.location = barcodeValue.toUpperCase();
+        showRealtimeFeedback(`📍 Ubicazione: ${realtimeSessionData.location}. Scansiona prodotti da caricare...`, '#007bff');
+        return;
     }
 
-    // STEP 2: È un prodotto
+    // STEP 2: È un prodotto - accumula quantità
     const parsed = parseProductBarcode(barcodeValue);
 
     // Valida che esista il prodotto
@@ -3056,9 +3112,10 @@ async function processCaricoBarcode(barcodeValue) {
     // Aggiorna display
     updateRealtimeProductList(realtimeProducts, 'scanned-products-list');
 
-    // Mostra istruzioni per ubicazione
+    // Mostra pulsante finalizza
     if (realtimeProducts.length > 0) {
-        document.getElementById('realtime-status').textContent = '📍 Ora scansiona l\'ubicazione destinazione';
+        document.getElementById('finalize-realtime-btn').style.display = 'block';
+        document.getElementById('realtime-status').textContent = '✅ Prodotti scansionati. Premi Finalizza quando pronto';
     }
 }
 
@@ -3071,6 +3128,20 @@ async function finalizeCarico() {
         return;
     }
 
+    // Se ubicazione non ancora scansionata, avvisa
+    if (!realtimeSessionData.location) {
+        showRealtimeFeedback('❌ Scansiona prima l\'ubicazione destinazione!', '#dc3545');
+        return;
+    }
+
+    // Procedi con finalizzazione
+    await executeCaricoFinalization();
+}
+
+/**
+ * Esegue la finalizzazione del carico
+ */
+async function executeCaricoFinalization() {
     if (!realtimeSessionData.location) {
         showRealtimeFeedback('❌ Ubicazione destinazione non specificata!', '#dc3545');
         return;
@@ -3184,8 +3255,8 @@ async function processScaricoBarcode(barcodeValue) {
         return;
     }
 
-    // Verifica se prodotto già scansionato
-    const existing = realtimeProducts.find(p => p.sku === parsed.sku);
+    // Verifica se prodotto già scansionato (usa validSku convertito da EAN)
+    const existing = realtimeProducts.find(p => p.sku === validSku);
 
     if (existing) {
         // Accumula quantità (come in Scarico Container e Carico)
@@ -3194,24 +3265,24 @@ async function processScaricoBarcode(barcodeValue) {
             existing.explicit_qty = (existing.explicit_qty || 0) + parsed.quantity;
             existing.scanned_count = 0;
             const totalQty = existing.explicit_qty;
-            showRealtimeFeedback(`✅ ${parsed.sku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
+            showRealtimeFeedback(`✅ ${validSku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
         } else {
             // Scansione senza qty: incrementa count
             existing.scanned_count++;
             const totalQty = existing.explicit_qty ? existing.explicit_qty + existing.scanned_count : existing.scanned_count;
-            showRealtimeFeedback(`✅ ${parsed.sku} +1 (totale: ${totalQty} pz)`, '#28a745');
+            showRealtimeFeedback(`✅ ${validSku} +1 (totale: ${totalQty} pz)`, '#28a745');
         }
     } else {
-        // Nuovo prodotto
+        // Nuovo prodotto (usa validSku convertito da EAN)
         const newProduct = {
-            sku: parsed.sku,
+            sku: validSku,
             scanned_count: parsed.has_suffix ? 0 : 1,
             explicit_qty: parsed.has_suffix ? parsed.quantity : 0
         };
         realtimeProducts.push(newProduct);
 
         const displayQty = parsed.has_suffix ? parsed.quantity : 1;
-        showRealtimeFeedback(`✅ ${parsed.sku} aggiunto (${displayQty} pz)`, '#28a745');
+        showRealtimeFeedback(`✅ ${validSku} aggiunto (${displayQty} pz)`, '#28a745');
     }
 
     // Aggiorna lista UI
@@ -3244,23 +3315,31 @@ async function processSpostamentoBarcode(barcodeValue) {
         return;
     }
 
-    // STEP 2: Determina se è ubicazione (mode totale) o prodotto (mode parziale)
+    // STEP 2: Determina se è ubicazione (destinazione) o prodotto (mode parziale)
     const isLocation = await validateLocation(barcodeValue);
 
     if (isLocation) {
-        // MODALITÀ TOTALE: Sposta tutti i prodotti
+        // È una ubicazione destinazione
         realtimeSessionData.locationTo = barcodeValue.toUpperCase();
-        realtimeSessionData.moveMode = 'TOTAL';
 
         if (realtimeSessionData.locationFrom === realtimeSessionData.locationTo) {
             showRealtimeFeedback('❌ Origine e destinazione non possono essere uguali!', '#dc3545');
             realtimeSessionData.locationTo = null;
-            realtimeSessionData.moveMode = null;
             return;
         }
 
-        // Finalizza automaticamente in modalità totale
-        return finalizeSpostamento();
+        // Se ci sono prodotti scansionati → PARTIAL, altrimenti → TOTAL
+        if (realtimeProducts.length > 0) {
+            // MODALITÀ PARZIALE: Sposta solo i prodotti scansionati
+            realtimeSessionData.moveMode = 'PARTIAL';
+            showRealtimeFeedback(`📍 Destinazione: ${realtimeSessionData.locationTo}. Premi Finalizza per confermare.`, '#007bff');
+            return finalizeSpostamento();
+        } else {
+            // MODALITÀ TOTALE: Sposta tutti i prodotti
+            realtimeSessionData.moveMode = 'TOTAL';
+            showRealtimeFeedback(`📍 Destinazione: ${realtimeSessionData.locationTo}. Spostamento TOTALE in corso...`, '#ffc107');
+            return finalizeSpostamento();
+        }
     }
 
     // MODALITÀ PARZIALE: È un prodotto - accumula
@@ -3274,8 +3353,8 @@ async function processSpostamentoBarcode(barcodeValue) {
         return;
     }
 
-    // Verifica se prodotto già scansionato
-    const existing = realtimeProducts.find(p => p.sku === parsed.sku);
+    // Verifica se prodotto già scansionato (usa validSku convertito da EAN)
+    const existing = realtimeProducts.find(p => p.sku === validSku);
 
     if (existing) {
         // Accumula quantità
@@ -3283,23 +3362,23 @@ async function processSpostamentoBarcode(barcodeValue) {
             existing.explicit_qty = (existing.explicit_qty || 0) + parsed.quantity;
             existing.scanned_count = 0;
             const totalQty = existing.explicit_qty;
-            showRealtimeFeedback(`✅ ${parsed.sku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
+            showRealtimeFeedback(`✅ ${validSku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
         } else {
             existing.scanned_count++;
             const totalQty = existing.explicit_qty ? existing.explicit_qty + existing.scanned_count : existing.scanned_count;
-            showRealtimeFeedback(`✅ ${parsed.sku} +1 (totale: ${totalQty} pz)`, '#28a745');
+            showRealtimeFeedback(`✅ ${validSku} +1 (totale: ${totalQty} pz)`, '#28a745');
         }
     } else {
-        // Nuovo prodotto
+        // Nuovo prodotto (usa validSku convertito da EAN)
         const newProduct = {
-            sku: parsed.sku,
+            sku: validSku,
             scanned_count: parsed.has_suffix ? 0 : 1,
             explicit_qty: parsed.has_suffix ? parsed.quantity : 0
         };
         realtimeProducts.push(newProduct);
 
         const displayQty = parsed.has_suffix ? parsed.quantity : 1;
-        showRealtimeFeedback(`✅ ${parsed.sku} aggiunto (${displayQty} pz). Scansiona altri prodotti o destinazione...`, '#28a745');
+        showRealtimeFeedback(`✅ ${validSku} aggiunto (${displayQty} pz). Scansiona altri prodotti o destinazione...`, '#28a745');
     }
 
     // Aggiorna lista UI
@@ -3315,28 +3394,26 @@ async function processSpostamentoBarcode(barcodeValue) {
 /**
  * POSIZIONA DA TERRA - Scansiona prodotti da TERRA → Scansiona ubicazione destinazione
  */
+/**
+ * UBICAZIONE DA TERRA - Scansiona ubicazione → Scansiona prodotti → Premi Finalizza (come Carico)
+ */
 async function processUbicazioneTerraBarcode(barcodeValue) {
-    // STEP 1: Verifica se è ubicazione (trigger finalizzazione)
-    if (!realtimeSessionData.awaitingLocation) {
+    // STEP 1: Prima scansione deve essere l'ubicazione di destinazione
+    if (!realtimeSessionData.location) {
         const isLocation = await validateLocation(barcodeValue);
 
-        if (isLocation) {
-            realtimeSessionData.awaitingLocation = true;
-            realtimeSessionData.location = barcodeValue.toUpperCase();
-
-            if (realtimeProducts.length === 0) {
-                showRealtimeFeedback('❌ Scansiona prima dei prodotti da TERRA!', '#dc3545');
-                realtimeSessionData.awaitingLocation = false;
-                realtimeSessionData.location = null;
-                return;
-            }
-
-            // Finalizza automaticamente quando viene scansionata ubicazione
-            return finalizeUbicazioneTerra();
+        if (!isLocation) {
+            showRealtimeFeedback('❌ Prima scansione deve essere un\'ubicazione valida!', '#dc3545');
+            return;
         }
+
+        // Salva ubicazione
+        realtimeSessionData.location = barcodeValue.toUpperCase();
+        showRealtimeFeedback(`📍 Ubicazione: ${realtimeSessionData.location}. Scansiona prodotti da spostare da TERRA...`, '#007bff');
+        return;
     }
 
-    // STEP 2: È un prodotto - accumula quantities
+    // STEP 2: È un prodotto - valida e accumula
     const parsed = parseProductBarcode(barcodeValue);
     const validSku = await validateProductBarcode(parsed.sku);
 
@@ -3345,8 +3422,8 @@ async function processUbicazioneTerraBarcode(barcodeValue) {
         return;
     }
 
-    // Verifica se prodotto già scansionato
-    const existing = realtimeProducts.find(p => p.sku === parsed.sku);
+    // Verifica se prodotto già scansionato (usa validSku convertito da EAN)
+    const existing = realtimeProducts.find(p => p.sku === validSku);
 
     if (existing) {
         // Accumula quantità
@@ -3354,23 +3431,23 @@ async function processUbicazioneTerraBarcode(barcodeValue) {
             existing.explicit_qty = (existing.explicit_qty || 0) + parsed.quantity;
             existing.scanned_count = 0;
             const totalQty = existing.explicit_qty;
-            showRealtimeFeedback(`✅ ${parsed.sku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
+            showRealtimeFeedback(`✅ ${validSku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
         } else {
             existing.scanned_count++;
             const totalQty = existing.explicit_qty ? existing.explicit_qty + existing.scanned_count : existing.scanned_count;
-            showRealtimeFeedback(`✅ ${parsed.sku} +1 (totale: ${totalQty} pz)`, '#28a745');
+            showRealtimeFeedback(`✅ ${validSku} +1 (totale: ${totalQty} pz)`, '#28a745');
         }
     } else {
-        // Nuovo prodotto
+        // Nuovo prodotto (usa validSku convertito da EAN)
         const newProduct = {
-            sku: parsed.sku,
+            sku: validSku,
             scanned_count: parsed.has_suffix ? 0 : 1,
             explicit_qty: parsed.has_suffix ? parsed.quantity : 0
         };
         realtimeProducts.push(newProduct);
 
         const displayQty = parsed.has_suffix ? parsed.quantity : 1;
-        showRealtimeFeedback(`✅ ${parsed.sku} aggiunto (${displayQty} pz)`, '#28a745');
+        showRealtimeFeedback(`✅ ${validSku} aggiunto (${displayQty} pz)`, '#28a745');
     }
 
     // Aggiorna lista UI
@@ -3379,6 +3456,7 @@ async function processUbicazioneTerraBarcode(barcodeValue) {
     // Mostra pulsante finalizza se ci sono prodotti
     if (realtimeProducts.length > 0) {
         document.getElementById('finalize-realtime-btn').style.display = 'block';
+        document.getElementById('realtime-status').textContent = '✅ Prodotti scansionati. Premi Finalizza quando pronto';
     }
 }
 
@@ -3461,8 +3539,140 @@ function resetScaricoSession() {
     document.getElementById('realtime-status').textContent = '📱 Pronto per la scansione...';
 }
 
+/**
+ * Finalizza operazione Spostamento
+ */
 async function finalizeSpostamento() {
-    showRealtimeFeedback('🚧 Operazione Spostamento in sviluppo...', '#ffc107');
+    if (!realtimeSessionData.locationFrom) {
+        showRealtimeFeedback('❌ Ubicazione origine non impostata!', '#dc3545');
+        return;
+    }
+
+    // In modalità parziale, richiedi destinazione se non ancora scansionata
+    if (realtimeSessionData.moveMode === 'PARTIAL' && !realtimeSessionData.locationTo) {
+        // Mostra prompt per scansionare destinazione
+        showRealtimeFeedback('📍 Scansiona ubicazione destinazione...', '#ffc107');
+
+        // Imposta flag per aspettare destinazione
+        realtimeSessionData.awaitingDestination = true;
+
+        // Listener temporaneo per catturare prossima scansione come destinazione
+        const originalHandler = document.getElementById('realtime-barcode-input').onkeypress;
+
+        document.getElementById('realtime-barcode-input').onkeypress = async function(e) {
+            if (e.key === 'Enter' && this.value.trim()) {
+                const destValue = this.value.trim();
+                this.value = '';
+
+                const isLocation = await validateLocation(destValue);
+
+                if (!isLocation) {
+                    showRealtimeFeedback('❌ Deve essere una ubicazione valida!', '#dc3545');
+                    return;
+                }
+
+                realtimeSessionData.locationTo = destValue.toUpperCase();
+
+                if (realtimeSessionData.locationFrom === realtimeSessionData.locationTo) {
+                    showRealtimeFeedback('❌ Origine e destinazione non possono essere uguali!', '#dc3545');
+                    realtimeSessionData.locationTo = null;
+                    return;
+                }
+
+                // Ripristina handler originale
+                document.getElementById('realtime-barcode-input').onkeypress = originalHandler;
+
+                // Procedi con finalizzazione
+                await executeSpostamentoFinalization();
+            }
+        };
+
+        return;
+    }
+
+    // Modalità totale o modalità parziale con destinazione già impostata
+    await executeSpostamentoFinalization();
+}
+
+/**
+ * Esegue la finalizzazione dello spostamento
+ */
+async function executeSpostamentoFinalization() {
+    const mode = realtimeSessionData.moveMode || 'TOTAL';
+
+    // Conferma operazione
+    let confirmMessage;
+    if (mode === 'TOTAL') {
+        confirmMessage = `Confermare spostamento TOTALE da ${realtimeSessionData.locationFrom} a ${realtimeSessionData.locationTo}?`;
+    } else {
+        const totalQty = realtimeProducts.reduce((sum, p) => {
+            return sum + (p.explicit_qty || 0) + p.scanned_count;
+        }, 0);
+        confirmMessage = `Confermare spostamento di ${totalQty} pezzi (${realtimeProducts.length} SKU) da ${realtimeSessionData.locationFrom} a ${realtimeSessionData.locationTo}?`;
+    }
+
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+
+    try {
+        showRealtimeFeedback('⏳ Spostamento in corso...', '#ffc107');
+
+        // Prepara payload
+        const payload = {
+            location_from: realtimeSessionData.locationFrom,
+            location_to: realtimeSessionData.locationTo,
+            move_mode: mode
+        };
+
+        // In modalità parziale, aggiungi prodotti
+        if (mode === 'PARTIAL') {
+            payload.operations = realtimeProducts.map(p => ({
+                product_sku: p.sku,
+                quantity: (p.explicit_qty || 0) + p.scanned_count
+            }));
+        }
+
+        // Chiamata API
+        const response = await fetch('/inventory/realtime/spostamento/finalize', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showRealtimeFeedback(`✅ ${result.message}`, '#28a745');
+
+            // Reset dopo successo
+            setTimeout(() => {
+                resetSpostamentoSession();
+                cancelRealtimeOperation();
+                loadInventory(); // Ricarica inventario
+            }, 1500);
+        } else {
+            showRealtimeFeedback(`❌ ${result.message}`, '#dc3545');
+        }
+    } catch (error) {
+        console.error('Errore finalizzazione spostamento:', error);
+        showRealtimeFeedback('❌ Errore durante la finalizzazione: ' + error.message, '#dc3545');
+    }
+}
+
+/**
+ * Reset sessione Spostamento
+ */
+function resetSpostamentoSession() {
+    realtimeProducts = [];
+    realtimeSessionData = {};
+    document.getElementById('scanned-products-list').innerHTML = '';
+    document.getElementById('finalize-realtime-btn').style.display = 'none';
+    document.getElementById('finalize-realtime-btn').textContent = 'Finalizza';
+    document.getElementById('realtime-barcode-input').value = '';
+    document.getElementById('realtime-status').textContent = '📱 Pronto per la scansione...';
 }
 
 /**
