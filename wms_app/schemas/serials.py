@@ -133,3 +133,20 @@ class SerialCommitRequest(BaseModel):
     file_name: str
     recap_items: List[SerialRecapItem]
     uploaded_by: Optional[str] = "file_user"
+
+# ========================================
+# REALTIME SCANNER SCHEMAS
+# ========================================
+
+class RealtimeSerialValidation(BaseModel):
+    """Richiesta validazione seriale in tempo reale"""
+    order_numbers: List[str]
+    ean_code: str
+    serial_number: str
+    scanned_serials: List[str]  # Seriali già scansionati in sessione (per check duplicati)
+    scanned_serials_detail: List[Dict[str, Any]] = []  # Dettagli completi per quantity check
+
+class RealtimeSerialCommit(BaseModel):
+    """Richiesta commit seriali scansionati in tempo reale"""
+    serials: List[Dict[str, Any]]  # [{order_number, ean_code, serial_number, product_sku}]
+    uploaded_by: str

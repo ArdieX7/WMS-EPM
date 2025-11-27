@@ -664,11 +664,225 @@ async def commit_serial_operations(
     try:
         serial_service = SerialService(db)
         result = serial_service.commit_serial_operations(request)
-        
+
         if not result.success:
             raise HTTPException(status_code=400, detail=result.message)
-        
+
         return result
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore durante il commit: {str(e)}")
+
+# ========================================
+# REALTIME SCANNER ENDPOINTS
+# ========================================
+
+@router.get("/open-orders-for-scanning")
+async def get_open_orders_for_scanning(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("serials_view"))
+):
+    """
+    Ritorna ordini aperti con prodotti attesi per scansione real-time
+    """
+    try:
+        from wms_app.models.orders import Order
+        from wms_app.models.serials import ProductSerial
+
+        # Query ordini aperti
+        orders = db.query(Order).filter(
+            Order.is_completed == False,
+            Order.is_archived == False,
+            Order.is_cancelled == False
+        ).all()
+
+        result = []
+        for order in orders:
+            # Conta seriali già caricati per questo ordine
+            existing_serials = db.query(ProductSerial).filter(
+                ProductSerial.order_number == order.order_number
+            ).count()
+
+            # Prodotti attesi
+            expected_products = {}
+            total_expected = 0
+            for line in order.lines:
+                expected_products[line.product_sku] = {
+                    "quantity": line.requested_quantity,
+                    "product_name": line.product.name if line.product else line.product_sku
+                }
+                total_expected += line.requested_quantity
+
+            result.append({
+                "order_number": order.order_number,
+                "customer_name": order.customer_name,
+                "expected_products": expected_products,
+                "total_expected": total_expected,
+                "serials_loaded": existing_serials,
+                "is_complete": existing_serials >= total_expected
+            })
+
+        return {"orders": result}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore caricamento ordini: {str(e)}")
+
+@router.post("/validate-serial-realtime")
+async def validate_serial_realtime(
+    request: schemas.serials.RealtimeSerialValidation,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("serials_manage"))
+):
+    """
+    Valida un singolo seriale in tempo reale durante scansione
+    """
+    try:
+        serial_service = SerialService(db)
+
+        # 1. Verifica EAN valido
+        ean_to_sku = serial_service._build_ean_to_sku_map()
+        if request.ean_code not in ean_to_sku:
+            return {
+                "valid": False,
+                "sku": None,
+                "order_number": None,
+                "error": "EAN non trovato nel database",
+                "status": "invalid_ean"
+            }
+
+        sku = ean_to_sku[request.ean_code]
+
+        # 2. Verifica SKU appartiene a uno degli ordini selezionati
+        orders_cache = serial_service._build_orders_cache(request.order_numbers)
+        matched_order = None
+        for order_num in request.order_numbers:
+            if order_num in orders_cache:
+                expected_skus = orders_cache[order_num]['expected_products'].keys()
+                if sku in expected_skus:
+                    matched_order = order_num
+                    break
+
+        if not matched_order:
+            return {
+                "valid": False,
+                "sku": sku,
+                "order_number": None,
+                "error": f"SKU {sku} non trovato negli ordini selezionati",
+                "status": "wrong_order"
+            }
+
+        # 3. Verifica duplicato in sessione corrente
+        if request.serial_number in request.scanned_serials:
+            return {
+                "valid": False,
+                "sku": sku,
+                "order_number": matched_order,
+                "error": "Seriale già scansionato in questa sessione",
+                "status": "duplicate_in_session"
+            }
+
+        # 4. Verifica duplicato nel database
+        existing_serial = serial_service.check_serial_exists(request.serial_number)
+        if existing_serial:
+            return {
+                "valid": False,
+                "sku": sku,
+                "order_number": matched_order,
+                "error": f"Seriale già esistente nell'ordine {existing_serial.order_number}",
+                "status": "duplicate_in_db"
+            }
+
+        # 5. Verifica quantità non superata
+        session_count = sum(1 for s in request.scanned_serials_detail
+                           if s.get('sku') == sku and s.get('order_number') == matched_order)
+
+        from wms_app.models.serials import ProductSerial
+        db_count = db.query(ProductSerial).filter(
+            ProductSerial.order_number == matched_order,
+            ProductSerial.product_sku == sku
+        ).count()
+
+        expected_qty = orders_cache[matched_order]['expected_products'][sku]
+        total_count = session_count + db_count + 1  # +1 per seriale corrente
+
+        if total_count > expected_qty:
+            return {
+                "valid": False,
+                "sku": sku,
+                "order_number": matched_order,
+                "error": f"Quantità superata per {sku}: {total_count}/{expected_qty}",
+                "status": "excess_quantity",
+                "warning": True  # Flag per permettere override se necessario
+            }
+
+        # ✅ VALIDO
+        return {
+            "valid": True,
+            "sku": sku,
+            "order_number": matched_order,
+            "error": None,
+            "status": "ok",
+            "progress": f"{total_count}/{expected_qty}"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore validazione: {str(e)}")
+
+@router.post("/commit-realtime-serials")
+async def commit_realtime_serials(
+    request: schemas.serials.RealtimeSerialCommit,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("serials_manage"))
+):
+    """
+    Salva seriali scansionati in tempo reale
+    """
+    try:
+        from wms_app.models.serials import ProductSerial
+        from wms_app.services.logging_service import LoggingService
+        from datetime import datetime
+
+        # Genera batch ID univoco per questa sessione
+        upload_batch_id = f"realtime_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+        # Inserisci seriali
+        inserted_count = 0
+        for serial in request.serials:
+            new_serial = ProductSerial(
+                order_number=serial['order_number'],
+                product_sku=serial['sku'],
+                ean_code=serial['ean_code'],
+                serial_number=serial['serial_number'],
+                upload_batch_id=upload_batch_id,
+                uploaded_by=request.uploaded_by,
+                is_validated=False,
+                validation_status="pending"
+            )
+            db.add(new_serial)
+            inserted_count += 1
+
+        db.commit()
+
+        # Log operazione
+        logging_service = LoggingService(db)
+        logging_service.log_serial_operation(
+            operation_type="SCAN_REALTIME",
+            operation_category="MANUAL",
+            details={
+                "serials_count": inserted_count,
+                "upload_batch_id": upload_batch_id,
+                "orders": list(set([s['order_number'] for s in request.serials]))
+            },
+            file_name=None,
+            user_name=request.uploaded_by
+        )
+
+        return {
+            "success": True,
+            "inserted_count": inserted_count,
+            "upload_batch_id": upload_batch_id
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore salvataggio: {str(e)}")

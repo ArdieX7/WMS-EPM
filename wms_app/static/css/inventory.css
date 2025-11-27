@@ -1583,6 +1583,80 @@ tr:hover {
     background: #ffe5e5;
 }
 
+/* Quantità cliccabile - EDIT MODE */
+.realtime-product-qty.clickable {
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.realtime-product-qty.clickable:hover {
+    background: #e0e7ff;
+    box-shadow: 0 0 0 2px #6366f1;
+}
+
+.realtime-product-item.editing {
+    background: #f0f9ff;
+    border-left-color: #3b82f6;
+}
+
+.realtime-qty-edit {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.realtime-qty-input {
+    width: 80px;
+    padding: 0.4rem 0.6rem;
+    border: 2px solid #3b82f6;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-weight: bold;
+    text-align: center;
+    outline: none;
+}
+
+.realtime-qty-input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.realtime-qty-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 4px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.realtime-qty-btn.save {
+    background: #10b981;
+    color: white;
+}
+
+.realtime-qty-btn.save:hover {
+    background: #059669;
+    transform: scale(1.1);
+}
+
+.realtime-qty-btn.cancel {
+    background: #ef4444;
+    color: white;
+}
+
+.realtime-qty-btn.cancel:hover {
+    background: #dc2626;
+    transform: scale(1.1);
+}
+
 /* Scanner Actions */
 .scanner-actions {
     display: flex;

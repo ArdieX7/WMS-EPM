@@ -2662,16 +2662,117 @@ function updateRealtimeProductList(products, containerId) {
 
     container.innerHTML = products.map((p, index) => {
         const displayQty = (p.explicit_qty || 0) + (p.scanned_count || 0) || p.quantity || 1;
+
+        // Check if this product is in edit mode
+        if (p._isEditing) {
+            return `
+                <div class="realtime-product-item editing" data-index="${index}">
+                    <span class="realtime-product-sku"><strong>${p.sku}</strong></span>
+                    <div class="realtime-qty-edit">
+                        <input type="number"
+                               id="qty-edit-${index}"
+                               class="realtime-qty-input"
+                               value="${displayQty}"
+                               min="1"
+                               step="1"
+                               inputmode="numeric"
+                               onkeypress="if(event.key==='Enter') saveRealtimeQuantity(${index})">
+                        <button class="realtime-qty-btn save" onclick="saveRealtimeQuantity(${index})" title="Salva">✓</button>
+                        <button class="realtime-qty-btn cancel" onclick="cancelRealtimeQuantityEdit(${index})" title="Annulla">✕</button>
+                    </div>
+                </div>
+            `;
+        }
+
         return `
             <div class="realtime-product-item" data-index="${index}">
                 <span class="realtime-product-sku"><strong>${p.sku}</strong></span>
-                <span class="realtime-product-qty">${displayQty} pz</span>
+                <span class="realtime-product-qty clickable"
+                      onclick="editRealtimeQuantity(${index}, ${displayQty})"
+                      title="Clicca per modificare">
+                    ${displayQty} pz ✏️
+                </span>
                 <button class="realtime-product-remove" onclick="removeRealtimeProduct(${index})" title="Rimuovi">
                     ❌
                 </button>
             </div>
         `;
     }).join('');
+}
+
+/**
+ * Attiva modalità modifica quantità per un prodotto
+ * @param {number} index - Indice prodotto in realtimeProducts[]
+ * @param {number} currentQty - Quantità attuale visualizzata
+ */
+function editRealtimeQuantity(index, currentQty) {
+    if (index >= 0 && index < realtimeProducts.length) {
+        // Imposta flag editing
+        realtimeProducts[index]._isEditing = true;
+        realtimeProducts[index]._originalQty = currentQty;
+
+        // Ri-render lista
+        updateRealtimeProductList(realtimeProducts, 'scanned-products-list');
+
+        // Auto-focus sull'input
+        setTimeout(() => {
+            const input = document.getElementById(`qty-edit-${index}`);
+            if (input) {
+                input.focus();
+                input.select();
+            }
+        }, 50);
+    }
+}
+
+/**
+ * Salva la quantità modificata
+ * @param {number} index - Indice prodotto in realtimeProducts[]
+ */
+function saveRealtimeQuantity(index) {
+    if (index >= 0 && index < realtimeProducts.length) {
+        const input = document.getElementById(`qty-edit-${index}`);
+        if (!input) return;
+
+        const newQty = parseInt(input.value);
+
+        // Validazione
+        if (isNaN(newQty) || newQty < 1) {
+            showRealtimeFeedback('⚠️ Quantità non valida (minimo 1)', '#dc3545');
+            input.focus();
+            return;
+        }
+
+        // Aggiorna il prodotto: imposta explicit_qty e azzera scanned_count
+        realtimeProducts[index].explicit_qty = newQty;
+        realtimeProducts[index].scanned_count = 0;
+        realtimeProducts[index]._isEditing = false;
+        delete realtimeProducts[index]._originalQty;
+
+        // Ri-render lista
+        updateRealtimeProductList(realtimeProducts, 'scanned-products-list');
+
+        // Feedback positivo
+        showRealtimeFeedback(`✅ Quantità ${realtimeProducts[index].sku} aggiornata a ${newQty}`, '#28a745');
+    }
+}
+
+/**
+ * Annulla la modifica quantità
+ * @param {number} index - Indice prodotto in realtimeProducts[]
+ */
+function cancelRealtimeQuantityEdit(index) {
+    if (index >= 0 && index < realtimeProducts.length) {
+        // Rimuovi flag editing
+        realtimeProducts[index]._isEditing = false;
+        delete realtimeProducts[index]._originalQty;
+
+        // Ri-render lista
+        updateRealtimeProductList(realtimeProducts, 'scanned-products-list');
+
+        // Feedback
+        showRealtimeFeedback('↩️ Modifica annullata', '#6c757d');
+    }
 }
 
 /**
@@ -2718,7 +2819,9 @@ function setupRealtimeScannerInput(inputId) {
         input.addEventListener('blur', function() {
             setTimeout(() => {
                 const overlayVisible = document.getElementById('realtime-scanner-interface')?.style.display !== 'none';
-                if (overlayVisible) {
+                // NON refocus se l'utente sta editando una quantità
+                const qtyEditActive = document.querySelector('.realtime-qty-input');
+                if (overlayVisible && !qtyEditActive) {
                     this.focus();
                     if (!this.value) {
                         this.readOnly = true;
@@ -2925,15 +3028,14 @@ async function processScaricoContainerBarcode(barcodeValue) {
     if (existing) {
         // Scarico Container: SEMPRE accumula quantità (anche qty esplicite multiple)
         if (parsed.has_suffix) {
-            // Scansione con qty esplicita: aggiungi alla qty esplicita totale
+            // Scansione con qty esplicita: aggiungi alla qty esplicita totale (NON resettare scanned_count!)
             existing.explicit_qty = (existing.explicit_qty || 0) + parsed.quantity;
-            existing.scanned_count = 0; // Reset count perché usiamo explicit_qty
-            const totalQty = existing.explicit_qty;
+            const totalQty = (existing.explicit_qty || 0) + (existing.scanned_count || 0);
             showRealtimeFeedback(`✅ ${parsed.sku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
         } else {
             // Scansione senza qty: incrementa count
-            existing.scanned_count++;
-            const totalQty = existing.explicit_qty ? existing.explicit_qty + existing.scanned_count : existing.scanned_count;
+            existing.scanned_count = (existing.scanned_count || 0) + 1;
+            const totalQty = (existing.explicit_qty || 0) + existing.scanned_count;
             showRealtimeFeedback(`✅ ${parsed.sku} +1 (totale: ${totalQty} pz)`, '#28a745');
         }
     } else {
@@ -3089,12 +3191,11 @@ async function processCaricoBarcode(barcodeValue) {
         // Accumula quantità (come Scarico Container)
         if (parsed.has_suffix) {
             existing.explicit_qty = (existing.explicit_qty || 0) + parsed.quantity;
-            existing.scanned_count = 0;
-            const totalQty = existing.explicit_qty;
+            const totalQty = (existing.explicit_qty || 0) + (existing.scanned_count || 0);
             showRealtimeFeedback(`✅ ${parsed.sku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
         } else {
-            existing.scanned_count++;
-            const totalQty = existing.explicit_qty ? existing.explicit_qty + existing.scanned_count : existing.scanned_count;
+            existing.scanned_count = (existing.scanned_count || 0) + 1;
+            const totalQty = (existing.explicit_qty || 0) + existing.scanned_count;
             showRealtimeFeedback(`✅ ${parsed.sku} +1 (totale: ${totalQty} pz)`, '#28a745');
         }
     } else {
@@ -3261,15 +3362,14 @@ async function processScaricoBarcode(barcodeValue) {
     if (existing) {
         // Accumula quantità (come in Scarico Container e Carico)
         if (parsed.has_suffix) {
-            // Scansione con qty esplicita: aggiungi
+            // Scansione con qty esplicita: aggiungi (NON resettare scanned_count!)
             existing.explicit_qty = (existing.explicit_qty || 0) + parsed.quantity;
-            existing.scanned_count = 0;
-            const totalQty = existing.explicit_qty;
+            const totalQty = (existing.explicit_qty || 0) + (existing.scanned_count || 0);
             showRealtimeFeedback(`✅ ${validSku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
         } else {
             // Scansione senza qty: incrementa count
-            existing.scanned_count++;
-            const totalQty = existing.explicit_qty ? existing.explicit_qty + existing.scanned_count : existing.scanned_count;
+            existing.scanned_count = (existing.scanned_count || 0) + 1;
+            const totalQty = (existing.explicit_qty || 0) + existing.scanned_count;
             showRealtimeFeedback(`✅ ${validSku} +1 (totale: ${totalQty} pz)`, '#28a745');
         }
     } else {
@@ -3360,12 +3460,11 @@ async function processSpostamentoBarcode(barcodeValue) {
         // Accumula quantità
         if (parsed.has_suffix) {
             existing.explicit_qty = (existing.explicit_qty || 0) + parsed.quantity;
-            existing.scanned_count = 0;
-            const totalQty = existing.explicit_qty;
+            const totalQty = (existing.explicit_qty || 0) + (existing.scanned_count || 0);
             showRealtimeFeedback(`✅ ${validSku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
         } else {
-            existing.scanned_count++;
-            const totalQty = existing.explicit_qty ? existing.explicit_qty + existing.scanned_count : existing.scanned_count;
+            existing.scanned_count = (existing.scanned_count || 0) + 1;
+            const totalQty = (existing.explicit_qty || 0) + existing.scanned_count;
             showRealtimeFeedback(`✅ ${validSku} +1 (totale: ${totalQty} pz)`, '#28a745');
         }
     } else {
@@ -3429,12 +3528,11 @@ async function processUbicazioneTerraBarcode(barcodeValue) {
         // Accumula quantità
         if (parsed.has_suffix) {
             existing.explicit_qty = (existing.explicit_qty || 0) + parsed.quantity;
-            existing.scanned_count = 0;
-            const totalQty = existing.explicit_qty;
+            const totalQty = (existing.explicit_qty || 0) + (existing.scanned_count || 0);
             showRealtimeFeedback(`✅ ${validSku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
         } else {
-            existing.scanned_count++;
-            const totalQty = existing.explicit_qty ? existing.explicit_qty + existing.scanned_count : existing.scanned_count;
+            existing.scanned_count = (existing.scanned_count || 0) + 1;
+            const totalQty = (existing.explicit_qty || 0) + existing.scanned_count;
             showRealtimeFeedback(`✅ ${validSku} +1 (totale: ${totalQty} pz)`, '#28a745');
         }
     } else {
