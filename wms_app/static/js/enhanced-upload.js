@@ -94,6 +94,12 @@ class EnhancedUpload {
 
     createDragDropZone() {
         return `
+            <!-- Pulsante Mobile (visibile solo su mobile) -->
+            <button type="button" class="mobile-file-select-btn" id="${this.containerId}-mobile-browse">
+                📂 Seleziona File da Dispositivo
+            </button>
+
+            <!-- Drag & Drop Zone (nascosta su mobile) -->
             <div class="drag-drop-zone" id="${this.containerId}-dropzone">
                 <div class="drag-drop-content">
                     <div class="drag-drop-icon">📁</div>
@@ -161,10 +167,18 @@ class EnhancedUpload {
             fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         }
 
-        // Browse Button
+        // Browse Button (Desktop)
         const browseButton = this.container.querySelector(`#${this.containerId}-browse`);
         if (browseButton && fileInput) {
             browseButton.addEventListener('click', () => fileInput.click());
+        }
+
+        // Mobile Browse Button
+        const mobileBrowseButton = this.container.querySelector(`#${this.containerId}-mobile-browse`);
+        if (mobileBrowseButton && fileInput) {
+            mobileBrowseButton.addEventListener('click', () => {
+                fileInput.click();
+            });
         }
 
         // Drag & Drop
@@ -211,10 +225,10 @@ class EnhancedUpload {
         const processButton = this.container.querySelector(`#${this.containerId}-process-scanner`);
         const clearButton = this.container.querySelector(`#${this.containerId}-clear-scanner`);
         const scannerInput = this.container.querySelector(`#${this.containerId}-scanner-input`);
-        
+
         if (processButton && scannerInput) {
             processButton.addEventListener('click', () => this.processScanner());
-            
+
             // Auto-resize textarea
             scannerInput.addEventListener('input', (e) => {
                 e.target.style.height = 'auto';
@@ -228,6 +242,50 @@ class EnhancedUpload {
                     this.processScanner();
                 }
             });
+
+            // NUOVO: Modalità scanner-friendly per mobile
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                             || window.innerWidth < 768;
+
+            if (isMobile && this.options.enableScanner) {
+                // SOLO inputmode="none" per bloccare tastiera, NO readOnly
+                // Questo permette input da scanner hardware mantenendo la tastiera chiusa
+                scannerInput.setAttribute('inputmode', 'none');
+                scannerInput.removeAttribute('readonly');
+
+                // Visual feedback: mostra quando scanner è attivo
+                scannerInput.addEventListener('focus', function() {
+                    this.style.borderColor = '#28a745';
+                    this.style.background = '#f0fff4';
+                });
+
+                // Auto-refocus quando perde focus (mantiene scanner sempre pronto)
+                scannerInput.addEventListener('blur', function() {
+                    // Reset colori
+                    this.style.borderColor = '#007bff';
+                    this.style.background = '#f8f9ff';
+
+                    // Auto-refocus se modalità scanner ancora attiva
+                    setTimeout(() => {
+                        const modeElement = this.closest('.upload-mode');
+                        if (modeElement && modeElement.classList.contains('active')) {
+                            this.focus();
+                        }
+                    }, 100);
+                });
+
+                // Autofocus immediato quando viene mostrato
+                setTimeout(() => {
+                    if (this.currentMode === 'scanner') {
+                        scannerInput.focus();
+                    }
+                }, 150);
+
+                // Click/tap: assicura focus
+                scannerInput.addEventListener('click', function() {
+                    this.focus();
+                });
+            }
         }
 
         if (clearButton) {

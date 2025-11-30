@@ -49,6 +49,7 @@
         <div class="inventory-section" data-permission="inventory_vehicle_unload">
             <h2 class="section-title">🚛 Gestione Scarico Mezzi</h2>
             <div class="action-buttons">
+                <button class="action-btn realtime" onclick="openOverlay('realtime-operations-overlay')" data-permission="inventory_manage">⚡ Operazioni in Tempo Reale</button>
                 <button class="action-btn" onclick="openOverlay('manual-operations-overlay')" data-permission="inventory_manage">⚙️ Operazioni Manuali</button>
                 <button class="action-btn" onclick="openOverlay('file-operations-overlay')" data-permission="inventory_manage">📁 Operazioni da File</button>
                 <button class="action-btn truck" onclick="openOverlay('unload-container-overlay')" data-permission="warehouse_manage">📦 Scarico Container</button>
@@ -771,6 +772,81 @@
             <div class="modal-actions">
                 <button id="cancel-import-button" class="btn-secondary">Annulla</button>
                 <button id="confirm-import-button" class="btn-primary">Conferma e Importa</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay Operazioni in Tempo Reale - Menu Principale -->
+    <div id="realtime-operations-overlay" class="overlay">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>⚡ Operazioni in Tempo Reale</h3>
+                <button class="overlay-close" onclick="closeOverlay('realtime-operations-overlay')">&times;</button>
+            </div>
+
+            <div class="realtime-operations-menu">
+                <p class="realtime-menu-description">
+                    Seleziona l'operazione da eseguire con la pistola scanner
+                </p>
+
+                <div class="realtime-op-buttons">
+                    <button class="realtime-op-button" onclick="startRealtimeOperation('CARICO')">
+                        <span class="op-icon">🔼</span>
+                        <span class="op-name">Carico</span>
+                        <span class="op-desc">Ubicazione → Prodotti → Finalizza</span>
+                    </button>
+
+                    <button class="realtime-op-button" onclick="startRealtimeOperation('SPOSTAMENTO')">
+                        <span class="op-icon">🔄</span>
+                        <span class="op-name">Spostamento</span>
+                        <span class="op-desc">Scansiona origine → Prodotti/ubicazione</span>
+                    </button>
+
+                    <button class="realtime-op-button" onclick="startRealtimeOperation('SCARICO')">
+                        <span class="op-icon">🔽</span>
+                        <span class="op-name">Scarico</span>
+                        <span class="op-desc">Scansiona ubicazione → Scansiona prodotti</span>
+                    </button>
+
+                    <button class="realtime-op-button" onclick="startRealtimeOperation('SCARICO_CONTAINER')">
+                        <span class="op-icon">📦</span>
+                        <span class="op-name">Scarico Container</span>
+                        <span class="op-desc">Scansiona prodotti → Vanno a TERRA</span>
+                    </button>
+
+                    <button class="realtime-op-button" onclick="startRealtimeOperation('UBICAZIONE_TERRA')">
+                        <span class="op-icon">📍</span>
+                        <span class="op-name">Posiziona da TERRA</span>
+                        <span class="op-desc">Ubicazione → Prodotti → Finalizza</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interfaccia Scanner (condivisa da tutte le operazioni) -->
+    <div id="realtime-scanner-interface" class="overlay" style="display:none;">
+        <div class="overlay-content scanner-container">
+            <div class="scanner-header">
+                <h3 id="scanner-title">⚡ Operazione in Tempo Reale</h3>
+                <button class="overlay-close" onclick="cancelRealtimeOperation()">❌ Annulla</button>
+            </div>
+
+            <div id="realtime-feedback" class="realtime-feedback"></div>
+            <div id="realtime-status" class="realtime-status">📱 Pronto per la scansione...</div>
+
+            <input type="text"
+                   id="realtime-barcode-input"
+                   class="scanner-input"
+                   placeholder="Scansiona barcode..."
+                   autocomplete="off" />
+
+            <div id="scanned-products-list" class="scanned-products-list"></div>
+
+            <div class="scanner-actions">
+                <button id="finalize-realtime-btn" class="btn-primary" onclick="finalizeRealtimeOperation()" style="display:none;">
+                    ✅ Finalizza Operazione
+                </button>
             </div>
         </div>
     </div>

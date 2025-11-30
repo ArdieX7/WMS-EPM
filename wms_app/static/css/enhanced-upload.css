@@ -371,37 +371,89 @@
     animation: pulse 0.3s ease-in-out;
 }
 
+/* Mobile File Selection Button */
+.mobile-file-select-btn {
+    display: none;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .enhanced-upload-container {
         padding: 1.5rem;
     }
-    
+
     .enhanced-upload-header {
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .upload-mode-toggle {
         order: -1;
     }
-    
+
+    /* Su mobile, nascondi drag-drop e mostra solo pulsante grande */
     .drag-drop-zone {
-        padding: 1.5rem;
+        display: none;
     }
-    
+
+    /* Mostra pulsante mobile */
+    .mobile-file-select-btn {
+        display: block;
+        width: 100%;
+        padding: 1.5rem;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        margin-bottom: 1rem;
+        text-align: center;
+        transition: background 0.2s ease;
+    }
+
+    .mobile-file-select-btn:active {
+        background: #0056b3;
+        transform: scale(0.98);
+    }
+
+    /* Scanner ottimizzato per mobile */
+    .scanner-textarea {
+        min-height: 300px;
+        font-size: 1rem;
+        padding: 1.25rem;
+        border-width: 3px;
+        border-color: #007bff;
+        background: #f8f9ff;
+    }
+
+    .scanner-textarea::placeholder {
+        font-size: 0.95rem;
+    }
+
+    .scanner-info {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #007bff;
+    }
+
     .scanner-controls {
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .scanner-buttons {
         justify-content: stretch;
+        gap: 0.5rem;
     }
-    
+
     .scanner-button {
         flex: 1;
         text-align: center;
+        padding: 1rem;
+        font-size: 1rem;
+        font-weight: 600;
     }
 }
 

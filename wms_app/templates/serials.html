@@ -51,8 +51,12 @@
                     <button class="serials-action-btn" onclick="openSerialUploadOverlay()" data-permission="serials_manage">
                         📤 Carica File Seriali
                     </button>
-                    <button class="serials-action-btn secondary" onclick="exportAllSerialsExcel()" data-permission="serials_view">
+                    <button class="serials-action-btn secondary mobile-hide" onclick="exportAllSerialsExcel()" data-permission="serials_view">
                         📈 Esporta Tutti Excel
+                    </button>
+                    <!-- MOBILE ONLY: Scansione Real-Time -->
+                    <button class="serials-action-btn mobile-only" onclick="openOrderSelectionModal()" data-permission="serials_manage" style="display: none;">
+                        📷 Scansione Real-Time
                     </button>
                 </div>
             </div>
@@ -62,13 +66,13 @@
         <div class="serials-sections">
             <div class="serials-section" data-permission="serials_view">
                 <h2 class="serials-section-title">📋 Ordini con Seriali Caricati</h2>
-                
+
                 <!-- Controlli ricerca e azioni -->
                 <div class="serials-action-buttons" style="margin-bottom: 1.5rem; align-items: center; gap: 1rem;">
-                    <input type="text" id="search-order" placeholder="🔍 Cerca numero ordine..." 
+                    <input type="text" id="search-order" placeholder="🔍 Cerca numero ordine..."
                            style="padding: 0.5rem; border: 2px solid #dee2e6; border-radius: 6px; font-size: 1rem; min-width: 250px;">
                     <button onclick="refreshOrdersList()" class="serials-action-btn secondary">🔄 Aggiorna Lista</button>
-                    <button onclick="clearSearch()" class="serials-action-btn secondary">✖ Pulisci Ricerca</button>
+                    <button onclick="clearSearch()" class="serials-action-btn secondary mobile-hide">✖ Pulisci Ricerca</button>
                 </div>
 
                 <div class="table-container">
@@ -90,7 +94,7 @@
                         </thead>
                         <tbody id="ordersTableBody">
                             {% for order in orders_with_serials %}
-                            <tr>
+                            <tr data-order-status="{{ order.order_status if order.order_exists else 'not_found' }}">
                                 <td><strong>{{ order.order_number }}</strong></td>
                                 <td>
                                     {% if order.order_exists %}
@@ -133,28 +137,28 @@
                                     {% endif %}
                                 </td>
                                 <td class="actions">
-                                    <button onclick="viewOrderDetails('{{ order.order_number }}')" 
+                                    <button onclick="viewOrderDetails('{{ order.order_number }}')"
                                             class="btn btn-small btn-info" title="Visualizza Dettagli">
                                         👁️ Dettagli
                                     </button>
-                                    <button onclick="validateOrder('{{ order.order_number }}')" 
-                                            class="btn btn-small btn-warning" title="Valida Seriali">
+                                    <button onclick="validateOrder('{{ order.order_number }}')"
+                                            class="btn btn-small btn-warning mobile-hide" title="Valida Seriali">
                                         ✅ Valida
                                     </button>
-                                    <button onclick="generateOrderPDF('{{ order.order_number }}')" 
-                                            class="btn btn-small btn-success" title="Genera PDF">
+                                    <button onclick="generateOrderPDF('{{ order.order_number }}')"
+                                            class="btn btn-small btn-success mobile-hide" title="Genera PDF">
                                         📄 PDF
                                     </button>
-                                    <button onclick="generateOrderCSV('{{ order.order_number }}')" 
-                                            class="btn btn-small btn-primary" title="Esporta CSV">
+                                    <button onclick="generateOrderCSV('{{ order.order_number }}')"
+                                            class="btn btn-small btn-primary mobile-hide" title="Esporta CSV">
                                         📊 CSV
                                     </button>
-                                    <button onclick="generateOrderExcel('{{ order.order_number }}')" 
-                                            class="btn btn-small btn-info" title="Esporta Excel">
+                                    <button onclick="generateOrderExcel('{{ order.order_number }}')"
+                                            class="btn btn-small btn-info mobile-hide" title="Esporta Excel">
                                         📈 Excel
                                     </button>
-                                    <button onclick="deleteOrderSerials('{{ order.order_number }}')" 
-                                            class="btn btn-small btn-danger" title="Elimina Seriali">
+                                    <button onclick="deleteOrderSerials('{{ order.order_number }}')"
+                                            class="btn btn-small btn-danger mobile-hide" title="Elimina Seriali">
                                         🗑️ Elimina
                                     </button>
                                 </td>
@@ -352,6 +356,95 @@ SN100</code></pre>
                 </div>
                 <div class="modal-footer">
                     <button onclick="closeValidationModal()" class="btn btn-secondary">Chiudi</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================
+             REALTIME SCANNER - MOBILE ONLY
+             ======================================== -->
+
+        <!-- Overlay Scanner Full-Screen -->
+        <div id="realtime-scanner-overlay" class="overlay" style="display: none;">
+            <div class="scanner-content">
+                <!-- Header -->
+                <div class="scanner-header">
+                    <h2>📷 Scansione Seriali</h2>
+                    <button class="close-btn" onclick="closeRealtimeScanner()">✕</button>
+                </div>
+
+                <!-- Body Scrollabile -->
+                <div class="scanner-body">
+                    <!-- 1. Ordini Selezionati -->
+                    <div class="section">
+                        <h3>📋 Ordini Attivi</h3>
+                        <div id="scanner-orders-list"></div>
+                    </div>
+
+                    <!-- 2. Input Scansione -->
+                    <div class="section scan-input-section">
+                        <label>🔍 Scansiona Barcode</label>
+                        <input type="text"
+                               id="scanner-barcode-input"
+                               placeholder="SCANSIONA EAN"
+                               autofocus
+                               autocomplete="off"
+                               inputmode="none"
+                               readonly>
+                        <div id="scan-feedback" class="scan-feedback"></div>
+                    </div>
+
+                    <!-- 3. Tracker Prodotti -->
+                    <div class="section">
+                        <h3>📦 Prodotti da Scansionare</h3>
+                        <div id="products-tracker-list"></div>
+                    </div>
+
+                    <!-- 4. Log Seriali Validi -->
+                    <div class="section">
+                        <h3>✅ Seriali Validi (<span id="valid-count">0</span>)</h3>
+                        <div id="scanned-serials-log"></div>
+                    </div>
+
+                    <!-- 5. Log Errori -->
+                    <div class="section" id="errors-section" style="display: none;">
+                        <h3>❌ Errori (<span id="error-count">0</span>)</h3>
+                        <div id="scan-errors-log"></div>
+                    </div>
+                </div>
+
+                <!-- Footer Azioni -->
+                <div class="scanner-footer">
+                    <button class="btn btn-success btn-lg"
+                            onclick="closeRealtimeScanner()">
+                        ✓ Chiudi Scanner
+                    </button>
+                    <div style="font-size: 0.9rem; color: #28a745; margin-top: 8px;">
+                        💾 Salvataggio automatico attivo
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Selezione Ordini -->
+        <div id="order-selection-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Seleziona Ordini da Lavorare</h3>
+                    <span class="close" onclick="closeOrderSelectionModal()">✕</span>
+                </div>
+                <div class="modal-body">
+                    <input type="text"
+                           id="search-open-orders"
+                           placeholder="🔍 Cerca ordine..."
+                           style="width: 100%; margin-bottom: 12px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <div id="open-orders-list" class="orders-checklist"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary btn-lg"
+                            onclick="startRealtimeScanner()">
+                        🚀 Inizia Scansione
+                    </button>
                 </div>
             </div>
         </div>

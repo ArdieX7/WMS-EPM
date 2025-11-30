@@ -1069,6 +1069,20 @@ body {
     align-items: center;
 }
 
+/* ========================================
+   REALTIME SCANNER - BASE STYLES
+   ======================================== */
+
+.mobile-only {
+    display: none;
+}
+
+#realtime-scanner-overlay .scanner-content {
+    background: white;
+    display: flex;
+    flex-direction: column;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     body {
@@ -1111,6 +1125,691 @@ body {
     .format-toggle-btn {
         width: 100%;
         justify-content: center;
+    }
+
+    /* ========== MOBILE OPTIMIZATION - TABLE COLUMNS ========== */
+
+    /* Nascondi colonne non essenziali: Stato Ordine, Prodotti Attesi, Seriali Trovati, Ultima Modifica */
+    #ordersTable th:nth-child(2),
+    #ordersTable td:nth-child(2),
+    #ordersTable th:nth-child(3),
+    #ordersTable td:nth-child(3),
+    #ordersTable th:nth-child(4),
+    #ordersTable td:nth-child(4),
+    #ordersTable th:nth-child(6),
+    #ordersTable td:nth-child(6) {
+        display: none;
+    }
+
+    /* Larghezze responsive colonne visibili */
+    #ordersTable th:nth-child(1),
+    #ordersTable td:nth-child(1) {
+        width: 30%;  /* Numero Ordine */
+        word-wrap: break-word;
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
+
+    #ordersTable th:nth-child(5),
+    #ordersTable td:nth-child(5) {
+        width: 40%;  /* Stato Validazione */
+    }
+
+    #ordersTable th:nth-child(7),
+    #ordersTable td:nth-child(7) {
+        width: 30%;  /* Azioni */
+    }
+
+    /* ========== MOBILE OPTIMIZATION - ACTION BUTTONS ========== */
+
+    /* Nascondi tutti i pulsanti azione tranne "Dettagli" (btn-info) */
+    .actions .btn-small:not(.btn-info) {
+        display: none !important;
+    }
+
+    .actions .btn-small.btn-info {
+        width: 100%;
+        padding: 0.6rem 0.4rem;
+        font-size: 0.75rem;
+        min-height: 44px;  /* Touch-friendly */
+        text-align: center;
+    }
+
+    /* ========== MOBILE OPTIMIZATION - TOOLBAR ========== */
+
+    /* Pulsanti toolbar full-width e stacked */
+    .serials-action-buttons {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .serials-action-btn {
+        width: 100%;
+        min-height: 44px;  /* Touch-friendly */
+    }
+
+    /* Search input full width */
+    #orderSearchInput {
+        width: 100%;
+        min-height: 44px;
+    }
+
+    /* ========== MOBILE OPTIMIZATION - MODALS ========== */
+
+    .modal-content {
+        width: 95%;
+        max-height: calc(100vh - 140px);
+        overflow-y: auto;
+    }
+
+    #serial-recap-overlay .overlay-content {
+        max-width: 95vw;
+        width: 95vw;
+        padding: 1rem;
+    }
+
+    /* Responsive table in modals */
+    .modal-content table {
+        font-size: 0.8rem;
+    }
+
+    .modal-content table th,
+    .modal-content table td {
+        padding: 0.5rem 0.25rem;
+    }
+
+    /* Mobile-friendly modal actions */
+    .modal-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .modal-actions button {
+        width: 100%;
+        min-height: 44px;
+    }
+
+    /* ========== MOBILE OPTIMIZATION - STATUS BADGE ========== */
+
+    /* Spazio per badge status nella cella Numero Ordine */
+    #ordersTable tbody td:nth-child(1) {
+        position: relative;
+        padding-top: 2rem;
+        padding-left: 0.5rem;
+    }
+
+    .mobile-status-badge {
+        position: absolute;
+        top: 0.25rem;
+        left: 0.25rem;
+        font-size: 0.6rem;
+        padding: 0.15rem 0.35rem;
+        z-index: 1;
+    }
+
+    /* ========== MOBILE HIDE CLASS ========== */
+
+    .mobile-hide {
+        display: none !important;
+    }
+
+    /* ========== MOBILE OVERLAY OPTIMIZATIONS ========== */
+
+    /* Serial Upload Overlay - Ultra-compact per massimizzare spazio */
+    #serial-upload-overlay .overlay-content {
+        max-height: calc(100vh - 95px) !important;
+        max-width: calc(100vw - 20px) !important;
+        width: 95%;
+        margin: 0;
+        padding: 0 !important;
+    }
+
+    #serial-upload-overlay .overlay-header {
+        padding: 8px 12px !important;
+    }
+
+    #serial-upload-overlay .overlay-header h2 {
+        font-size: 14px !important;
+        margin: 0;
+    }
+
+    #serial-upload-overlay .close-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 24px;
+    }
+
+    #serial-upload-overlay .overlay-body {
+        padding: 8px 12px !important;
+        overflow-y: auto;
+    }
+
+    /* Form compatto */
+    #serial-upload-overlay .form-group {
+        margin-bottom: 6px !important;
+    }
+
+    #serial-upload-overlay .form-group label {
+        margin-bottom: 2px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    #serial-upload-overlay input[type="text"] {
+        min-height: 38px;
+        font-size: 14px;
+        padding: 8px 10px;
+    }
+
+    /* Upload component compatto */
+    #serial-upload-overlay .enhanced-upload-container {
+        margin-bottom: 8px;
+    }
+
+    /* Div contenitore bottone analizza - riduzione margini */
+    #serial-upload-overlay .upload-form > div {
+        margin: 6px 0 !important;
+    }
+
+    /* Bottone analizza */
+    #serial-upload-overlay .btn-upload {
+        width: 100%;
+        min-height: 44px;
+        padding: 8px 16px !important;
+        font-size: 14px !important;
+        margin: 0 !important;
+    }
+
+    /* Nascondi sezione formato file su mobile per risparmiare spazio */
+    #serial-upload-overlay .collapsible-container {
+        display: none !important;
+    }
+
+    /* Recap Overlay - Ultra-compact */
+    #serial-recap-overlay .overlay-content {
+        max-height: calc(100vh - 95px) !important;
+        max-width: calc(100vw - 20px) !important;
+        width: 98%;
+        margin: 0;
+        padding: 0 !important;
+    }
+
+    #serial-recap-overlay .overlay-header {
+        padding: 8px 12px !important;
+    }
+
+    #serial-recap-overlay .overlay-header h2 {
+        font-size: 14px !important;
+        margin: 0;
+    }
+
+    #serial-recap-overlay .overlay-body {
+        padding: 8px 12px !important;
+        overflow-y: auto;
+        max-height: calc(100vh - 150px);
+    }
+
+    /* Stats grid compatto - 2 colonne */
+    #serial-recap-overlay .recap-stats {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 4px !important;
+        margin-bottom: 6px !important;
+    }
+
+    #serial-recap-overlay .stat-card {
+        padding: 6px !important;
+    }
+
+    #serial-recap-overlay .stat-number {
+        font-size: 1.2rem !important;
+    }
+
+    #serial-recap-overlay .stat-label {
+        font-size: 0.65rem !important;
+    }
+
+    /* Sezioni recap compatte */
+    #serial-recap-overlay .recap-section {
+        margin-bottom: 8px !important;
+    }
+
+    #serial-recap-overlay .recap-section h4 {
+        font-size: 13px !important;
+        margin-bottom: 4px !important;
+    }
+
+    /* Tabella recap ultra-compatta */
+    #serial-recap-overlay .recap-table {
+        font-size: 0.7rem !important;
+    }
+
+    #serial-recap-overlay .recap-table th,
+    #serial-recap-overlay .recap-table td {
+        padding: 4px 2px !important;
+        font-size: 0.7rem !important;
+    }
+
+    #serial-recap-overlay .recap-table th {
+        font-size: 0.65rem !important;
+    }
+
+    /* Header tabella recap */
+    #serial-recap-overlay .recap-table-header {
+        margin-bottom: 6px;
+    }
+
+    #serial-recap-overlay .recap-table-header h4 {
+        font-size: 13px !important;
+    }
+
+    #serial-recap-overlay .recap-table-header .btn-small {
+        font-size: 11px !important;
+        padding: 6px 8px !important;
+    }
+
+    /* Azioni bottom compatte */
+    #serial-recap-overlay .recap-actions {
+        padding: 8px !important;
+        gap: 6px;
+    }
+
+    #serial-recap-overlay .recap-actions button {
+        width: 100%;
+        min-height: 44px;
+        font-size: 13px !important;
+        padding: 10px 12px !important;
+    }
+
+    /* Liste errori/warning compatte */
+    #serial-recap-overlay .error-list,
+    #serial-recap-overlay .warning-list {
+        font-size: 0.75rem;
+        max-height: 120px;
+        overflow-y: auto;
+    }
+
+    /* Summary ordini compatto */
+    #serial-recap-overlay .orders-summary {
+        font-size: 0.8rem;
+    }
+
+    /* ========== MODAL DETTAGLI/VALIDAZIONE MOBILE ========== */
+
+    /* Order Details Modal - Compatto */
+    #orderDetailsModal .modal-content {
+        width: 95%;
+        max-width: calc(100vw - 20px);
+        max-height: calc(100vh - 100px);
+        margin: 5% auto;
+    }
+
+    #orderDetailsModal .modal-header {
+        padding: 8px 12px;
+    }
+
+    #orderDetailsModal .modal-header h3 {
+        font-size: 14px;
+        margin: 0;
+    }
+
+    #orderDetailsModal .modal-body {
+        padding: 8px 12px;
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+    }
+
+    #orderDetailsModal .order-info,
+    #orderDetailsModal .products-comparison,
+    #orderDetailsModal .serials-detail,
+    #orderDetailsModal .validation-errors {
+        margin-bottom: 8px;
+    }
+
+    #orderDetailsModal h4 {
+        font-size: 13px;
+        margin-bottom: 4px;
+    }
+
+    #orderDetailsModal h5 {
+        font-size: 12px;
+        margin-bottom: 3px;
+    }
+
+    #orderDetailsModal .comparison-table {
+        font-size: 0.7rem;
+    }
+
+    #orderDetailsModal .comparison-table th,
+    #orderDetailsModal .comparison-table td {
+        padding: 4px 2px;
+    }
+
+    #orderDetailsModal .serial-item {
+        font-size: 0.75rem;
+        padding: 3px 6px;
+        margin-bottom: 3px;
+    }
+
+    #orderDetailsModal .modal-footer {
+        padding: 8px 12px;
+    }
+
+    #orderDetailsModal .modal-footer button {
+        width: 100%;
+        min-height: 44px;
+    }
+
+    /* Validation Modal - Compatto */
+    #validationModal .modal-content {
+        width: 95%;
+        max-width: calc(100vw - 20px);
+        max-height: calc(100vh - 100px);
+        margin: 5% auto;
+    }
+
+    #validationModal .modal-header {
+        padding: 8px 12px;
+    }
+
+    #validationModal .modal-header h3 {
+        font-size: 14px;
+        margin: 0;
+    }
+
+    #validationModal .modal-body {
+        padding: 8px 12px;
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+        font-size: 0.8rem;
+    }
+
+    #validationModal .modal-footer {
+        padding: 8px 12px;
+    }
+
+    #validationModal .modal-footer button {
+        width: 100%;
+        min-height: 44px;
+    }
+
+    /* ========== REALTIME SCANNER MOBILE ========== */
+
+    .mobile-only {
+        display: block !important;
+    }
+
+    /* Scanner Overlay Full-Screen */
+    #realtime-scanner-overlay .scanner-content {
+        width: 100vw;
+        height: 100vh;
+        max-height: 100vh;
+        margin: 0;
+        border-radius: 0;
+    }
+
+    .scanner-header {
+        padding: 12px;
+        background: #007bff;
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
+    .scanner-header h2 {
+        font-size: 16px;
+        margin: 0;
+        font-weight: 700;
+    }
+
+    .scanner-header .close-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 24px;
+        background: rgba(255,255,255,0.2);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    .scanner-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+        background: #f8f9fa;
+    }
+
+    .scanner-body .section {
+        background: white;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+    }
+
+    .scanner-body .section h3 {
+        font-size: 14px;
+        font-weight: 700;
+        margin: 0 0 8px 0;
+    }
+
+    /* Input Scansione */
+    .scan-input-section {
+        background: #e3f2fd !important;
+        border: 2px solid #2196f3;
+    }
+
+    #scanner-barcode-input {
+        width: 100%;
+        min-height: 52px;
+        font-size: 16px;
+        padding: 12px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+    }
+
+    #scanner-barcode-input:focus {
+        border-color: #007bff;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+    }
+
+    .scan-feedback {
+        margin-top: 8px;
+        padding: 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 700;
+        text-align: center;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .scan-feedback.success {
+        background: #d4edda;
+        color: #155724;
+        border: 2px solid #28a745;
+    }
+
+    .scan-feedback.error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 2px solid #dc3545;
+    }
+
+    .scan-feedback.loading {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+
+    /* Product Tracker */
+    .product-tracker {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        border-left: 4px solid #ffc107;
+    }
+
+    .product-tracker.complete {
+        border-left-color: #28a745;
+        opacity: 0.6;
+    }
+
+    .product-tracker.incomplete {
+        border-left-color: #dc3545;
+    }
+
+    .product-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 6px;
+    }
+
+    .product-header .sku {
+        font-weight: 700;
+        font-size: 14px;
+    }
+
+    .product-header .name {
+        font-size: 12px;
+        color: #666;
+    }
+
+    .progress-bar {
+        height: 10px;
+        background: #e9ecef;
+        border-radius: 5px;
+        overflow: hidden;
+        margin-bottom: 4px;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #28a745, #20c997);
+        transition: width 0.3s ease;
+    }
+
+    .progress-text {
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .progress-text .missing {
+        color: #dc3545;
+        font-weight: 700;
+    }
+
+    /* Serial Log */
+    #scanned-serials-log,
+    #scan-errors-log {
+        max-height: 180px;
+        overflow-y: auto;
+    }
+
+    .serial-log-item {
+        background: #d4edda;
+        padding: 8px;
+        border-radius: 4px;
+        margin-bottom: 4px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        font-family: monospace;
+    }
+
+    .error-log-item {
+        background: #f8d7da;
+        padding: 8px;
+        border-radius: 4px;
+        margin-bottom: 4px;
+        font-size: 11px;
+    }
+
+    .error-msg {
+        color: #721c24;
+        font-weight: 600;
+        margin-top: 4px;
+    }
+
+    /* Scanner Footer */
+    .scanner-footer {
+        padding: 12px;
+        background: white;
+        border-top: 2px solid #dee2e6;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .scanner-footer button {
+        width: 100%;
+        min-height: 52px;
+        font-size: 15px;
+        font-weight: 700;
+        border-radius: 8px;
+    }
+
+    /* Order Selection Modal */
+    #order-selection-modal .modal-content {
+        width: 95%;
+        max-height: 90vh;
+    }
+
+    .order-checkbox {
+        display: flex;
+        align-items: center;
+        padding: 12px;
+        background: #f8f9fa;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        cursor: pointer;
+    }
+
+    .order-checkbox input[type="checkbox"] {
+        width: 28px;
+        height: 28px;
+        margin-right: 12px;
+        cursor: pointer;
+    }
+
+    .order-details {
+        flex: 1;
+    }
+
+    .order-num {
+        font-weight: 700;
+        font-size: 16px;
+        margin-bottom: 2px;
+    }
+
+    .order-customer {
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 4px;
+    }
+
+    .order-stats {
+        font-size: 12px;
+        color: #6c757d;
+    }
+
+    .selected-order-badge {
+        background: #e3f2fd;
+        color: #0d47a1;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 6px;
     }
 }
 

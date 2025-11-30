@@ -208,6 +208,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // Funzioni per gestione overlay
     window.openOverlay = function(overlayId) {
         document.getElementById(overlayId).style.display = 'block';
+
+        // NUOVO: Autofocus su campo scanner per mobile quando si apre file-operations
+        if (overlayId === 'file-operations-overlay') {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                             || window.innerWidth < 768;
+
+            if (isMobile) {
+                // Aspetta che il tab attivo sia completamente renderizzato
+                setTimeout(() => {
+                    // Cerca il primo textarea scanner visibile nel tab attivo
+                    const activeTab = document.querySelector('.tab-content.active');
+                    if (activeTab) {
+                        const scannerInput = activeTab.querySelector('.scanner-textarea');
+                        if (scannerInput) {
+                            scannerInput.focus();
+                        }
+                    }
+                }, 200);  // Delay maggiore per dare tempo al tab system
+            }
+        }
     };
 
     window.closeOverlay = function(overlayId) {
@@ -2469,4 +2489,1365 @@ async function exportConsolidationPDF() {
         
         alert(`Errore durante l'esportazione del PDF: ${error.message}`);
     }
+}
+
+// ========================================================================
+// OPERAZIONI IN TEMPO REALE - HELPERS CONDIVISI
+// ========================================================================
+
+/**
+ * Parse barcode prodotto con supporto qty esplicita
+ * @param {string} barcodeValue - Barcode scansionato (es: "SKU123" o "SKU123_5")
+ * @returns {object} - {sku, quantity, has_suffix}
+ */
+function parseProductBarcode(barcodeValue) {
+    const parts = barcodeValue.split('_');
+
+    if (parts.length === 2 && !isNaN(parts[1])) {
+        return {
+            sku: parts[0],
+            quantity: parseInt(parts[1]),
+            has_suffix: true
+        };
+    }
+
+    return {
+        sku: barcodeValue,
+        quantity: 1,
+        has_suffix: false
+    };
+}
+
+/**
+ * Valida se un barcode è un'ubicazione valida
+ * @param {string} barcodeValue - Barcode da validare
+ * @returns {Promise<boolean>} - true se è ubicazione valida
+ */
+async function validateLocation(barcodeValue) {
+    const maxRetries = 2;
+    let lastError;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 sec timeout
+
+            const response = await fetch('/inventory/validate-location', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({location: barcodeValue.toUpperCase()}),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+            return result.is_location || false;
+        } catch (error) {
+            lastError = error;
+            console.warn(`⚠️ Tentativo ${attempt + 1}/${maxRetries + 1} validazione ubicazione fallito:`, error.message);
+
+            // Se non è l'ultimo tentativo, aspetta un po' prima di riprovare
+            if (attempt < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+        }
+    }
+
+    // Tutti i tentativi falliti
+    console.error('❌ Validazione ubicazione fallita dopo tutti i tentativi:', lastError);
+    showRealtimeFeedback('⚠️ Errore di rete. Riprova la scansione.', '#ffc107');
+    return false;
+}
+
+/**
+ * Valida e converte barcode prodotto (EAN → SKU se necessario)
+ * @param {string} barcodeValue - Barcode da validare
+ * @returns {Promise<string|null>} - SKU prodotto o null se non trovato
+ */
+async function validateProductBarcode(barcodeValue) {
+    const maxRetries = 2;
+    let lastError;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 sec timeout
+
+            const response = await fetch('/inventory/validate-barcode', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({barcode: barcodeValue}),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            // Se prodotto non trovato (ma risposta OK), ritorna subito null
+            if (!result.found) {
+                return null;
+            }
+
+            return result.product_sku;
+        } catch (error) {
+            lastError = error;
+            console.warn(`⚠️ Tentativo ${attempt + 1}/${maxRetries + 1} validazione prodotto fallito:`, error.message);
+
+            // Se non è l'ultimo tentativo, aspetta un po' prima di riprovare
+            if (attempt < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+        }
+    }
+
+    // Tutti i tentativi falliti - errore di rete
+    console.error('❌ Validazione prodotto fallita dopo tutti i tentativi:', lastError);
+    showRealtimeFeedback('⚠️ Errore di rete. Riprova la scansione.', '#ffc107');
+    return null;
+}
+
+/**
+ * Mostra feedback visivo per operazioni realtime
+ * @param {string} message - Messaggio da mostrare
+ * @param {string} color - Colore del messaggio (hex)
+ * @param {string} containerId - ID del container feedback (default: 'realtime-feedback')
+ */
+function showRealtimeFeedback(message, color, containerId = 'realtime-feedback') {
+    const feedback = document.getElementById(containerId);
+    if (!feedback) {
+        console.warn(`Container feedback ${containerId} non trovato`);
+        return;
+    }
+
+    feedback.textContent = message;
+    feedback.style.color = color;
+    feedback.style.backgroundColor = color + '22';
+    feedback.style.padding = '10px';
+    feedback.style.borderRadius = '5px';
+    feedback.style.marginBottom = '10px';
+    feedback.style.transition = 'all 0.3s ease';
+
+    // Auto-fade dopo 3 secondi
+    setTimeout(() => {
+        feedback.style.backgroundColor = 'transparent';
+    }, 3000);
+}
+
+/**
+ * Aggiorna lista prodotti visualizzata
+ * @param {Array} products - Array di prodotti [{sku, quantity, scanned_count}]
+ * @param {string} containerId - ID del container lista prodotti
+ */
+function updateRealtimeProductList(products, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.warn(`Container ${containerId} non trovato`);
+        return;
+    }
+
+    if (products.length === 0) {
+        container.innerHTML = '<p style="color: #6c757d; text-align: center; padding: 20px;">Nessun prodotto scansionato</p>';
+        return;
+    }
+
+    container.innerHTML = products.map((p, index) => {
+        const displayQty = (p.explicit_qty || 0) + (p.scanned_count || 0) || p.quantity || 1;
+
+        // Check if this product is in edit mode
+        if (p._isEditing) {
+            return `
+                <div class="realtime-product-item editing" data-index="${index}">
+                    <span class="realtime-product-sku"><strong>${p.sku}</strong></span>
+                    <div class="realtime-qty-edit">
+                        <input type="number"
+                               id="qty-edit-${index}"
+                               class="realtime-qty-input"
+                               value="${displayQty}"
+                               min="1"
+                               step="1"
+                               inputmode="numeric"
+                               onkeypress="if(event.key==='Enter') saveRealtimeQuantity(${index})">
+                        <button class="realtime-qty-btn save" onclick="saveRealtimeQuantity(${index})" title="Salva">✓</button>
+                        <button class="realtime-qty-btn cancel" onclick="cancelRealtimeQuantityEdit(${index})" title="Annulla">✕</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="realtime-product-item" data-index="${index}">
+                <span class="realtime-product-sku"><strong>${p.sku}</strong></span>
+                <span class="realtime-product-qty clickable"
+                      onclick="editRealtimeQuantity(${index}, ${displayQty})"
+                      title="Clicca per modificare">
+                    ${displayQty} pz ✏️
+                </span>
+                <button class="realtime-product-remove" onclick="removeRealtimeProduct(${index})" title="Rimuovi">
+                    ❌
+                </button>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * Attiva modalità modifica quantità per un prodotto
+ * @param {number} index - Indice prodotto in realtimeProducts[]
+ * @param {number} currentQty - Quantità attuale visualizzata
+ */
+function editRealtimeQuantity(index, currentQty) {
+    if (index >= 0 && index < realtimeProducts.length) {
+        // Imposta flag editing
+        realtimeProducts[index]._isEditing = true;
+        realtimeProducts[index]._originalQty = currentQty;
+
+        // Ri-render lista
+        updateRealtimeProductList(realtimeProducts, 'scanned-products-list');
+
+        // Auto-focus sull'input
+        setTimeout(() => {
+            const input = document.getElementById(`qty-edit-${index}`);
+            if (input) {
+                input.focus();
+                input.select();
+            }
+        }, 50);
+    }
+}
+
+/**
+ * Salva la quantità modificata
+ * @param {number} index - Indice prodotto in realtimeProducts[]
+ */
+function saveRealtimeQuantity(index) {
+    if (index >= 0 && index < realtimeProducts.length) {
+        const input = document.getElementById(`qty-edit-${index}`);
+        if (!input) return;
+
+        const newQty = parseInt(input.value);
+
+        // Validazione
+        if (isNaN(newQty) || newQty < 1) {
+            showRealtimeFeedback('⚠️ Quantità non valida (minimo 1)', '#dc3545');
+            input.focus();
+            return;
+        }
+
+        // Aggiorna il prodotto: imposta explicit_qty e azzera scanned_count
+        realtimeProducts[index].explicit_qty = newQty;
+        realtimeProducts[index].scanned_count = 0;
+        realtimeProducts[index]._isEditing = false;
+        delete realtimeProducts[index]._originalQty;
+
+        // Ri-render lista
+        updateRealtimeProductList(realtimeProducts, 'scanned-products-list');
+
+        // Feedback positivo
+        showRealtimeFeedback(`✅ Quantità ${realtimeProducts[index].sku} aggiornata a ${newQty}`, '#28a745');
+    }
+}
+
+/**
+ * Annulla la modifica quantità
+ * @param {number} index - Indice prodotto in realtimeProducts[]
+ */
+function cancelRealtimeQuantityEdit(index) {
+    if (index >= 0 && index < realtimeProducts.length) {
+        // Rimuovi flag editing
+        realtimeProducts[index]._isEditing = false;
+        delete realtimeProducts[index]._originalQty;
+
+        // Ri-render lista
+        updateRealtimeProductList(realtimeProducts, 'scanned-products-list');
+
+        // Feedback
+        showRealtimeFeedback('↩️ Modifica annullata', '#6c757d');
+    }
+}
+
+/**
+ * Valida esistenza ubicazione (verifica nel database)
+ * @param {string} location - Nome ubicazione
+ * @returns {Promise<boolean>} - true se esiste
+ */
+async function validateLocationExists(location) {
+    return await validateLocation(location);
+}
+
+/**
+ * Setup autofocus e readonly per input scanner mobile
+ * @param {string} inputId - ID dell'input scanner
+ */
+function setupRealtimeScannerInput(inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) {
+        console.warn(`Input scanner ${inputId} non trovato`);
+        return;
+    }
+
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                     || window.innerWidth < 768;
+
+    if (isMobile) {
+        // Impedisce tastiera virtuale
+        input.readOnly = true;
+        input.setAttribute('inputmode', 'none');
+
+        // Autofocus immediato
+        setTimeout(() => {
+            input.focus();
+        }, 150);
+
+        // Toggle readonly al primo input
+        input.addEventListener('keydown', function(e) {
+            if (this.readOnly && e.key !== 'Tab') {
+                this.readOnly = false;
+            }
+        });
+
+        // Auto-refocus quando perde focus
+        input.addEventListener('blur', function() {
+            setTimeout(() => {
+                const overlayVisible = document.getElementById('realtime-scanner-interface')?.style.display !== 'none';
+                // NON refocus se l'utente sta editando una quantità
+                const qtyEditActive = document.querySelector('.realtime-qty-input');
+                if (overlayVisible && !qtyEditActive) {
+                    this.focus();
+                    if (!this.value) {
+                        this.readOnly = true;
+                    }
+                }
+            }, 100);
+        });
+    }
+
+    // Enter per processare
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+
+            // Piccolo delay per assicurarsi che lo scanner finisca di scrivere
+            // Prima di processare il barcode
+            setTimeout(() => {
+                const value = this.value.trim();
+                if (value) {
+                    processRealtimeBarcode(value);
+                    this.value = '';
+                }
+            }, 50); // 50ms di delay
+        }
+    });
+}
+
+// ========================================================================
+// OPERAZIONI IN TEMPO REALE - GESTIONE INTERFACCIA
+// ========================================================================
+
+// Variabili globali per stato operazione
+let currentRealtimeOperation = null;
+let realtimeProducts = [];
+let realtimeSessionData = {};
+
+/**
+ * Avvia un'operazione in tempo reale
+ * @param {string} operationType - Tipo operazione (CARICO, SCARICO, etc.)
+ */
+function startRealtimeOperation(operationType) {
+    currentRealtimeOperation = operationType;
+    realtimeProducts = [];
+    realtimeSessionData = {
+        operationType: operationType,
+        awaitingLocation: false,
+        locationValidated: false,
+        location: null,
+        originLocation: null,
+        destinationLocation: null
+    };
+
+    // Chiudi menu principale
+    closeOverlay('realtime-operations-overlay');
+
+    // Mostra interfaccia scanner
+    document.getElementById('realtime-scanner-interface').style.display = 'block';
+
+    // Aggiorna titolo
+    const titles = {
+        'SCARICO_CONTAINER': '📦 Scarico Container in Tempo Reale',
+        'CARICO': '🔼 Carico in Tempo Reale',
+        'SCARICO': '🔽 Scarico in Tempo Reale',
+        'SPOSTAMENTO': '🔄 Spostamento in Tempo Reale',
+        'UBICAZIONE_TERRA': '📍 Posiziona da TERRA in Tempo Reale'
+    };
+    document.getElementById('scanner-title').textContent = titles[operationType] || '⚡ Operazione in Tempo Reale';
+
+    // Setup input scanner
+    setupRealtimeScannerInput('realtime-barcode-input');
+
+    // Mostra feedback iniziale
+    showRealtimeFeedback('📱 Pronto per la scansione...', '#007bff');
+}
+
+/**
+ * Processa barcode scansionato (dispatcher per operazione corrente)
+ * @param {string} barcodeValue - Barcode scansionato
+ */
+async function processRealtimeBarcode(barcodeValue) {
+    if (!currentRealtimeOperation) {
+        console.error('Nessuna operazione attiva');
+        return;
+    }
+
+    // Dispatch alla funzione specifica dell'operazione
+    switch (currentRealtimeOperation) {
+        case 'SCARICO_CONTAINER':
+            await processScaricoContainerBarcode(barcodeValue);
+            break;
+        case 'CARICO':
+            await processCaricoBarcode(barcodeValue);
+            break;
+        case 'SCARICO':
+            await processScaricoBarcode(barcodeValue);
+            break;
+        case 'SPOSTAMENTO':
+            await processSpostamentoBarcode(barcodeValue);
+            break;
+        case 'UBICAZIONE_TERRA':
+            await processUbicazioneTerraBarcode(barcodeValue);
+            break;
+        default:
+            console.error('Operazione non supportata:', currentRealtimeOperation);
+    }
+}
+
+/**
+ * Annulla operazione in corso
+ */
+function cancelRealtimeOperation() {
+    if (realtimeProducts.length > 0) {
+        if (!confirm('Annullare l\'operazione in corso? Tutti i dati scansionati saranno persi.')) {
+            return;
+        }
+    }
+
+    // Reset stato
+    currentRealtimeOperation = null;
+    realtimeProducts = [];
+    realtimeSessionData = {};
+
+    // Reset UI
+    document.getElementById('realtime-scanner-interface').style.display = 'none';
+    document.getElementById('scanned-products-list').innerHTML = '';
+    document.getElementById('realtime-feedback').textContent = '';
+    document.getElementById('realtime-barcode-input').value = '';
+    document.getElementById('finalize-realtime-btn').style.display = 'none';
+
+    // Riapri menu principale
+    openOverlay('realtime-operations-overlay');
+}
+
+/**
+ * Finalizza operazione in corso (dispatcher)
+ */
+async function finalizeRealtimeOperation() {
+    if (!currentRealtimeOperation) {
+        console.error('Nessuna operazione attiva');
+        return;
+    }
+
+    // Dispatch alla funzione di finalizzazione specifica
+    switch (currentRealtimeOperation) {
+        case 'SCARICO_CONTAINER':
+            await finalizeScaricoContainer();
+            break;
+        case 'CARICO':
+            await finalizeCarico();
+            break;
+        case 'SCARICO':
+            await finalizeScarico();
+            break;
+        case 'SPOSTAMENTO':
+            await finalizeSpostamento();
+            break;
+        case 'UBICAZIONE_TERRA':
+            await finalizeUbicazioneTerra();
+            break;
+        default:
+            console.error('Operazione non supportata:', currentRealtimeOperation);
+    }
+}
+
+/**
+ * Rimuovi prodotto dalla lista scansionata
+ * @param {number} index - Indice prodotto da rimuovere
+ */
+function removeRealtimeProduct(index) {
+    if (index >= 0 && index < realtimeProducts.length) {
+        const removed = realtimeProducts.splice(index, 1)[0];
+        updateRealtimeProductList(realtimeProducts, 'scanned-products-list');
+        showRealtimeFeedback(`🗑️ Rimosso ${removed.sku}`, '#6c757d');
+    }
+}
+
+// ========================================================================
+// OPERAZIONE: SCARICO CONTAINER IN TEMPO REALE
+// ========================================================================
+
+/**
+ * Processa barcode per scarico container (modalità continua)
+ * @param {string} barcodeValue - Barcode scansionato
+ */
+async function processScaricoContainerBarcode(barcodeValue) {
+    // Parse barcode prodotto
+    const parsed = parseProductBarcode(barcodeValue);
+
+    // Valida che esista il prodotto
+    const validSku = await validateProductBarcode(parsed.sku);
+    if (!validSku) {
+        showRealtimeFeedback(`❌ Prodotto ${parsed.sku} non trovato!`, '#dc3545');
+        return;
+    }
+
+    // Aggiorna SKU se era EAN
+    if (validSku !== parsed.sku) {
+        parsed.sku = validSku;
+    }
+
+    // Trova se già scansionato
+    const existing = realtimeProducts.find(p => p.sku === parsed.sku);
+
+    if (existing) {
+        // Scarico Container: SEMPRE accumula quantità (anche qty esplicite multiple)
+        if (parsed.has_suffix) {
+            // Scansione con qty esplicita: aggiungi alla qty esplicita totale (NON resettare scanned_count!)
+            existing.explicit_qty = (existing.explicit_qty || 0) + parsed.quantity;
+            const totalQty = (existing.explicit_qty || 0) + (existing.scanned_count || 0);
+            showRealtimeFeedback(`✅ ${parsed.sku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
+        } else {
+            // Scansione senza qty: incrementa count
+            existing.scanned_count = (existing.scanned_count || 0) + 1;
+            const totalQty = (existing.explicit_qty || 0) + existing.scanned_count;
+            showRealtimeFeedback(`✅ ${parsed.sku} +1 (totale: ${totalQty} pz)`, '#28a745');
+        }
+    } else {
+        // Nuovo prodotto
+        realtimeProducts.push({
+            sku: parsed.sku,
+            scanned_count: parsed.has_suffix ? 0 : 1,
+            explicit_qty: parsed.has_suffix ? parsed.quantity : 0,
+            has_qty_suffix: parsed.has_suffix
+        });
+        const qty = parsed.quantity || 1;
+        showRealtimeFeedback(`✅ ${parsed.sku} aggiunto (${qty} pz) → TERRA`, '#28a745');
+    }
+
+    // Aggiorna display lista prodotti
+    updateRealtimeProductList(realtimeProducts, 'scanned-products-list');
+
+    // Mostra tasto finalizza se ci sono prodotti
+    if (realtimeProducts.length > 0) {
+        document.getElementById('finalize-realtime-btn').style.display = 'block';
+    }
+}
+
+/**
+ * Finalizza scarico container
+ */
+async function finalizeScaricoContainer() {
+    if (realtimeProducts.length === 0) {
+        showRealtimeFeedback('❌ Nessun prodotto scansionato!', '#dc3545');
+        return;
+    }
+
+    // Conferma operazione
+    const totalProducts = realtimeProducts.length;
+    const totalQty = realtimeProducts.reduce((sum, p) => sum + ((p.explicit_qty || 0) + p.scanned_count), 0);
+
+    if (!confirm(`Confermare scarico container?\n\n${totalProducts} prodotti diversi\n${totalQty} pezzi totali\n\nTutto verrà spostato a TERRA.`)) {
+        return;
+    }
+
+    // Mostra loading
+    showRealtimeFeedback('⏳ Finalizzazione in corso...', '#ffc107');
+    document.getElementById('finalize-realtime-btn').disabled = true;
+
+    try {
+        // Prepara operazioni (somma explicit_qty + scanned_count)
+        const operations = realtimeProducts.map(p => ({
+            product_sku: p.sku,
+            quantity: (p.explicit_qty || 0) + p.scanned_count
+        }));
+
+        // API Call
+        const response = await fetch('/inventory/realtime/scarico-container/finalize', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                operations: operations
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showRealtimeFeedback(`✅ Scarico container completato! ${totalProducts} prodotti aggiunti a TERRA`, '#28a745');
+
+            // Mostra riepilogo
+            setTimeout(() => {
+                alert(`Scarico Container Completato!\n\n` +
+                      `✅ ${totalProducts} prodotti diversi\n` +
+                      `✅ ${totalQty} pezzi totali\n` +
+                      `✅ Tutto aggiunto a TERRA con consolidamento automatico`);
+
+                // Reset e chiudi
+                resetScaricoContainerSession();
+                setTimeout(() => {
+                    document.getElementById('realtime-scanner-interface').style.display = 'none';
+                    openOverlay('realtime-operations-overlay');
+
+                    // Ricarica inventario per mostrare aggiornamenti
+                    if (typeof loadInventoryData === 'function') {
+                        loadInventoryData();
+                    }
+                }, 1000);
+            }, 500);
+        } else {
+            showRealtimeFeedback(`❌ Errore: ${result.message}`, '#dc3545');
+            document.getElementById('finalize-realtime-btn').disabled = false;
+        }
+    } catch (error) {
+        console.error('Errore finalizzazione scarico container:', error);
+        showRealtimeFeedback(`❌ Errore durante la finalizzazione: ${error.message}`, '#dc3545');
+        document.getElementById('finalize-realtime-btn').disabled = false;
+    }
+}
+
+/**
+ * Reset sessione scarico container
+ */
+function resetScaricoContainerSession() {
+    realtimeProducts = [];
+    realtimeSessionData = {};
+    currentRealtimeOperation = null;
+    document.getElementById('scanned-products-list').innerHTML = '';
+    document.getElementById('realtime-feedback').textContent = '';
+    document.getElementById('realtime-barcode-input').value = '';
+    document.getElementById('finalize-realtime-btn').style.display = 'none';
+    document.getElementById('finalize-realtime-btn').disabled = false;
+}
+
+// ========================================================================
+// OPERAZIONE: CARICO IN TEMPO REALE
+// ========================================================================
+
+/**
+ * CARICO - Scansiona ubicazione → Scansiona prodotti → Premi Finalizza (come Scarico)
+ * @param {string} barcodeValue - Barcode scansionato
+ */
+async function processCaricoBarcode(barcodeValue) {
+    // STEP 1: Prima scansione deve essere l'ubicazione
+    if (!realtimeSessionData.location) {
+        const isLocation = await validateLocation(barcodeValue);
+
+        if (!isLocation) {
+            showRealtimeFeedback('❌ Prima scansione deve essere un\'ubicazione valida!', '#dc3545');
+            return;
+        }
+
+        // Salva ubicazione
+        realtimeSessionData.location = barcodeValue.toUpperCase();
+        showRealtimeFeedback(`📍 Ubicazione: ${realtimeSessionData.location}. Scansiona prodotti da caricare...`, '#007bff');
+        return;
+    }
+
+    // STEP 2: È un prodotto - accumula quantità
+    const parsed = parseProductBarcode(barcodeValue);
+
+    // Valida che esista il prodotto
+    const validSku = await validateProductBarcode(parsed.sku);
+    if (!validSku) {
+        showRealtimeFeedback(`❌ Prodotto ${parsed.sku} non trovato!`, '#dc3545');
+        return;
+    }
+
+    // Aggiorna SKU se era EAN
+    if (validSku !== parsed.sku) {
+        parsed.sku = validSku;
+    }
+
+    // Trova se già scansionato
+    const existing = realtimeProducts.find(p => p.sku === parsed.sku);
+
+    if (existing) {
+        // Accumula quantità (come Scarico Container)
+        if (parsed.has_suffix) {
+            existing.explicit_qty = (existing.explicit_qty || 0) + parsed.quantity;
+            const totalQty = (existing.explicit_qty || 0) + (existing.scanned_count || 0);
+            showRealtimeFeedback(`✅ ${parsed.sku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
+        } else {
+            existing.scanned_count = (existing.scanned_count || 0) + 1;
+            const totalQty = (existing.explicit_qty || 0) + existing.scanned_count;
+            showRealtimeFeedback(`✅ ${parsed.sku} +1 (totale: ${totalQty} pz)`, '#28a745');
+        }
+    } else {
+        // Nuovo prodotto
+        realtimeProducts.push({
+            sku: parsed.sku,
+            scanned_count: parsed.has_suffix ? 0 : 1,
+            explicit_qty: parsed.has_suffix ? parsed.quantity : 0,
+            has_qty_suffix: parsed.has_suffix
+        });
+        const qty = parsed.quantity || 1;
+        showRealtimeFeedback(`✅ ${parsed.sku} aggiunto (${qty} pz)`, '#28a745');
+    }
+
+    // Aggiorna display
+    updateRealtimeProductList(realtimeProducts, 'scanned-products-list');
+
+    // Mostra pulsante finalizza
+    if (realtimeProducts.length > 0) {
+        document.getElementById('finalize-realtime-btn').style.display = 'block';
+        document.getElementById('realtime-status').textContent = '✅ Prodotti scansionati. Premi Finalizza quando pronto';
+    }
+}
+
+/**
+ * Finalizza carico
+ */
+async function finalizeCarico() {
+    if (realtimeProducts.length === 0) {
+        showRealtimeFeedback('❌ Nessun prodotto scansionato!', '#dc3545');
+        return;
+    }
+
+    // Se ubicazione non ancora scansionata, avvisa
+    if (!realtimeSessionData.location) {
+        showRealtimeFeedback('❌ Scansiona prima l\'ubicazione destinazione!', '#dc3545');
+        return;
+    }
+
+    // Procedi con finalizzazione
+    await executeCaricoFinalization();
+}
+
+/**
+ * Esegue la finalizzazione del carico
+ */
+async function executeCaricoFinalization() {
+    if (!realtimeSessionData.location) {
+        showRealtimeFeedback('❌ Ubicazione destinazione non specificata!', '#dc3545');
+        return;
+    }
+
+    // Conferma operazione
+    const totalProducts = realtimeProducts.length;
+    const totalQty = realtimeProducts.reduce((sum, p) => sum + ((p.explicit_qty || 0) + p.scanned_count), 0);
+
+    if (!confirm(`Confermare carico?\n\n${totalProducts} prodotti diversi\n${totalQty} pezzi totali\n\n→ Ubicazione: ${realtimeSessionData.location}`)) {
+        realtimeSessionData.awaitingLocation = false;
+        realtimeSessionData.location = null;
+        return;
+    }
+
+    // Mostra loading
+    showRealtimeFeedback('⏳ Finalizzazione in corso...', '#ffc107');
+
+    try {
+        // Prepara operazioni
+        const operations = realtimeProducts.map(p => ({
+            product_sku: p.sku,
+            quantity: (p.explicit_qty || 0) + p.scanned_count
+        }));
+
+        // API Call
+        const response = await fetch('/inventory/realtime/carico/finalize', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                location: realtimeSessionData.location,
+                operations: operations
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showRealtimeFeedback(`✅ Carico completato! ${totalProducts} prodotti aggiunti a ${realtimeSessionData.location}`, '#28a745');
+
+            // Mostra riepilogo
+            setTimeout(() => {
+                alert(`Carico Completato!\n\n` +
+                      `✅ ${totalProducts} prodotti diversi\n` +
+                      `✅ ${totalQty} pezzi totali\n` +
+                      `✅ Ubicazione: ${realtimeSessionData.location}`);
+
+                // Reset e chiudi
+                resetCaricoSession();
+                setTimeout(() => {
+                    document.getElementById('realtime-scanner-interface').style.display = 'none';
+                    openOverlay('realtime-operations-overlay');
+
+                    // Ricarica inventario
+                    if (typeof loadInventoryData === 'function') {
+                        loadInventoryData();
+                    }
+                }, 1000);
+            }, 500);
+        } else {
+            showRealtimeFeedback(`❌ Errore: ${result.message}`, '#dc3545');
+            realtimeSessionData.awaitingLocation = false;
+            realtimeSessionData.location = null;
+        }
+    } catch (error) {
+        console.error('Errore finalizzazione carico:', error);
+        showRealtimeFeedback(`❌ Errore durante la finalizzazione: ${error.message}`, '#dc3545');
+        realtimeSessionData.awaitingLocation = false;
+        realtimeSessionData.location = null;
+    }
+}
+
+/**
+ * Reset sessione carico
+ */
+function resetCaricoSession() {
+    realtimeProducts = [];
+    realtimeSessionData = {};
+    currentRealtimeOperation = null;
+    document.getElementById('scanned-products-list').innerHTML = '';
+    document.getElementById('realtime-feedback').textContent = '';
+    document.getElementById('realtime-barcode-input').value = '';
+    document.getElementById('realtime-status').textContent = '📱 Pronto per la scansione...';
+}
+
+/**
+ * SCARICO - Scansiona ubicazione → Scansiona prodotti da scaricare
+ */
+async function processScaricoBarcode(barcodeValue) {
+    // STEP 1: Prima scansione deve essere l'ubicazione
+    if (!realtimeSessionData.location) {
+        const isLocation = await validateLocation(barcodeValue);
+
+        if (!isLocation) {
+            showRealtimeFeedback('❌ Prima scansione deve essere un\'ubicazione valida!', '#dc3545');
+            return;
+        }
+
+        // Salva ubicazione
+        realtimeSessionData.location = barcodeValue.toUpperCase();
+        showRealtimeFeedback(`📍 Ubicazione: ${realtimeSessionData.location}. Scansiona prodotti da scaricare...`, '#007bff');
+        return;
+    }
+
+    // STEP 2: È un prodotto - valida e accumula
+    const parsed = parseProductBarcode(barcodeValue);
+    const validSku = await validateProductBarcode(parsed.sku);
+
+    if (!validSku) {
+        showRealtimeFeedback(`❌ Prodotto ${parsed.sku} non trovato nel sistema`, '#dc3545');
+        return;
+    }
+
+    // Verifica se prodotto già scansionato (usa validSku convertito da EAN)
+    const existing = realtimeProducts.find(p => p.sku === validSku);
+
+    if (existing) {
+        // Accumula quantità (come in Scarico Container e Carico)
+        if (parsed.has_suffix) {
+            // Scansione con qty esplicita: aggiungi (NON resettare scanned_count!)
+            existing.explicit_qty = (existing.explicit_qty || 0) + parsed.quantity;
+            const totalQty = (existing.explicit_qty || 0) + (existing.scanned_count || 0);
+            showRealtimeFeedback(`✅ ${validSku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
+        } else {
+            // Scansione senza qty: incrementa count
+            existing.scanned_count = (existing.scanned_count || 0) + 1;
+            const totalQty = (existing.explicit_qty || 0) + existing.scanned_count;
+            showRealtimeFeedback(`✅ ${validSku} +1 (totale: ${totalQty} pz)`, '#28a745');
+        }
+    } else {
+        // Nuovo prodotto (usa validSku convertito da EAN)
+        const newProduct = {
+            sku: validSku,
+            scanned_count: parsed.has_suffix ? 0 : 1,
+            explicit_qty: parsed.has_suffix ? parsed.quantity : 0
+        };
+        realtimeProducts.push(newProduct);
+
+        const displayQty = parsed.has_suffix ? parsed.quantity : 1;
+        showRealtimeFeedback(`✅ ${validSku} aggiunto (${displayQty} pz)`, '#28a745');
+    }
+
+    // Aggiorna lista UI
+    updateRealtimeProductList(realtimeProducts, 'scanned-products-list');
+
+    // Mostra pulsante finalizza se ci sono prodotti
+    if (realtimeProducts.length > 0) {
+        document.getElementById('finalize-realtime-btn').style.display = 'block';
+    }
+}
+
+/**
+ * SPOSTAMENTO - Modalità doppia:
+ * 1. TOTALE: Scansiona origine → Scansiona destinazione (sposta tutti i prodotti)
+ * 2. PARZIALE: Scansiona origine → Scansiona prodotti → Scansiona destinazione (sposta prodotti specifici)
+ */
+async function processSpostamentoBarcode(barcodeValue) {
+    // STEP 1: Prima scansione deve essere ubicazione origine
+    if (!realtimeSessionData.locationFrom) {
+        const isLocation = await validateLocation(barcodeValue);
+
+        if (!isLocation) {
+            showRealtimeFeedback('❌ Prima scansione deve essere ubicazione origine!', '#dc3545');
+            return;
+        }
+
+        // Salva ubicazione origine
+        realtimeSessionData.locationFrom = barcodeValue.toUpperCase();
+        showRealtimeFeedback(`📍 Origine: ${realtimeSessionData.locationFrom}. Scansiona prodotti o destinazione...`, '#007bff');
+        return;
+    }
+
+    // STEP 2: Determina se è ubicazione (destinazione) o prodotto (mode parziale)
+    const isLocation = await validateLocation(barcodeValue);
+
+    if (isLocation) {
+        // È una ubicazione destinazione
+        realtimeSessionData.locationTo = barcodeValue.toUpperCase();
+
+        if (realtimeSessionData.locationFrom === realtimeSessionData.locationTo) {
+            showRealtimeFeedback('❌ Origine e destinazione non possono essere uguali!', '#dc3545');
+            realtimeSessionData.locationTo = null;
+            return;
+        }
+
+        // Se ci sono prodotti scansionati → PARTIAL, altrimenti → TOTAL
+        if (realtimeProducts.length > 0) {
+            // MODALITÀ PARZIALE: Sposta solo i prodotti scansionati
+            realtimeSessionData.moveMode = 'PARTIAL';
+            showRealtimeFeedback(`📍 Destinazione: ${realtimeSessionData.locationTo}. Premi Finalizza per confermare.`, '#007bff');
+            return finalizeSpostamento();
+        } else {
+            // MODALITÀ TOTALE: Sposta tutti i prodotti
+            realtimeSessionData.moveMode = 'TOTAL';
+            showRealtimeFeedback(`📍 Destinazione: ${realtimeSessionData.locationTo}. Spostamento TOTALE in corso...`, '#ffc107');
+            return finalizeSpostamento();
+        }
+    }
+
+    // MODALITÀ PARZIALE: È un prodotto - accumula
+    realtimeSessionData.moveMode = 'PARTIAL';
+
+    const parsed = parseProductBarcode(barcodeValue);
+    const validSku = await validateProductBarcode(parsed.sku);
+
+    if (!validSku) {
+        showRealtimeFeedback(`❌ Prodotto ${parsed.sku} non trovato nel sistema`, '#dc3545');
+        return;
+    }
+
+    // Verifica se prodotto già scansionato (usa validSku convertito da EAN)
+    const existing = realtimeProducts.find(p => p.sku === validSku);
+
+    if (existing) {
+        // Accumula quantità
+        if (parsed.has_suffix) {
+            existing.explicit_qty = (existing.explicit_qty || 0) + parsed.quantity;
+            const totalQty = (existing.explicit_qty || 0) + (existing.scanned_count || 0);
+            showRealtimeFeedback(`✅ ${validSku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
+        } else {
+            existing.scanned_count = (existing.scanned_count || 0) + 1;
+            const totalQty = (existing.explicit_qty || 0) + existing.scanned_count;
+            showRealtimeFeedback(`✅ ${validSku} +1 (totale: ${totalQty} pz)`, '#28a745');
+        }
+    } else {
+        // Nuovo prodotto (usa validSku convertito da EAN)
+        const newProduct = {
+            sku: validSku,
+            scanned_count: parsed.has_suffix ? 0 : 1,
+            explicit_qty: parsed.has_suffix ? parsed.quantity : 0
+        };
+        realtimeProducts.push(newProduct);
+
+        const displayQty = parsed.has_suffix ? parsed.quantity : 1;
+        showRealtimeFeedback(`✅ ${validSku} aggiunto (${displayQty} pz). Scansiona altri prodotti o destinazione...`, '#28a745');
+    }
+
+    // Aggiorna lista UI
+    updateRealtimeProductList(realtimeProducts, 'scanned-products-list');
+
+    // In modalità parziale, mostra pulsante finalizza per scansionare destinazione
+    if (realtimeProducts.length > 0) {
+        document.getElementById('finalize-realtime-btn').style.display = 'block';
+        document.getElementById('finalize-realtime-btn').textContent = 'Scansiona destinazione o premi qui';
+    }
+}
+
+/**
+ * POSIZIONA DA TERRA - Scansiona prodotti da TERRA → Scansiona ubicazione destinazione
+ */
+/**
+ * UBICAZIONE DA TERRA - Scansiona ubicazione → Scansiona prodotti → Premi Finalizza (come Carico)
+ */
+async function processUbicazioneTerraBarcode(barcodeValue) {
+    // STEP 1: Prima scansione deve essere l'ubicazione di destinazione
+    if (!realtimeSessionData.location) {
+        const isLocation = await validateLocation(barcodeValue);
+
+        if (!isLocation) {
+            showRealtimeFeedback('❌ Prima scansione deve essere un\'ubicazione valida!', '#dc3545');
+            return;
+        }
+
+        // Salva ubicazione
+        realtimeSessionData.location = barcodeValue.toUpperCase();
+        showRealtimeFeedback(`📍 Ubicazione: ${realtimeSessionData.location}. Scansiona prodotti da spostare da TERRA...`, '#007bff');
+        return;
+    }
+
+    // STEP 2: È un prodotto - valida e accumula
+    const parsed = parseProductBarcode(barcodeValue);
+    const validSku = await validateProductBarcode(parsed.sku);
+
+    if (!validSku) {
+        showRealtimeFeedback(`❌ Prodotto ${parsed.sku} non trovato nel sistema`, '#dc3545');
+        return;
+    }
+
+    // Verifica se prodotto già scansionato (usa validSku convertito da EAN)
+    const existing = realtimeProducts.find(p => p.sku === validSku);
+
+    if (existing) {
+        // Accumula quantità
+        if (parsed.has_suffix) {
+            existing.explicit_qty = (existing.explicit_qty || 0) + parsed.quantity;
+            const totalQty = (existing.explicit_qty || 0) + (existing.scanned_count || 0);
+            showRealtimeFeedback(`✅ ${validSku} +${parsed.quantity} (totale: ${totalQty} pz)`, '#28a745');
+        } else {
+            existing.scanned_count = (existing.scanned_count || 0) + 1;
+            const totalQty = (existing.explicit_qty || 0) + existing.scanned_count;
+            showRealtimeFeedback(`✅ ${validSku} +1 (totale: ${totalQty} pz)`, '#28a745');
+        }
+    } else {
+        // Nuovo prodotto (usa validSku convertito da EAN)
+        const newProduct = {
+            sku: validSku,
+            scanned_count: parsed.has_suffix ? 0 : 1,
+            explicit_qty: parsed.has_suffix ? parsed.quantity : 0
+        };
+        realtimeProducts.push(newProduct);
+
+        const displayQty = parsed.has_suffix ? parsed.quantity : 1;
+        showRealtimeFeedback(`✅ ${validSku} aggiunto (${displayQty} pz)`, '#28a745');
+    }
+
+    // Aggiorna lista UI
+    updateRealtimeProductList(realtimeProducts, 'scanned-products-list');
+
+    // Mostra pulsante finalizza se ci sono prodotti
+    if (realtimeProducts.length > 0) {
+        document.getElementById('finalize-realtime-btn').style.display = 'block';
+        document.getElementById('realtime-status').textContent = '✅ Prodotti scansionati. Premi Finalizza quando pronto';
+    }
+}
+
+/**
+ * Finalizza operazione Scarico
+ */
+async function finalizeScarico() {
+    if (realtimeProducts.length === 0) {
+        showRealtimeFeedback('❌ Nessun prodotto da scaricare!', '#dc3545');
+        return;
+    }
+
+    if (!realtimeSessionData.location) {
+        showRealtimeFeedback('❌ Ubicazione non impostata!', '#dc3545');
+        return;
+    }
+
+    // Conferma operazione
+    const totalItems = realtimeProducts.length;
+    const totalQty = realtimeProducts.reduce((sum, p) => {
+        return sum + (p.explicit_qty || 0) + p.scanned_count;
+    }, 0);
+
+    if (!confirm(`Confermare scarico di ${totalQty} pezzi (${totalItems} SKU) da ${realtimeSessionData.location}?`)) {
+        return;
+    }
+
+    try {
+        showRealtimeFeedback('⏳ Scarico in corso...', '#ffc107');
+
+        // Prepara payload
+        const operations = realtimeProducts.map(p => ({
+            product_sku: p.sku,
+            quantity: (p.explicit_qty || 0) + p.scanned_count
+        }));
+
+        const payload = {
+            location: realtimeSessionData.location,
+            operations: operations
+        };
+
+        // Chiamata API
+        const response = await fetch('/inventory/realtime/scarico/finalize', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showRealtimeFeedback(`✅ ${result.message}`, '#28a745');
+
+            // Reset dopo successo
+            setTimeout(() => {
+                resetScaricoSession();
+                cancelRealtimeOperation();
+                loadInventory(); // Ricarica inventario
+            }, 1500);
+        } else {
+            showRealtimeFeedback(`❌ ${result.message}`, '#dc3545');
+        }
+    } catch (error) {
+        console.error('Errore finalizzazione scarico:', error);
+        showRealtimeFeedback('❌ Errore durante la finalizzazione: ' + error.message, '#dc3545');
+    }
+}
+
+/**
+ * Reset sessione Scarico
+ */
+function resetScaricoSession() {
+    realtimeProducts = [];
+    realtimeSessionData = {};
+    document.getElementById('scanned-products-list').innerHTML = '';
+    document.getElementById('finalize-realtime-btn').style.display = 'none';
+    document.getElementById('realtime-barcode-input').value = '';
+    document.getElementById('realtime-status').textContent = '📱 Pronto per la scansione...';
+}
+
+/**
+ * Finalizza operazione Spostamento
+ */
+async function finalizeSpostamento() {
+    if (!realtimeSessionData.locationFrom) {
+        showRealtimeFeedback('❌ Ubicazione origine non impostata!', '#dc3545');
+        return;
+    }
+
+    // In modalità parziale, richiedi destinazione se non ancora scansionata
+    if (realtimeSessionData.moveMode === 'PARTIAL' && !realtimeSessionData.locationTo) {
+        // Mostra prompt per scansionare destinazione
+        showRealtimeFeedback('📍 Scansiona ubicazione destinazione...', '#ffc107');
+
+        // Imposta flag per aspettare destinazione
+        realtimeSessionData.awaitingDestination = true;
+
+        // Listener temporaneo per catturare prossima scansione come destinazione
+        const originalHandler = document.getElementById('realtime-barcode-input').onkeypress;
+
+        document.getElementById('realtime-barcode-input').onkeypress = async function(e) {
+            if (e.key === 'Enter' && this.value.trim()) {
+                const destValue = this.value.trim();
+                this.value = '';
+
+                const isLocation = await validateLocation(destValue);
+
+                if (!isLocation) {
+                    showRealtimeFeedback('❌ Deve essere una ubicazione valida!', '#dc3545');
+                    return;
+                }
+
+                realtimeSessionData.locationTo = destValue.toUpperCase();
+
+                if (realtimeSessionData.locationFrom === realtimeSessionData.locationTo) {
+                    showRealtimeFeedback('❌ Origine e destinazione non possono essere uguali!', '#dc3545');
+                    realtimeSessionData.locationTo = null;
+                    return;
+                }
+
+                // Ripristina handler originale
+                document.getElementById('realtime-barcode-input').onkeypress = originalHandler;
+
+                // Procedi con finalizzazione
+                await executeSpostamentoFinalization();
+            }
+        };
+
+        return;
+    }
+
+    // Modalità totale o modalità parziale con destinazione già impostata
+    await executeSpostamentoFinalization();
+}
+
+/**
+ * Esegue la finalizzazione dello spostamento
+ */
+async function executeSpostamentoFinalization() {
+    const mode = realtimeSessionData.moveMode || 'TOTAL';
+
+    // Conferma operazione
+    let confirmMessage;
+    if (mode === 'TOTAL') {
+        confirmMessage = `Confermare spostamento TOTALE da ${realtimeSessionData.locationFrom} a ${realtimeSessionData.locationTo}?`;
+    } else {
+        const totalQty = realtimeProducts.reduce((sum, p) => {
+            return sum + (p.explicit_qty || 0) + p.scanned_count;
+        }, 0);
+        confirmMessage = `Confermare spostamento di ${totalQty} pezzi (${realtimeProducts.length} SKU) da ${realtimeSessionData.locationFrom} a ${realtimeSessionData.locationTo}?`;
+    }
+
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+
+    try {
+        showRealtimeFeedback('⏳ Spostamento in corso...', '#ffc107');
+
+        // Prepara payload
+        const payload = {
+            location_from: realtimeSessionData.locationFrom,
+            location_to: realtimeSessionData.locationTo,
+            move_mode: mode
+        };
+
+        // In modalità parziale, aggiungi prodotti
+        if (mode === 'PARTIAL') {
+            payload.operations = realtimeProducts.map(p => ({
+                product_sku: p.sku,
+                quantity: (p.explicit_qty || 0) + p.scanned_count
+            }));
+        }
+
+        // Chiamata API
+        const response = await fetch('/inventory/realtime/spostamento/finalize', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showRealtimeFeedback(`✅ ${result.message}`, '#28a745');
+
+            // Reset dopo successo
+            setTimeout(() => {
+                resetSpostamentoSession();
+                cancelRealtimeOperation();
+                loadInventory(); // Ricarica inventario
+            }, 1500);
+        } else {
+            showRealtimeFeedback(`❌ ${result.message}`, '#dc3545');
+        }
+    } catch (error) {
+        console.error('Errore finalizzazione spostamento:', error);
+        showRealtimeFeedback('❌ Errore durante la finalizzazione: ' + error.message, '#dc3545');
+    }
+}
+
+/**
+ * Reset sessione Spostamento
+ */
+function resetSpostamentoSession() {
+    realtimeProducts = [];
+    realtimeSessionData = {};
+    document.getElementById('scanned-products-list').innerHTML = '';
+    document.getElementById('finalize-realtime-btn').style.display = 'none';
+    document.getElementById('finalize-realtime-btn').textContent = 'Finalizza';
+    document.getElementById('realtime-barcode-input').value = '';
+    document.getElementById('realtime-status').textContent = '📱 Pronto per la scansione...';
+}
+
+/**
+ * Finalizza operazione Posiziona da TERRA
+ */
+async function finalizeUbicazioneTerra() {
+    if (realtimeProducts.length === 0) {
+        showRealtimeFeedback('❌ Nessun prodotto da posizionare!', '#dc3545');
+        return;
+    }
+
+    if (!realtimeSessionData.location) {
+        showRealtimeFeedback('❌ Ubicazione destinazione non impostata!', '#dc3545');
+        return;
+    }
+
+    // Conferma operazione
+    const totalItems = realtimeProducts.length;
+    const totalQty = realtimeProducts.reduce((sum, p) => {
+        return sum + (p.explicit_qty || 0) + p.scanned_count;
+    }, 0);
+
+    if (!confirm(`Confermare posizionamento di ${totalQty} pezzi (${totalItems} SKU) da TERRA a ${realtimeSessionData.location}?`)) {
+        return;
+    }
+
+    try {
+        showRealtimeFeedback('⏳ Posizionamento in corso...', '#ffc107');
+
+        // Prepara payload
+        const operations = realtimeProducts.map(p => ({
+            product_sku: p.sku,
+            quantity: (p.explicit_qty || 0) + p.scanned_count
+        }));
+
+        const payload = {
+            destination: realtimeSessionData.location,
+            operations: operations
+        };
+
+        // Chiamata API
+        const response = await fetch('/inventory/realtime/ubicazione-terra/finalize', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showRealtimeFeedback(`✅ ${result.message}`, '#28a745');
+
+            // Reset dopo successo
+            setTimeout(() => {
+                resetUbicazioneTerraSession();
+                cancelRealtimeOperation();
+                loadInventory(); // Ricarica inventario
+            }, 1500);
+        } else {
+            showRealtimeFeedback(`❌ ${result.message}`, '#dc3545');
+        }
+    } catch (error) {
+        console.error('Errore finalizzazione ubicazione terra:', error);
+        showRealtimeFeedback('❌ Errore durante la finalizzazione: ' + error.message, '#dc3545');
+    }
+}
+
+/**
+ * Reset sessione Ubicazione TERRA
+ */
+function resetUbicazioneTerraSession() {
+    realtimeProducts = [];
+    realtimeSessionData = {};
+    document.getElementById('scanned-products-list').innerHTML = '';
+    document.getElementById('finalize-realtime-btn').style.display = 'none';
+    document.getElementById('realtime-barcode-input').value = '';
+    document.getElementById('realtime-status').textContent = '📱 Pronto per la scansione...';
 }

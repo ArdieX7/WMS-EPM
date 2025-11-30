@@ -57,7 +57,36 @@ document.addEventListener('DOMContentLoaded', function() {
             closeSerialUploadOverlay();
         }
     };
+
+    // ========== MOBILE OPTIMIZATION ==========
+    // Inietta badge status mobile nella cella Numero Ordine
+    injectMobileOrderStatus();
 });
+
+/**
+ * MOBILE OPTIMIZATION: Inietta badge status nella cella Numero Ordine su mobile
+ */
+function injectMobileOrderStatus() {
+    if (window.innerWidth <= 768) {
+        const rows = document.querySelectorAll('#ordersTable tbody tr');
+        rows.forEach(row => {
+            const orderNumberCell = row.querySelector('td:nth-child(1)');
+            const statusCell = row.querySelector('td:nth-child(2)');
+
+            if (orderNumberCell && statusCell && !orderNumberCell.querySelector('.mobile-status-badge')) {
+                const statusBadge = statusCell.querySelector('.status-badge');
+                if (statusBadge) {
+                    const mobileBadge = statusBadge.cloneNode(true);
+                    mobileBadge.classList.add('mobile-status-badge');
+                    mobileBadge.style.cssText = 'position: absolute; top: 0.25rem; left: 0.25rem; font-size: 0.6rem;';
+                    orderNumberCell.style.position = 'relative';
+                    orderNumberCell.style.paddingTop = '2rem';
+                    orderNumberCell.insertBefore(mobileBadge, orderNumberCell.firstChild);
+                }
+            }
+        });
+    }
+}
 
 function setupEventListeners() {
     // Form upload seriali
@@ -1046,7 +1075,7 @@ async function refreshOrdersList() {
                 .reduce((sum, serials) => sum + serials.length, 0);
             
             return `
-                <tr>
+                <tr data-order-status="${order.order_status || 'pending'}">
                     <td><strong>${order.order_number}</strong></td>
                     <td>${statusBadge}</td>
                     <td>${expectedCount}</td>
@@ -1054,35 +1083,38 @@ async function refreshOrdersList() {
                     <td>${validationBadge}</td>
                     <td>${lastUpdate}</td>
                     <td class="actions">
-                        <button onclick="viewOrderDetails('${order.order_number}')" 
+                        <button onclick="viewOrderDetails('${order.order_number}')"
                                 class="btn btn-small btn-info" title="Visualizza Dettagli">
                             👁️ Dettagli
                         </button>
-                        <button onclick="validateOrder('${order.order_number}')" 
-                                class="btn btn-small btn-warning" title="Valida Seriali">
+                        <button onclick="validateOrder('${order.order_number}')"
+                                class="btn btn-small btn-warning mobile-hide" title="Valida Seriali">
                             ✅ Valida
                         </button>
-                        <button onclick="generateOrderPDF('${order.order_number}')" 
-                                class="btn btn-small btn-success" title="Genera PDF">
+                        <button onclick="generateOrderPDF('${order.order_number}')"
+                                class="btn btn-small btn-success mobile-hide" title="Genera PDF">
                             📄 PDF
                         </button>
-                        <button onclick="generateOrderCSV('${order.order_number}')" 
-                                class="btn btn-small btn-primary" title="Esporta CSV">
+                        <button onclick="generateOrderCSV('${order.order_number}')"
+                                class="btn btn-small btn-primary mobile-hide" title="Esporta CSV">
                             📊 CSV
                         </button>
-                        <button onclick="generateOrderExcel('${order.order_number}')" 
-                                class="btn btn-small btn-info" title="Esporta Excel">
+                        <button onclick="generateOrderExcel('${order.order_number}')"
+                                class="btn btn-small btn-info mobile-hide" title="Esporta Excel">
                             📈 Excel
                         </button>
-                        <button onclick="deleteOrderSerials('${order.order_number}')" 
-                                class="btn btn-small btn-danger" title="Elimina Seriali">
+                        <button onclick="deleteOrderSerials('${order.order_number}')"
+                                class="btn btn-small btn-danger mobile-hide" title="Elimina Seriali">
                             🗑️ Elimina
                         </button>
                     </td>
                 </tr>
             `;
         }).join('');
-        
+
+        // MOBILE OPTIMIZATION: Inietta badge status dopo rebuild tabella
+        injectMobileOrderStatus();
+
     } catch (error) {
         console.error('Errore nel refresh della lista ordini:', error);
     }
@@ -1204,7 +1236,18 @@ function showOrderDetailsModal(orderData) {
         });
         html += '</div>';
     }
-    
+
+    // MOBILE OPTIMIZATION: Aggiungi pulsanti azione per mobile
+    if (window.innerWidth <= 768) {
+        html += '<div class="modal-actions" style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem;">';
+        html += `<button onclick="validateOrder('${orderData.order_number}')" class="btn btn-warning" style="width: 100%; min-height: 44px;">✅ Valida Seriali</button>`;
+        html += `<button onclick="generateOrderPDF('${orderData.order_number}')" class="btn btn-success" style="width: 100%; min-height: 44px;">📄 Genera PDF</button>`;
+        html += `<button onclick="generateOrderCSV('${orderData.order_number}')" class="btn btn-primary" style="width: 100%; min-height: 44px;">📊 Esporta CSV</button>`;
+        html += `<button onclick="generateOrderExcel('${orderData.order_number}')" class="btn btn-info" style="width: 100%; min-height: 44px;">📈 Esporta Excel</button>`;
+        html += `<button onclick="if(confirm('Sei sicuro di voler eliminare i seriali per questo ordine?')) deleteOrderSerials('${orderData.order_number}')" class="btn btn-danger" style="width: 100%; min-height: 44px;">🗑️ Elimina Seriali</button>`;
+        html += '</div>';
+    }
+
     content.innerHTML = html;
     modal.style.display = 'flex';
 }
@@ -1589,3 +1632,461 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// MOBILE OPTIMIZATION: Resize listener per re-inject badge su cambio orientamento
+let resizeTimeout;
+window.addEventListener('resize', function() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(injectMobileOrderStatus, 250);
+});
+
+// ========================================
+// REALTIME SCANNER - STATE MANAGEMENT
+// ========================================
+
+let realtimeScannerState = {
+    selectedOrders: [],
+    ordersData: {},
+    scannedSerials: [],
+    scannedSerialsSet: new Set(),
+    errors: [],
+    productsProgress: {},
+    scanStep: 'EAN',           // 'EAN' o 'SERIAL'
+    currentEan: null,          // EAN appena scansionato in attesa di seriale
+    currentSku: null           // SKU corrispondente all'EAN
+};
+
+// ========================================
+// MODAL SELEZIONE ORDINI
+// ========================================
+
+async function openOrderSelectionModal() {
+    try {
+        const response = await fetch('/serials/open-orders-for-scanning', {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Orders data:', data);
+
+        if (!data.orders) {
+            throw new Error('Formato risposta non valido: manca "orders"');
+        }
+
+        const list = document.getElementById('open-orders-list');
+        list.innerHTML = data.orders.map(order => `
+            <label class="order-checkbox">
+                <input type="checkbox"
+                       value="${order.order_number}"
+                       data-order='${JSON.stringify(order)}'>
+                <div class="order-details">
+                    <div class="order-num">#${order.order_number}</div>
+                    <div class="order-customer">${order.customer_name}</div>
+                    <div class="order-stats">
+                        ${order.serials_loaded}/${order.total_expected} seriali
+                        ${order.is_complete ? '✅' : '⏳'}
+                    </div>
+                </div>
+            </label>
+        `).join('');
+
+        document.getElementById('order-selection-modal').style.display = 'flex';
+
+    } catch (error) {
+        console.error('Errore caricamento ordini:', error);
+        alert('Errore nel caricamento degli ordini');
+    }
+}
+
+function closeOrderSelectionModal() {
+    document.getElementById('order-selection-modal').style.display = 'none';
+}
+
+function startRealtimeScanner() {
+    const checkboxes = document.querySelectorAll('#open-orders-list input:checked');
+
+    if (checkboxes.length === 0) {
+        alert('⚠️ Seleziona almeno un ordine');
+        return;
+    }
+
+    realtimeScannerState = {
+        selectedOrders: [],
+        ordersData: {},
+        scannedSerials: [],
+        scannedSerialsSet: new Set(),
+        errors: [],
+        productsProgress: {},
+        scanStep: 'EAN',
+        currentEan: null,
+        currentSku: null
+    };
+
+    checkboxes.forEach(cb => {
+        const orderData = JSON.parse(cb.dataset.order);
+        realtimeScannerState.selectedOrders.push(orderData.order_number);
+        realtimeScannerState.ordersData[orderData.order_number] = orderData;
+
+        for (const [sku, info] of Object.entries(orderData.expected_products)) {
+            const key = `${orderData.order_number}_${sku}`;
+            realtimeScannerState.productsProgress[key] = {
+                order_number: orderData.order_number,
+                sku: sku,
+                product_name: info.product_name,
+                expected: info.quantity,
+                scanned: info.serials_loaded || 0  // USA i seriali già salvati
+            };
+        }
+    });
+
+    closeOrderSelectionModal();
+    document.getElementById('realtime-scanner-overlay').style.display = 'flex';
+    renderScannerState();
+    document.getElementById('scanner-barcode-input').focus();
+}
+
+// ========================================
+// INPUT SCANNER - VALIDAZIONE REAL-TIME
+// ========================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    const scannerInput = document.getElementById('scanner-barcode-input');
+    if (scannerInput) {
+        // Gestione readonly per mobile (come inventory.js)
+        scannerInput.addEventListener('keydown', function(e) {
+            if (this.readOnly && e.key !== 'Tab') {
+                this.readOnly = false;
+            }
+        });
+
+        // Gestione scansione a due step
+        scannerInput.addEventListener('keypress', async function(e) {
+            if (e.key === 'Enter') {
+                const input = this.value.trim();
+                if (!input) return;
+
+                if (realtimeScannerState.scanStep === 'EAN') {
+                    // STEP 1: Scansiona EAN
+                    await handleEanScan(input);
+                } else {
+                    // STEP 2: Scansiona SERIALE
+                    await handleSerialScan(input);
+                }
+
+                this.value = '';
+            }
+        });
+    }
+});
+
+// STEP 1: Gestione scansione EAN
+async function handleEanScan(eanCode) {
+    const feedback = document.getElementById('scan-feedback');
+    const input = document.getElementById('scanner-barcode-input');
+
+    if (!eanCode || eanCode.trim() === '') {
+        showScanFeedback('❌ Codice vuoto', 'error');
+        playErrorBeep();
+        return;
+    }
+
+    feedback.className = 'scan-feedback loading';
+    feedback.textContent = '⏳ Verifica prodotto...';
+
+    try {
+        // Converti EAN→SKU tramite backend
+        const response = await fetch('/serials/convert-ean-to-sku', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify({
+                ean_code: eanCode.trim(),
+                order_numbers: realtimeScannerState.selectedOrders
+            })
+        });
+
+        const result = await response.json();
+
+        if (!result.valid) {
+            showScanFeedback(`❌ ${result.error}`, 'error');
+            playErrorBeep();
+            return;
+        }
+
+        // Passa allo step SERIAL con SKU convertito
+        realtimeScannerState.scanStep = 'SERIAL';
+        realtimeScannerState.currentEan = eanCode.trim();
+        realtimeScannerState.currentSku = result.sku;
+
+        input.placeholder = 'SCANSIONA SERIALE';
+        showScanFeedback(`📦 ${result.sku} - Scansiona SERIALE`, 'success');
+        playSuccessBeep();
+
+    } catch (error) {
+        console.error('Errore conversione EAN:', error);
+        showScanFeedback('❌ Errore verifica prodotto', 'error');
+        playErrorBeep();
+    }
+}
+
+// STEP 2: Gestione scansione SERIALE
+async function handleSerialScan(serialNumber) {
+    const feedback = document.getElementById('scan-feedback');
+    const input = document.getElementById('scanner-barcode-input');
+
+    feedback.className = 'scan-feedback loading';
+    feedback.textContent = '⏳ Validazione seriale...';
+
+    // Usa la funzione esistente per validare con il backend
+    await validateAndAddSerial(realtimeScannerState.currentEan, serialNumber);
+
+    // Torna allo step EAN
+    realtimeScannerState.scanStep = 'EAN';
+    realtimeScannerState.currentEan = null;
+    realtimeScannerState.currentSku = null;
+    input.placeholder = 'SCANSIONA EAN';
+}
+
+async function validateAndAddSerial(eanCode, serialNumber) {
+    const feedback = document.getElementById('scan-feedback');
+    feedback.className = 'scan-feedback loading';
+    feedback.textContent = '⏳ Validazione...';
+
+    try {
+        const response = await fetch('/serials/validate-serial-realtime', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify({
+                order_numbers: realtimeScannerState.selectedOrders,
+                ean_code: eanCode,
+                serial_number: serialNumber,
+                scanned_serials: Array.from(realtimeScannerState.scannedSerialsSet),
+                scanned_serials_detail: realtimeScannerState.scannedSerials
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.valid) {
+            // Aggiungi alla lista locale (per tracking UI)
+            realtimeScannerState.scannedSerials.push({
+                ean_code: eanCode,
+                serial_number: serialNumber,
+                sku: result.sku,
+                order_number: result.order_number,
+                timestamp: new Date().toISOString()
+            });
+            realtimeScannerState.scannedSerialsSet.add(serialNumber);
+
+            const key = `${result.order_number}_${result.sku}`;
+            if (realtimeScannerState.productsProgress[key]) {
+                realtimeScannerState.productsProgress[key].scanned++;
+            }
+
+            // Feedback con indicazione salvataggio automatico
+            showScanFeedback(`✅ ${result.sku} - ${result.progress} | 💾 Salvato`, 'success');
+            playSuccessBeep();
+
+        } else {
+            realtimeScannerState.errors.push({
+                ean_code: eanCode,
+                serial_number: serialNumber,
+                error: result.error,
+                status: result.status,
+                timestamp: new Date().toISOString()
+            });
+
+            showScanFeedback(`❌ ${result.error}`, 'error');
+            playErrorBeep();
+        }
+
+        renderScannerState();
+
+    } catch (error) {
+        console.error('Errore validazione:', error);
+        showScanFeedback('❌ Errore di rete', 'error');
+        playErrorBeep();
+    }
+}
+
+// ========================================
+// RENDER STATE
+// ========================================
+
+function renderScannerState() {
+    renderSelectedOrders();
+    renderProductsTracker();
+    renderScannedSerialsLog();
+    renderErrorsLog();
+
+    document.getElementById('valid-count').textContent = realtimeScannerState.scannedSerials.length;
+    document.getElementById('error-count').textContent = realtimeScannerState.errors.length;
+    document.getElementById('commit-count').textContent = realtimeScannerState.scannedSerials.length;
+}
+
+function renderSelectedOrders() {
+    const list = document.getElementById('scanner-orders-list');
+    list.innerHTML = realtimeScannerState.selectedOrders.map(orderNum => {
+        const order = realtimeScannerState.ordersData[orderNum];
+        return `
+            <div class="selected-order-badge">
+                #${orderNum} - ${order.customer_name}
+            </div>
+        `;
+    }).join('');
+}
+
+function renderProductsTracker() {
+    const list = document.getElementById('products-tracker-list');
+
+    const items = Object.values(realtimeScannerState.productsProgress)
+        .sort((a, b) => {
+            const aMissing = a.expected - a.scanned;
+            const bMissing = b.expected - b.scanned;
+            return bMissing - aMissing;
+        });
+
+    list.innerHTML = items.map(item => {
+        const missing = item.expected - item.scanned;
+        const isComplete = missing === 0;
+        const percent = (item.scanned / item.expected) * 100;
+
+        return `
+            <div class="product-tracker ${isComplete ? 'complete' : 'incomplete'}">
+                <div class="product-header">
+                    <span class="sku">${item.sku}</span>
+                    <span class="name">${item.product_name}</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${percent}%"></div>
+                </div>
+                <div class="progress-text">
+                    ${item.scanned}/${item.expected}
+                    ${isComplete ? '✅' : `<span class="missing">(${missing} mancanti)</span>`}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderScannedSerialsLog() {
+    const log = document.getElementById('scanned-serials-log');
+    const recent = realtimeScannerState.scannedSerials.slice(-20).reverse();
+
+    log.innerHTML = recent.map(item => `
+        <div class="serial-log-item">
+            <span class="serial-num">${item.serial_number}</span>
+            <span class="serial-sku">${item.sku}</span>
+        </div>
+    `).join('');
+}
+
+function renderErrorsLog() {
+    const section = document.getElementById('errors-section');
+    const log = document.getElementById('scan-errors-log');
+
+    if (realtimeScannerState.errors.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    const recent = realtimeScannerState.errors.slice(-20).reverse();
+
+    log.innerHTML = recent.map(item => `
+        <div class="error-log-item">
+            <div class="error-serial">${item.serial_number}</div>
+            <div class="error-msg">${item.error}</div>
+        </div>
+    `).join('');
+}
+
+// ========================================
+// COMMIT & CLEAR
+// ========================================
+
+async function commitScannedSerials() {
+    if (realtimeScannerState.scannedSerials.length === 0) {
+        alert('⚠️ Nessun seriale da salvare');
+        return;
+    }
+
+    const count = realtimeScannerState.scannedSerials.length;
+    if (!confirm(`💾 Salvare ${count} seriali?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/serials/commit-realtime-serials', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify({
+                serials: realtimeScannerState.scannedSerials,
+                uploaded_by: document.body.dataset.username || 'operatore'
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            alert(`✅ ${result.inserted_count} seriali salvati!`);
+            closeRealtimeScanner();
+            refreshOrdersList();
+        }
+
+    } catch (error) {
+        console.error('Errore salvataggio:', error);
+        alert('❌ Errore durante il salvataggio');
+    }
+}
+
+function clearScannedSerials() {
+    if (!confirm('🗑️ Cancellare tutti i seriali scansionati?')) {
+        return;
+    }
+
+    realtimeScannerState.scannedSerials = [];
+    realtimeScannerState.scannedSerialsSet.clear();
+    realtimeScannerState.errors = [];
+
+    for (const key in realtimeScannerState.productsProgress) {
+        realtimeScannerState.productsProgress[key].scanned = 0;
+    }
+
+    renderScannerState();
+}
+
+function closeRealtimeScanner() {
+    document.getElementById('realtime-scanner-overlay').style.display = 'none';
+}
+
+// ========================================
+// UTILITY
+// ========================================
+
+function showScanFeedback(message, type) {
+    const feedback = document.getElementById('scan-feedback');
+    feedback.className = `scan-feedback ${type}`;
+    feedback.textContent = message;
+
+    setTimeout(() => {
+        feedback.className = 'scan-feedback';
+        feedback.textContent = '';
+    }, 3000);
+}
+
+function playSuccessBeep() {
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+Pw=');
+    audio.play().catch(() => {});
+}
+
+function playErrorBeep() {
+    const audio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+    audio.play().catch(() => {});
+}
