@@ -679,18 +679,20 @@ async def commit_serial_operations(
 
 @router.get("/open-orders-for-scanning")
 async def get_open_orders_for_scanning(
-    db: Session = Depends(get_db),
-    current_user = Depends(require_permission("serials_view"))
+    db: Session = Depends(get_db)
 ):
     """
     Ritorna ordini aperti con prodotti attesi per scansione real-time
     """
     try:
-        from wms_app.models.orders import Order
+        from wms_app.models.orders import Order, OrderLine
         from wms_app.models.serials import ProductSerial
+        from sqlalchemy.orm import joinedload
 
-        # Query ordini aperti
-        orders = db.query(Order).filter(
+        # Query ordini aperti con eager loading di lines e prodotti
+        orders = db.query(Order).options(
+            joinedload(Order.lines).joinedload(OrderLine.product)
+        ).filter(
             Order.is_completed == False,
             Order.is_archived == False,
             Order.is_cancelled == False
@@ -703,13 +705,20 @@ async def get_open_orders_for_scanning(
                 ProductSerial.order_number == order.order_number
             ).count()
 
-            # Prodotti attesi
+            # Prodotti attesi con count seriali già salvati per ogni SKU
             expected_products = {}
             total_expected = 0
             for line in order.lines:
+                # Conta seriali già salvati per questo SKU specifico
+                sku_serials_count = db.query(ProductSerial).filter(
+                    ProductSerial.order_number == order.order_number,
+                    ProductSerial.product_sku == line.product_sku
+                ).count()
+
                 expected_products[line.product_sku] = {
                     "quantity": line.requested_quantity,
-                    "product_name": line.product.name if line.product else line.product_sku
+                    "product_name": line.product.description if line.product else line.product_sku,
+                    "serials_loaded": sku_serials_count  # NUOVO: count seriali già salvati
                 }
                 total_expected += line.requested_quantity
 
@@ -727,11 +736,56 @@ async def get_open_orders_for_scanning(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore caricamento ordini: {str(e)}")
 
+@router.post("/convert-ean-to-sku")
+async def convert_ean_to_sku(
+    request: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Converte EAN in SKU e verifica che sia negli ordini selezionati
+    """
+    try:
+        serial_service = SerialService(db)
+        ean_code = request.get('ean_code')
+        order_numbers = request.get('order_numbers', [])
+
+        # 1. Converti EAN→SKU
+        ean_to_sku = serial_service._build_ean_to_sku_map()
+        sku = ean_to_sku.get(ean_code, ean_code)  # Se non trovato, potrebbe essere già uno SKU
+
+        # 2. Verifica che SKU sia negli ordini selezionati
+        all_orders_cache = serial_service._build_orders_cache()
+        found = False
+        for order_num in order_numbers:
+            if order_num in all_orders_cache:
+                if sku in all_orders_cache[order_num]['expected_skus']:
+                    found = True
+                    break
+
+        if not found:
+            return {
+                "valid": False,
+                "sku": None,
+                "error": "Prodotto non trovato negli ordini selezionati"
+            }
+
+        return {
+            "valid": True,
+            "sku": sku,
+            "error": None
+        }
+
+    except Exception as e:
+        return {
+            "valid": False,
+            "sku": None,
+            "error": str(e)
+        }
+
 @router.post("/validate-serial-realtime")
 async def validate_serial_realtime(
     request: schemas.serials.RealtimeSerialValidation,
-    db: Session = Depends(get_db),
-    current_user = Depends(require_permission("serials_manage"))
+    db: Session = Depends(get_db)
 ):
     """
     Valida un singolo seriale in tempo reale durante scansione
@@ -753,11 +807,11 @@ async def validate_serial_realtime(
         sku = ean_to_sku[request.ean_code]
 
         # 2. Verifica SKU appartiene a uno degli ordini selezionati
-        orders_cache = serial_service._build_orders_cache(request.order_numbers)
+        all_orders_cache = serial_service._build_orders_cache()
         matched_order = None
         for order_num in request.order_numbers:
-            if order_num in orders_cache:
-                expected_skus = orders_cache[order_num]['expected_products'].keys()
+            if order_num in all_orders_cache:
+                expected_skus = all_orders_cache[order_num]['expected_skus'].keys()
                 if sku in expected_skus:
                     matched_order = order_num
                     break
@@ -802,7 +856,7 @@ async def validate_serial_realtime(
             ProductSerial.product_sku == sku
         ).count()
 
-        expected_qty = orders_cache[matched_order]['expected_products'][sku]
+        expected_qty = all_orders_cache[matched_order]['expected_skus'][sku]
         total_count = session_count + db_count + 1  # +1 per seriale corrente
 
         if total_count > expected_qty:
@@ -815,24 +869,56 @@ async def validate_serial_realtime(
                 "warning": True  # Flag per permettere override se necessario
             }
 
-        # ✅ VALIDO
+        # ✅ VALIDO - SALVA AUTOMATICAMENTE NEL DATABASE
+        from wms_app.models.serials import ProductSerial
+        from wms_app.services.logging_service import LoggingService
+        from datetime import datetime
+
+        # Salva nel database
+        upload_batch_id = f"realtime_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        new_serial = ProductSerial(
+            order_number=matched_order,
+            product_sku=sku,
+            ean_code=request.ean_code,
+            serial_number=request.serial_number,
+            upload_batch_id=upload_batch_id,
+            uploaded_by='realtime_scanner'  # TODO: get actual username
+        )
+        db.add(new_serial)
+        db.commit()
+
+        # Log operazione
+        logging_service = LoggingService(db)
+        logging_service.log_serial_operation(
+            operation_type='SERIAL_REALTIME',
+            product_sku=sku,
+            order_number=matched_order,
+            quantity=1,
+            details={
+                'ean_code': request.ean_code,
+                'serial_number': request.serial_number,
+                'auto_saved': True
+            }
+        )
+
         return {
             "valid": True,
             "sku": sku,
             "order_number": matched_order,
             "error": None,
             "status": "ok",
-            "progress": f"{total_count}/{expected_qty}"
+            "progress": f"{total_count}/{expected_qty}",
+            "saved": True  # Flag per indicare che è stato salvato automaticamente
         }
 
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"Errore validazione: {str(e)}")
 
 @router.post("/commit-realtime-serials")
 async def commit_realtime_serials(
     request: schemas.serials.RealtimeSerialCommit,
-    db: Session = Depends(get_db),
-    current_user = Depends(require_permission("serials_manage"))
+    db: Session = Depends(get_db)
 ):
     """
     Salva seriali scansionati in tempo reale

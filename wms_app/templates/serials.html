@@ -386,9 +386,11 @@ SN100</code></pre>
                         <label>🔍 Scansiona Barcode</label>
                         <input type="text"
                                id="scanner-barcode-input"
-                               placeholder="EAN SERIALE"
+                               placeholder="SCANSIONA EAN"
                                autofocus
-                               autocomplete="off">
+                               autocomplete="off"
+                               inputmode="none"
+                               readonly>
                         <div id="scan-feedback" class="scan-feedback"></div>
                     </div>
 
@@ -414,13 +416,12 @@ SN100</code></pre>
                 <!-- Footer Azioni -->
                 <div class="scanner-footer">
                     <button class="btn btn-success btn-lg"
-                            onclick="commitScannedSerials()">
-                        💾 Salva Seriali (<span id="commit-count">0</span>)
+                            onclick="closeRealtimeScanner()">
+                        ✓ Chiudi Scanner
                     </button>
-                    <button class="btn btn-secondary"
-                            onclick="clearScannedSerials()">
-                        🗑️ Cancella Sessione
-                    </button>
+                    <div style="font-size: 0.9rem; color: #28a745; margin-top: 8px;">
+                        💾 Salvataggio automatico attivo
+                    </div>
                 </div>
             </div>
         </div>

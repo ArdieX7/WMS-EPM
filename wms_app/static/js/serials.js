@@ -1650,7 +1650,10 @@ let realtimeScannerState = {
     scannedSerials: [],
     scannedSerialsSet: new Set(),
     errors: [],
-    productsProgress: {}
+    productsProgress: {},
+    scanStep: 'EAN',           // 'EAN' o 'SERIAL'
+    currentEan: null,          // EAN appena scansionato in attesa di seriale
+    currentSku: null           // SKU corrispondente all'EAN
 };
 
 // ========================================
@@ -1659,8 +1662,20 @@ let realtimeScannerState = {
 
 async function openOrderSelectionModal() {
     try {
-        const response = await fetch('/serials/open-orders-for-scanning');
+        const response = await fetch('/serials/open-orders-for-scanning', {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
+        console.log('Orders data:', data);
+
+        if (!data.orders) {
+            throw new Error('Formato risposta non valido: manca "orders"');
+        }
 
         const list = document.getElementById('open-orders-list');
         list.innerHTML = data.orders.map(order => `
@@ -1705,7 +1720,10 @@ function startRealtimeScanner() {
         scannedSerials: [],
         scannedSerialsSet: new Set(),
         errors: [],
-        productsProgress: {}
+        productsProgress: {},
+        scanStep: 'EAN',
+        currentEan: null,
+        currentSku: null
     };
 
     checkboxes.forEach(cb => {
@@ -1720,7 +1738,7 @@ function startRealtimeScanner() {
                 sku: sku,
                 product_name: info.product_name,
                 expected: info.quantity,
-                scanned: 0
+                scanned: info.serials_loaded || 0  // USA i seriali già salvati
             };
         }
     });
@@ -1738,28 +1756,100 @@ function startRealtimeScanner() {
 document.addEventListener('DOMContentLoaded', function() {
     const scannerInput = document.getElementById('scanner-barcode-input');
     if (scannerInput) {
+        // Gestione readonly per mobile (come inventory.js)
+        scannerInput.addEventListener('keydown', function(e) {
+            if (this.readOnly && e.key !== 'Tab') {
+                this.readOnly = false;
+            }
+        });
+
+        // Gestione scansione a due step
         scannerInput.addEventListener('keypress', async function(e) {
             if (e.key === 'Enter') {
                 const input = this.value.trim();
                 if (!input) return;
 
-                const parts = input.split(/[\s\t]+/);
-                if (parts.length < 2) {
-                    showScanFeedback('❌ Formato errato. Usa: EAN SERIALE', 'error');
-                    playErrorBeep();
-                    return;
+                if (realtimeScannerState.scanStep === 'EAN') {
+                    // STEP 1: Scansiona EAN
+                    await handleEanScan(input);
+                } else {
+                    // STEP 2: Scansiona SERIALE
+                    await handleSerialScan(input);
                 }
-
-                const eanCode = parts[0];
-                const serialNumber = parts.slice(1).join('');
-
-                await validateAndAddSerial(eanCode, serialNumber);
 
                 this.value = '';
             }
         });
     }
 });
+
+// STEP 1: Gestione scansione EAN
+async function handleEanScan(eanCode) {
+    const feedback = document.getElementById('scan-feedback');
+    const input = document.getElementById('scanner-barcode-input');
+
+    if (!eanCode || eanCode.trim() === '') {
+        showScanFeedback('❌ Codice vuoto', 'error');
+        playErrorBeep();
+        return;
+    }
+
+    feedback.className = 'scan-feedback loading';
+    feedback.textContent = '⏳ Verifica prodotto...';
+
+    try {
+        // Converti EAN→SKU tramite backend
+        const response = await fetch('/serials/convert-ean-to-sku', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify({
+                ean_code: eanCode.trim(),
+                order_numbers: realtimeScannerState.selectedOrders
+            })
+        });
+
+        const result = await response.json();
+
+        if (!result.valid) {
+            showScanFeedback(`❌ ${result.error}`, 'error');
+            playErrorBeep();
+            return;
+        }
+
+        // Passa allo step SERIAL con SKU convertito
+        realtimeScannerState.scanStep = 'SERIAL';
+        realtimeScannerState.currentEan = eanCode.trim();
+        realtimeScannerState.currentSku = result.sku;
+
+        input.placeholder = 'SCANSIONA SERIALE';
+        showScanFeedback(`📦 ${result.sku} - Scansiona SERIALE`, 'success');
+        playSuccessBeep();
+
+    } catch (error) {
+        console.error('Errore conversione EAN:', error);
+        showScanFeedback('❌ Errore verifica prodotto', 'error');
+        playErrorBeep();
+    }
+}
+
+// STEP 2: Gestione scansione SERIALE
+async function handleSerialScan(serialNumber) {
+    const feedback = document.getElementById('scan-feedback');
+    const input = document.getElementById('scanner-barcode-input');
+
+    feedback.className = 'scan-feedback loading';
+    feedback.textContent = '⏳ Validazione seriale...';
+
+    // Usa la funzione esistente per validare con il backend
+    await validateAndAddSerial(realtimeScannerState.currentEan, serialNumber);
+
+    // Torna allo step EAN
+    realtimeScannerState.scanStep = 'EAN';
+    realtimeScannerState.currentEan = null;
+    realtimeScannerState.currentSku = null;
+    input.placeholder = 'SCANSIONA EAN';
+}
 
 async function validateAndAddSerial(eanCode, serialNumber) {
     const feedback = document.getElementById('scan-feedback');
@@ -1770,6 +1860,7 @@ async function validateAndAddSerial(eanCode, serialNumber) {
         const response = await fetch('/serials/validate-serial-realtime', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
             body: JSON.stringify({
                 order_numbers: realtimeScannerState.selectedOrders,
                 ean_code: eanCode,
@@ -1782,6 +1873,7 @@ async function validateAndAddSerial(eanCode, serialNumber) {
         const result = await response.json();
 
         if (result.valid) {
+            // Aggiungi alla lista locale (per tracking UI)
             realtimeScannerState.scannedSerials.push({
                 ean_code: eanCode,
                 serial_number: serialNumber,
@@ -1796,7 +1888,8 @@ async function validateAndAddSerial(eanCode, serialNumber) {
                 realtimeScannerState.productsProgress[key].scanned++;
             }
 
-            showScanFeedback(`✅ ${result.sku} - ${result.progress}`, 'success');
+            // Feedback con indicazione salvataggio automatico
+            showScanFeedback(`✅ ${result.sku} - ${result.progress} | 💾 Salvato`, 'success');
             playSuccessBeep();
 
         } else {
@@ -1932,6 +2025,7 @@ async function commitScannedSerials() {
         const response = await fetch('/serials/commit-realtime-serials', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
             body: JSON.stringify({
                 serials: realtimeScannerState.scannedSerials,
                 uploaded_by: document.body.dataset.username || 'operatore'
