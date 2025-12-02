@@ -64,11 +64,10 @@ async def get_ddt_management_page(request: Request, db: Session = Depends(get_db
         joinedload(DDT.order)
     ).order_by(DDT.issue_date.desc()).all()
     
-    # Ordini completati senza DDT (con righe e prodotti per calcolo peso)
+    # Tutti gli ordini senza DDT (anche non completati, con righe e prodotti per calcolo peso)
     orders_without_ddt = db.query(models.Order).options(
         joinedload(models.Order.lines).joinedload(models.OrderLine.product)
     ).filter(
-        models.Order.is_completed == True,
         ~models.Order.order_number.in_(
             db.query(DDT.order_number).subquery()
         )
@@ -85,14 +84,13 @@ async def get_ddt_management_page(request: Request, db: Session = Depends(get_db
 def generate_ddt_from_order(ddt_request: schemas.ddt.DDTGenerateRequest, db: Session = Depends(get_db)):
     """Genera DDT da ordine completato"""
     
-    # Verifica che l'ordine esista ed sia completato
+    # Verifica che l'ordine esista (anche se non completato)
     order = db.query(models.Order).filter(
-        models.Order.order_number == ddt_request.order_number,
-        models.Order.is_completed == True
+        models.Order.order_number == ddt_request.order_number
     ).options(joinedload(models.Order.lines)).first()
-    
+
     if not order:
-        raise HTTPException(status_code=404, detail="Ordine non trovato o non completato")
+        raise HTTPException(status_code=404, detail="Ordine non trovato")
     
     # Verifica che non esista già un DDT per questo ordine
     existing_ddt = db.query(DDT).filter(
