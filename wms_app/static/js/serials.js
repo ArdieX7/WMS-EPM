@@ -1746,7 +1746,11 @@ function startRealtimeScanner() {
     closeOrderSelectionModal();
     document.getElementById('realtime-scanner-overlay').style.display = 'flex';
     renderScannerState();
-    document.getElementById('scanner-barcode-input').focus();
+
+    // Autofocus con delay per garantire rendering DOM completo
+    setTimeout(() => {
+        document.getElementById('scanner-barcode-input').focus();
+    }, 150);
 }
 
 // ========================================
@@ -1926,7 +1930,7 @@ function renderScannerState() {
 
     document.getElementById('valid-count').textContent = realtimeScannerState.scannedSerials.length;
     document.getElementById('error-count').textContent = realtimeScannerState.errors.length;
-    document.getElementById('commit-count').textContent = realtimeScannerState.scannedSerials.length;
+    // commit-count rimosso: non più necessario con auto-save
 }
 
 function renderSelectedOrders() {
