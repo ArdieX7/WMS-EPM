@@ -118,6 +118,7 @@ class OperationType:
     # Operazioni Seriali
     SERIALI_ASSEGNATI = "SERIALI_ASSEGNATI"
     SERIALI_RIMOSSI = "SERIALI_RIMOSSI"
+    SERIAL_REALTIME = "SERIAL_REALTIME"
     
     # Operazioni DDT
     DDT_CREATO = "DDT_CREATO"

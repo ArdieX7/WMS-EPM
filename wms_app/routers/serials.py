@@ -889,14 +889,16 @@ async def validate_serial_realtime(
 
         # Log operazione
         logging_service = LoggingService(db)
-        logging_service.log_serial_operation(
-            operation_type='SERIAL_REALTIME',
+        logging_service.log_operation(
+            operation_type=OperationType.SERIAL_REALTIME,
+            operation_category=OperationCategory.PICKING,
+            status=OperationStatus.SUCCESS,
             product_sku=sku,
-            order_number=matched_order,
             quantity=1,
             details={
                 'ean_code': request.ean_code,
                 'serial_number': request.serial_number,
+                'order_number': matched_order,
                 'auto_saved': True
             }
         )
