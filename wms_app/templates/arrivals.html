@@ -43,7 +43,8 @@
                         <th class="mobile-hide">Fornitore</th>
                         <th class="mobile-hide">Data Arrivo</th>
                         <th>Stato</th>
-                        <th class="mobile-hide">Prodotti</th>
+                        <th class="mobile-hide">Referenze</th>
+                        <th class="mobile-hide">Quantità Colli</th>
                         <th>Azioni</th>
                     </tr>
                 </thead>
@@ -55,12 +56,13 @@
                         <td class="mobile-hide">{{ arrival.arrival_date.strftime('%d/%m/%Y') if arrival.arrival_date else '-' }}</td>
                         <td>
                             {% if arrival.is_draft %}
-                            <span class="status-badge status-draft">📝 Bozza</span>
+                            <span class="status-badge status-draft">📦 Precarico</span>
                             {% else %}
                             <span class="status-badge status-completed">✅ Completato</span>
                             {% endif %}
                         </td>
-                        <td class="mobile-hide">{{ arrival.lines|length }} prodotti</td>
+                        <td class="mobile-hide">{{ arrival.lines|length }}</td>
+                        <td class="mobile-hide">{{ arrival.lines|sum(attribute='expected_quantity') }}</td>
                         <td class="actions-cell">
                             <button class="btn-icon mobile-hide" onclick="viewArrivalDetails({{ arrival.id }})" title="Dettagli">👁️</button>
                             {% if arrival.is_draft %}
@@ -93,7 +95,8 @@
                         <th>Numero Doc</th>
                         <th>Fornitore</th>
                         <th>Data Completamento</th>
-                        <th>Prodotti</th>
+                        <th>Referenze</th>
+                        <th>Quantità Colli</th>
                         <th>Azioni</th>
                     </tr>
                 </thead>
@@ -103,7 +106,8 @@
                         <td><strong>{{ arrival.arrival_number }}</strong></td>
                         <td>{{ arrival.supplier_name }}</td>
                         <td>{{ arrival.completed_date.strftime('%d/%m/%Y %H:%M') if arrival.completed_date else '-' }}</td>
-                        <td>{{ arrival.lines|length }} prodotti</td>
+                        <td>{{ arrival.lines|length }}</td>
+                        <td>{{ arrival.lines|sum(attribute='expected_quantity') }}</td>
                         <td>
                             <button class="btn-icon" onclick="viewArrivalDetails({{ arrival.id }})" title="Dettagli">👁️</button>
                         </td>
@@ -145,15 +149,15 @@
 
                 <hr>
 
-                <h3>Prodotti</h3>
+                <h3>Referenze</h3>
                 <div id="products-container">
                     <!-- Righe prodotti aggiunte dinamicamente -->
                 </div>
 
-                <button type="button" class="action-btn secondary" onclick="addProductRow()">➕ Aggiungi Prodotto</button>
+                <button type="button" class="action-btn secondary" onclick="addProductRow()">➕ Aggiungi Referenza</button>
 
                 <div class="form-actions">
-                    <button type="submit" class="action-btn">💾 Salva Bozza</button>
+                    <button type="submit" class="action-btn">📦 Precarica</button>
                     <button type="button" class="action-btn secondary" onclick="closeCreateArrivalOverlay()">❌ Annulla</button>
                 </div>
             </form>
@@ -169,7 +173,7 @@
                 <!-- Info documento popolate dinamicamente -->
             </div>
 
-            <h3>Prodotti da Caricare a TERRA</h3>
+            <h3>Referenze da Caricare a TERRA</h3>
             <p class="info-text">Controlla le quantità. Puoi modificarle prima della conferma finale.</p>
 
             <table class="recap-table" id="arrival-recap-table">

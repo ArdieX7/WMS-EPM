@@ -260,7 +260,7 @@ async function finalConfirmArrival() {
     }
 
     // Conferma finale
-    if (!confirm('⚠️ Confermi il carico di tutti i prodotti a TERRA? Questa operazione non è reversibile.')) {
+    if (!confirm('⚠️ Confermi il carico di tutte le referenze a TERRA? Questa operazione non è reversibile.')) {
         return;
     }
 
@@ -310,12 +310,12 @@ async function viewArrivalDetails(arrivalId) {
                 <p><strong>Numero Documento:</strong> ${arrival.arrival_number}</p>
                 <p><strong>Fornitore:</strong> ${arrival.supplier_name}</p>
                 <p><strong>Data Arrivo:</strong> ${new Date(arrival.arrival_date).toLocaleDateString('it-IT')}</p>
-                <p><strong>Stato:</strong> ${arrival.is_completed ? '✅ Completato' : '📝 Bozza'}</p>
+                <p><strong>Stato:</strong> ${arrival.is_completed ? '✅ Completato' : '📦 Precarico'}</p>
                 ${arrival.notes ? `<p><strong>Note:</strong> ${arrival.notes}</p>` : ''}
                 ${arrival.completed_date ? `<p><strong>Data Completamento:</strong> ${new Date(arrival.completed_date).toLocaleString('it-IT')}</p>` : ''}
             </div>
 
-            <h3>Prodotti</h3>
+            <h3>Referenze</h3>
             <table class="recap-table">
                 <thead>
                     <tr>
@@ -461,7 +461,7 @@ async function loadAvailableArrivals() {
                 <div class="scanner-arrival-card" data-arrival-id="${arrival.id}" onclick="selectArrivalForScanner(${arrival.id})">
                     <h4>${arrival.arrival_number}</h4>
                     <p><strong>Fornitore:</strong> ${arrival.supplier_name}</p>
-                    <p><strong>Prodotti:</strong> ${arrival.lines.length}</p>
+                    <p><strong>Referenze:</strong> ${arrival.lines.length}</p>
                     <p><strong>Progress:</strong> ${totalReceived}/${totalExpected} (${progress}%)</p>
                 </div>
             `;
@@ -534,7 +534,7 @@ function updateScannerProgress() {
 
     document.getElementById('scanner-progress-fill').style.width = progress + '%';
     document.getElementById('scanner-progress-text').textContent =
-        `${completedProducts}/${scannerState.arrivalData.lines.length} prodotti completati (${progress.toFixed(0)}%)`;
+        `${completedProducts}/${scannerState.arrivalData.lines.length} referenze completate (${progress.toFixed(0)}%)`;
 }
 
 async function handleEANInput(ean) {
@@ -648,7 +648,7 @@ async function confirmScan() {
 
         // Se tutto completato, mostra messaggio
         if (result.all_completed) {
-            if (confirm('🎉 Tutti i prodotti sono stati scansionati! Vuoi confermare il documento ora?')) {
+            if (confirm('🎉 Tutte le referenze sono state scansionate! Vuoi confermare il documento ora?')) {
                 closeMobileScannerOverlay();
                 confirmArrivalDesktop(scannerState.arrivalId);
             }
