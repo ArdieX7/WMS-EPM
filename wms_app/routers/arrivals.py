@@ -1,0 +1,623 @@
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_, desc
+from typing import List, Dict, Optional
+from datetime import datetime
+import uuid
+
+from wms_app import models, schemas
+from wms_app.database import get_db
+from wms_app.services.logging_service import LoggingService
+from wms_app.models.logs import OperationType, OperationCategory, OperationStatus
+
+
+# Import templates lazy
+def get_templates():
+    from wms_app.main import templates
+    return templates
+
+
+router = APIRouter(
+    prefix="/arrivals",
+    tags=["arrivals"],
+)
+
+
+# ==================== PAGINA HTML ====================
+
+@router.get("/manage", response_class=HTMLResponse)
+async def get_arrivals_management_page(request: Request, db: Session = Depends(get_db)):
+    """Pagina gestione arrivi - Desktop e Mobile"""
+    # Carica documenti non completati (bozze e in lavorazione)
+    arrivals = db.query(models.arrivals.Arrival).filter(
+        models.arrivals.Arrival.is_completed == False
+    ).options(
+        joinedload(models.arrivals.Arrival.lines).joinedload(models.arrivals.ArrivalLine.product)
+    ).order_by(desc(models.arrivals.Arrival.created_date)).all()
+
+    # Carica anche storico completati (ultimi 50)
+    completed_arrivals = db.query(models.arrivals.Arrival).filter(
+        models.arrivals.Arrival.is_completed == True
+    ).options(
+        joinedload(models.arrivals.Arrival.lines)
+    ).order_by(desc(models.arrivals.Arrival.completed_date)).limit(50).all()
+
+    return get_templates().TemplateResponse("arrivals.html", {
+        "request": request,
+        "arrivals": arrivals,
+        "completed_arrivals": completed_arrivals,
+        "active_page": "arrivals"
+    })
+
+
+# ==================== API CRUD ====================
+
+@router.post("/", response_model=schemas.arrivals.Arrival)
+def create_arrival(
+    arrival: schemas.arrivals.ArrivalCreate,
+    db: Session = Depends(get_db)
+):
+    """Crea nuovo documento arrivo (Desktop form)"""
+    logger = LoggingService(db)
+
+    # Controlla duplicato numero documento
+    existing = db.query(models.arrivals.Arrival).filter(
+        models.arrivals.Arrival.arrival_number == arrival.arrival_number
+    ).first()
+
+    if existing:
+        logger.log_error(
+            operation_type=OperationType.ARRIVO_CREATO,
+            error=f"Arrival number {arrival.arrival_number} already exists",
+            operation_category=OperationCategory.MANUAL,
+            details={'arrival_number': arrival.arrival_number}
+        )
+        raise HTTPException(status_code=400, detail="Numero documento già esistente")
+
+    # Crea documento
+    new_arrival = models.arrivals.Arrival(
+        arrival_number=arrival.arrival_number,
+        supplier_name=arrival.supplier_name,
+        arrival_date=arrival.arrival_date or datetime.now(),
+        notes=arrival.notes,
+        is_draft=True,
+        is_completed=False
+    )
+
+    db.add(new_arrival)
+
+    try:
+        db.flush()  # Ottieni ID per le righe
+    except Exception as e:
+        db.rollback()
+        logger.log_error(
+            operation_type=OperationType.ARRIVO_CREATO,
+            error=str(e),
+            operation_category=OperationCategory.MANUAL,
+            details={'arrival_number': arrival.arrival_number}
+        )
+        raise HTTPException(status_code=500, detail=f"Errore creazione documento: {str(e)}")
+
+    # Consolida righe con stesso SKU (somma quantità)
+    consolidated_lines = {}
+    for line in arrival.lines:
+        sku = line.product_sku
+
+        # Verifica esistenza prodotto
+        product = db.query(models.Product).filter(
+            models.Product.sku == sku
+        ).first()
+
+        if not product:
+            db.rollback()
+            raise HTTPException(
+                status_code=400,
+                detail=f"Prodotto {sku} non trovato"
+            )
+
+        if sku in consolidated_lines:
+            consolidated_lines[sku] += line.expected_quantity
+        else:
+            consolidated_lines[sku] = line.expected_quantity
+
+    # Crea righe consolidate
+    for sku, qty in consolidated_lines.items():
+        arrival_line = models.arrivals.ArrivalLine(
+            arrival_id=new_arrival.id,
+            product_sku=sku,
+            expected_quantity=qty,
+            received_quantity=0
+        )
+        db.add(arrival_line)
+
+    try:
+        db.commit()
+        db.refresh(new_arrival)
+    except Exception as e:
+        db.rollback()
+        logger.log_error(
+            operation_type=OperationType.ARRIVO_CREATO,
+            error=str(e),
+            operation_category=OperationCategory.MANUAL
+        )
+        raise HTTPException(status_code=500, detail="Errore salvataggio righe")
+
+    # Log creazione
+    logger.log_operation(
+        operation_type=OperationType.ARRIVO_CREATO,
+        operation_category=OperationCategory.MANUAL,
+        status=OperationStatus.SUCCESS,
+        details={
+            'arrival_number': new_arrival.arrival_number,
+            'supplier_name': new_arrival.supplier_name,
+            'total_lines': len(consolidated_lines),
+            'total_quantity': sum(consolidated_lines.values())
+        }
+    )
+    db.commit()
+
+    return new_arrival
+
+
+@router.get("/", response_model=List[schemas.arrivals.Arrival])
+def list_arrivals(
+    include_completed: bool = False,
+    db: Session = Depends(get_db)
+):
+    """Lista documenti arrivo"""
+    query = db.query(models.arrivals.Arrival).options(
+        joinedload(models.arrivals.Arrival.lines)
+    )
+
+    if not include_completed:
+        query = query.filter(models.arrivals.Arrival.is_completed == False)
+
+    return query.order_by(desc(models.arrivals.Arrival.created_date)).all()
+
+
+@router.get("/{arrival_id}", response_model=schemas.arrivals.Arrival)
+def get_arrival(
+    arrival_id: int,
+    db: Session = Depends(get_db)
+):
+    """Dettaglio documento arrivo"""
+    arrival = db.query(models.arrivals.Arrival).filter(
+        models.arrivals.Arrival.id == arrival_id
+    ).options(
+        joinedload(models.arrivals.Arrival.lines).joinedload(models.arrivals.ArrivalLine.product)
+    ).first()
+
+    if not arrival:
+        raise HTTPException(status_code=404, detail="Documento non trovato")
+
+    return arrival
+
+
+@router.put("/{arrival_id}", response_model=schemas.arrivals.Arrival)
+def update_arrival(
+    arrival_id: int,
+    update_data: schemas.arrivals.ArrivalUpdate,
+    db: Session = Depends(get_db)
+):
+    """Modifica documento arrivo (solo se bozza)"""
+    arrival = db.query(models.arrivals.Arrival).filter(
+        models.arrivals.Arrival.id == arrival_id
+    ).first()
+
+    if not arrival:
+        raise HTTPException(status_code=404, detail="Documento non trovato")
+
+    if not arrival.is_draft:
+        raise HTTPException(status_code=400, detail="Documento già confermato, non modificabile")
+
+    # Aggiorna campi base
+    if update_data.supplier_name:
+        arrival.supplier_name = update_data.supplier_name
+    if update_data.arrival_date:
+        arrival.arrival_date = update_data.arrival_date
+    if update_data.notes is not None:
+        arrival.notes = update_data.notes
+
+    # Aggiorna righe se fornite
+    if update_data.lines:
+        # Rimuovi righe esistenti
+        db.query(models.arrivals.ArrivalLine).filter(
+            models.arrivals.ArrivalLine.arrival_id == arrival_id
+        ).delete()
+
+        # Consolida nuove righe
+        consolidated = {}
+        for line in update_data.lines:
+            if line.product_sku in consolidated:
+                consolidated[line.product_sku] += line.expected_quantity
+            else:
+                consolidated[line.product_sku] = line.expected_quantity
+
+        # Crea nuove righe
+        for sku, qty in consolidated.items():
+            new_line = models.arrivals.ArrivalLine(
+                arrival_id=arrival_id,
+                product_sku=sku,
+                expected_quantity=qty,
+                received_quantity=0
+            )
+            db.add(new_line)
+
+    db.commit()
+    db.refresh(arrival)
+
+    # Log modifica
+    logger = LoggingService(db)
+    logger.log_operation(
+        operation_type=OperationType.ARRIVO_MODIFICATO,
+        operation_category=OperationCategory.MANUAL,
+        status=OperationStatus.SUCCESS,
+        details={'arrival_id': arrival_id, 'arrival_number': arrival.arrival_number}
+    )
+    db.commit()
+
+    return arrival
+
+
+@router.delete("/{arrival_id}")
+def delete_arrival(
+    arrival_id: int,
+    db: Session = Depends(get_db)
+):
+    """Elimina documento arrivo (solo se bozza)"""
+    arrival = db.query(models.arrivals.Arrival).filter(
+        models.arrivals.Arrival.id == arrival_id
+    ).first()
+
+    if not arrival:
+        raise HTTPException(status_code=404, detail="Documento non trovato")
+
+    if not arrival.is_draft:
+        raise HTTPException(status_code=400, detail="Documento già confermato, non eliminabile")
+
+    arrival_number = arrival.arrival_number
+
+    # Cancella (cascade elimina anche le righe)
+    db.delete(arrival)
+    db.commit()
+
+    # Log eliminazione
+    logger = LoggingService(db)
+    logger.log_operation(
+        operation_type=OperationType.ARRIVO_ELIMINATO,
+        operation_category=OperationCategory.MANUAL,
+        status=OperationStatus.SUCCESS,
+        details={'arrival_id': arrival_id, 'arrival_number': arrival_number}
+    )
+    db.commit()
+
+    return {"success": True, "message": f"Documento {arrival_number} eliminato"}
+
+
+# ==================== CONFERMA DOCUMENTO (DESKTOP) ====================
+
+@router.post("/confirm", response_model=schemas.arrivals.ArrivalConfirmResponse)
+def confirm_arrival(
+    confirm_request: schemas.arrivals.ArrivalConfirmRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Conferma documento arrivo:
+    1. Applica modifiche se fornite (recap modificato)
+    2. Carica tutte le quantità a ubicazione TERRA
+    3. Logging completo operazione
+    4. Marca documento come completato
+    """
+    logger = LoggingService(db)
+    arrival_id = confirm_request.arrival_id
+
+    # Carica documento
+    arrival = db.query(models.arrivals.Arrival).filter(
+        models.arrivals.Arrival.id == arrival_id
+    ).options(
+        joinedload(models.arrivals.Arrival.lines).joinedload(models.arrivals.ArrivalLine.product)
+    ).first()
+
+    if not arrival:
+        raise HTTPException(status_code=404, detail="Documento non trovato")
+
+    if not arrival.is_draft:
+        raise HTTPException(status_code=400, detail="Documento già confermato")
+
+    # Applica modifiche se fornite
+    if confirm_request.modified_lines:
+        for modified_line in confirm_request.modified_lines:
+            line = db.query(models.arrivals.ArrivalLine).filter(
+                and_(
+                    models.arrivals.ArrivalLine.arrival_id == arrival_id,
+                    models.arrivals.ArrivalLine.product_sku == modified_line.product_sku
+                )
+            ).first()
+
+            if line:
+                line.expected_quantity = modified_line.expected_quantity
+
+        db.flush()
+
+    # Ricarica righe aggiornate
+    lines = db.query(models.arrivals.ArrivalLine).filter(
+        models.arrivals.ArrivalLine.arrival_id == arrival_id
+    ).all()
+
+    # Consolida SKU duplicati (non dovrebbero esserci, ma per sicurezza)
+    consolidated = {}
+    for line in lines:
+        if line.product_sku in consolidated:
+            consolidated[line.product_sku] += line.expected_quantity
+        else:
+            consolidated[line.product_sku] = line.expected_quantity
+
+    # Carica a TERRA con consolidamento
+    terra_location = db.query(models.Location).filter(
+        models.Location.name == "TERRA"
+    ).first()
+
+    if not terra_location:
+        raise HTTPException(status_code=500, detail="Ubicazione TERRA non trovata")
+
+    operations_logged = []
+    operation_id = str(uuid.uuid4())
+
+    for sku, qty in consolidated.items():
+        # Trova o crea record inventario TERRA
+        inventory = db.query(models.Inventory).filter(
+            and_(
+                models.Inventory.location_name == "TERRA",
+                models.Inventory.product_sku == sku
+            )
+        ).first()
+
+        if inventory:
+            inventory.quantity += qty
+        else:
+            inventory = models.Inventory(
+                location_name="TERRA",
+                product_sku=sku,
+                quantity=qty
+            )
+            db.add(inventory)
+
+        # Log singola operazione
+        operations_logged.append({
+            'product_sku': sku,
+            'location_to': 'TERRA',
+            'quantity': qty,
+            'status': OperationStatus.SUCCESS
+        })
+
+    # Log batch operazioni
+    logger.log_file_operations(
+        operation_type=OperationType.CARICO_ARRIVO,
+        operation_category=OperationCategory.MANUAL,
+        operations=operations_logged,
+        file_name=f"ARRIVO_{arrival.arrival_number}",
+        user_id="system"
+    )
+
+    # Marca documento come completato
+    arrival.is_draft = False
+    arrival.is_completed = True
+    arrival.completed_date = datetime.now()
+
+    # Aggiorna received_quantity = expected_quantity per tutte le righe
+    for line in lines:
+        line.received_quantity = line.expected_quantity
+
+    try:
+        db.commit()
+        db.refresh(arrival)
+    except Exception as e:
+        db.rollback()
+        logger.log_error(
+            operation_type=OperationType.ARRIVO_CONFERMATO,
+            error=str(e),
+            operation_category=OperationCategory.MANUAL,
+            details={'arrival_id': arrival_id}
+        )
+        raise HTTPException(status_code=500, detail="Errore conferma documento")
+
+    # Log conferma documento
+    logger.log_operation(
+        operation_type=OperationType.ARRIVO_CONFERMATO,
+        operation_category=OperationCategory.MANUAL,
+        status=OperationStatus.SUCCESS,
+        details={
+            'arrival_id': arrival_id,
+            'arrival_number': arrival.arrival_number,
+            'supplier_name': arrival.supplier_name,
+            'total_products': len(consolidated),
+            'total_quantity': sum(consolidated.values())
+        },
+        operation_id=operation_id
+    )
+    db.commit()
+
+    return schemas.arrivals.ArrivalConfirmResponse(
+        success=True,
+        message=f"Documento {arrival.arrival_number} confermato. {len(operations_logged)} prodotti caricati a TERRA.",
+        operations_logged=len(operations_logged),
+        arrival=arrival
+    )
+
+
+# ==================== MOBILE SCANNER REAL-TIME ====================
+
+@router.post("/validate-ean", response_model=schemas.arrivals.ArrivalScanValidationResponse)
+def validate_ean_for_arrival(
+    validation: schemas.arrivals.ArrivalScanValidation,
+    db: Session = Depends(get_db)
+):
+    """
+    Valida EAN scansionato da mobile:
+    - Converte EAN → SKU
+    - Verifica se SKU è nel documento arrivo
+    - Ritorna info prodotto e progress
+    """
+    arrival_id = validation.arrival_id
+    ean_code = validation.ean_code.strip()
+
+    # Carica documento
+    arrival = db.query(models.arrivals.Arrival).filter(
+        models.arrivals.Arrival.id == arrival_id
+    ).options(
+        joinedload(models.arrivals.Arrival.lines).joinedload(models.arrivals.ArrivalLine.product)
+    ).first()
+
+    if not arrival:
+        return schemas.arrivals.ArrivalScanValidationResponse(
+            valid=False,
+            message="Documento non trovato"
+        )
+
+    if not arrival.is_draft:
+        return schemas.arrivals.ArrivalScanValidationResponse(
+            valid=False,
+            message="Documento già confermato"
+        )
+
+    # Converti EAN → SKU
+    product_sku = None
+
+    # Prova come SKU diretto
+    product = db.query(models.Product).filter(
+        models.Product.sku == ean_code
+    ).first()
+
+    if product:
+        product_sku = product.sku
+    else:
+        # Prova come EAN
+        ean = db.query(models.EanCode).filter(
+            models.EanCode.ean == ean_code
+        ).first()
+
+        if ean:
+            product_sku = ean.product_sku
+            product = db.query(models.Product).filter(
+                models.Product.sku == product_sku
+            ).first()
+
+    if not product_sku:
+        return schemas.arrivals.ArrivalScanValidationResponse(
+            valid=False,
+            message=f"EAN {ean_code} non trovato nel database"
+        )
+
+    # Verifica se SKU è nel documento
+    line = None
+    for arrival_line in arrival.lines:
+        if arrival_line.product_sku == product_sku:
+            line = arrival_line
+            break
+
+    if not line:
+        return schemas.arrivals.ArrivalScanValidationResponse(
+            valid=False,
+            product_sku=product_sku,
+            message=f"Prodotto {product_sku} NON previsto in questo documento"
+        )
+
+    # Calcola progress
+    progress = (line.received_quantity / line.expected_quantity * 100) if line.expected_quantity > 0 else 0
+
+    return schemas.arrivals.ArrivalScanValidationResponse(
+        valid=True,
+        product_sku=product_sku,
+        product_description=product.description if product else "",
+        expected_quantity=line.expected_quantity,
+        received_quantity=line.received_quantity,
+        progress_percentage=round(progress, 1),
+        message=f"OK - {line.received_quantity}/{line.expected_quantity}"
+    )
+
+
+@router.post("/scan-confirm", response_model=schemas.arrivals.ArrivalScanConfirmResponse)
+def confirm_scan(
+    scan_confirm: schemas.arrivals.ArrivalScanConfirm,
+    db: Session = Depends(get_db)
+):
+    """
+    Conferma quantità scansionata da mobile:
+    - Incrementa received_quantity
+    - Auto-save a database
+    - Ritorna progress aggiornato
+    """
+    logger = LoggingService(db)
+    arrival_id = scan_confirm.arrival_id
+    product_sku = scan_confirm.product_sku
+    quantity = scan_confirm.quantity
+
+    # Trova riga documento
+    line = db.query(models.arrivals.ArrivalLine).filter(
+        and_(
+            models.arrivals.ArrivalLine.arrival_id == arrival_id,
+            models.arrivals.ArrivalLine.product_sku == product_sku
+        )
+    ).first()
+
+    if not line:
+        raise HTTPException(status_code=404, detail="Riga documento non trovata")
+
+    # Incrementa received_quantity
+    line.received_quantity += quantity
+
+    # Calcola progress
+    progress = (line.received_quantity / line.expected_quantity * 100) if line.expected_quantity > 0 else 0
+
+    # Verifica se tutto il documento è completato
+    arrival = db.query(models.arrivals.Arrival).filter(
+        models.arrivals.Arrival.id == arrival_id
+    ).options(
+        joinedload(models.arrivals.Arrival.lines)
+    ).first()
+
+    all_completed = all(
+        line.received_quantity >= line.expected_quantity
+        for line in arrival.lines
+    )
+
+    try:
+        db.commit()
+        db.refresh(line)
+    except Exception as e:
+        db.rollback()
+        logger.log_error(
+            operation_type=OperationType.ARRIVO_SCAN_MOBILE,
+            error=str(e),
+            operation_category=OperationCategory.MANUAL,
+            product_sku=product_sku,
+            details={'arrival_id': arrival_id, 'quantity': quantity}
+        )
+        raise HTTPException(status_code=500, detail="Errore salvataggio scansione")
+
+    # Log scansione mobile
+    logger.log_operation(
+        operation_type=OperationType.ARRIVO_SCAN_MOBILE,
+        operation_category=OperationCategory.MANUAL,
+        status=OperationStatus.SUCCESS,
+        product_sku=product_sku,
+        quantity=quantity,
+        details={
+            'arrival_id': arrival_id,
+            'arrival_number': arrival.arrival_number,
+            'received_quantity': line.received_quantity,
+            'expected_quantity': line.expected_quantity,
+            'progress': round(progress, 1)
+        }
+    )
+    db.commit()
+
+    return schemas.arrivals.ArrivalScanConfirmResponse(
+        success=True,
+        message=f"Scansionato {quantity} unità",
+        received_quantity=line.received_quantity,
+        expected_quantity=line.expected_quantity,
+        progress_percentage=round(progress, 1),
+        all_completed=all_completed
+    )

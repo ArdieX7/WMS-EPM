@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gestione Arrivi - WMS EPM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/no-flash.css">
+    <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/mobile-navbar.css">
+    <link rel="stylesheet" href="/static/css/arrivals.css">
+    <link rel="stylesheet" href="/static/css/footer.css">
+</head>
+<body>
+    {% include 'partials/navbar.html' %}
+
+    <!-- Loader permessi -->
+    <div class="permission-loader">
+        <div class="spinner"></div>
+        <div class="message">🔐 Verifica permessi in corso...</div>
+    </div>
+
+    <!-- Contenuto protetto -->
+    <div class="protected-content">
+    <div class="mobile-content">
+
+    <h1>Gestione Arrivi</h1>
+
+    <!-- Azioni principali -->
+    <div class="action-buttons" data-permission="arrivals_create">
+        <button class="action-btn mobile-hide" onclick="openCreateArrivalOverlay()">➕ Nuovo Documento Arrivo</button>
+        <button class="action-btn mobile-only" onclick="openMobileScannerOverlay()">📱 Scansiona Arrivo</button>
+    </div>
+
+    <!-- Lista documenti in lavorazione -->
+    <section class="arrivals-section">
+        <h2>📦 Documenti in Lavorazione</h2>
+
+        {% if arrivals %}
+        <div class="arrivals-table-container">
+            <table class="arrivals-table">
+                <thead>
+                    <tr>
+                        <th>Numero Doc</th>
+                        <th class="mobile-hide">Fornitore</th>
+                        <th class="mobile-hide">Data Arrivo</th>
+                        <th>Stato</th>
+                        <th class="mobile-hide">Prodotti</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody id="arrivals-table-body">
+                    {% for arrival in arrivals %}
+                    <tr data-arrival-id="{{ arrival.id }}">
+                        <td><strong>{{ arrival.arrival_number }}</strong></td>
+                        <td class="mobile-hide">{{ arrival.supplier_name }}</td>
+                        <td class="mobile-hide">{{ arrival.arrival_date.strftime('%d/%m/%Y') if arrival.arrival_date else '-' }}</td>
+                        <td>
+                            {% if arrival.is_draft %}
+                            <span class="status-badge status-draft">📝 Bozza</span>
+                            {% else %}
+                            <span class="status-badge status-completed">✅ Completato</span>
+                            {% endif %}
+                        </td>
+                        <td class="mobile-hide">{{ arrival.lines|length }} prodotti</td>
+                        <td class="actions-cell">
+                            <button class="btn-icon mobile-hide" onclick="viewArrivalDetails({{ arrival.id }})" title="Dettagli">👁️</button>
+                            {% if arrival.is_draft %}
+                            <button class="btn-icon" onclick="confirmArrivalDesktop({{ arrival.id }})" title="Conferma">✅</button>
+                            <button class="btn-icon mobile-only" onclick="openMobileScannerForArrival({{ arrival.id }})" title="Scansiona">📱</button>
+                            <button class="btn-icon btn-danger mobile-hide" onclick="deleteArrival({{ arrival.id }})" title="Elimina">🗑️</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="no-data">Nessun documento in lavorazione</p>
+        {% endif %}
+    </section>
+
+    <!-- Storico completati (collapsible) -->
+    <section class="arrivals-section mobile-hide">
+        <h2 onclick="toggleCompletedSection()" style="cursor: pointer;">
+            📋 Storico Completati <span id="toggle-icon">▼</span>
+        </h2>
+
+        <div id="completed-arrivals-section" style="display: none;">
+            {% if completed_arrivals %}
+            <table class="arrivals-table">
+                <thead>
+                    <tr>
+                        <th>Numero Doc</th>
+                        <th>Fornitore</th>
+                        <th>Data Completamento</th>
+                        <th>Prodotti</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for arrival in completed_arrivals %}
+                    <tr>
+                        <td><strong>{{ arrival.arrival_number }}</strong></td>
+                        <td>{{ arrival.supplier_name }}</td>
+                        <td>{{ arrival.completed_date.strftime('%d/%m/%Y %H:%M') if arrival.completed_date else '-' }}</td>
+                        <td>{{ arrival.lines|length }} prodotti</td>
+                        <td>
+                            <button class="btn-icon" onclick="viewArrivalDetails({{ arrival.id }})" title="Dettagli">👁️</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="no-data">Nessun documento completato</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- OVERLAY: Crea Documento (Desktop) -->
+    <div id="create-arrival-overlay" class="overlay" style="display: none;">
+        <div class="overlay-content">
+            <h2>➕ Nuovo Documento Arrivo</h2>
+
+            <form id="create-arrival-form">
+                <div class="form-group">
+                    <label for="arrival-number">Numero Documento *</label>
+                    <input type="text" id="arrival-number" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="supplier-name">Fornitore *</label>
+                    <input type="text" id="supplier-name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="arrival-date">Data Arrivo</label>
+                    <input type="date" id="arrival-date">
+                </div>
+
+                <div class="form-group">
+                    <label for="arrival-notes">Note</label>
+                    <textarea id="arrival-notes" rows="3"></textarea>
+                </div>
+
+                <hr>
+
+                <h3>Prodotti</h3>
+                <div id="products-container">
+                    <!-- Righe prodotti aggiunte dinamicamente -->
+                </div>
+
+                <button type="button" class="action-btn secondary" onclick="addProductRow()">➕ Aggiungi Prodotto</button>
+
+                <div class="form-actions">
+                    <button type="submit" class="action-btn">💾 Salva Bozza</button>
+                    <button type="button" class="action-btn secondary" onclick="closeCreateArrivalOverlay()">❌ Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- OVERLAY: Recap Conferma (Desktop) -->
+    <div id="confirm-arrival-overlay" class="overlay" style="display: none;">
+        <div class="overlay-content large">
+            <h2>✅ Conferma Documento Arrivo</h2>
+
+            <div id="arrival-recap-info">
+                <!-- Info documento popolate dinamicamente -->
+            </div>
+
+            <h3>Prodotti da Caricare a TERRA</h3>
+            <p class="info-text">Controlla le quantità. Puoi modificarle prima della conferma finale.</p>
+
+            <table class="recap-table" id="arrival-recap-table">
+                <thead>
+                    <tr>
+                        <th>SKU</th>
+                        <th>Descrizione</th>
+                        <th>Quantità</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody id="arrival-recap-tbody">
+                    <!-- Righe popolate dinamicamente -->
+                </tbody>
+            </table>
+
+            <div class="form-actions">
+                <button class="action-btn" onclick="finalConfirmArrival()">✅ Conferma e Carica a TERRA</button>
+                <button class="action-btn secondary" onclick="closeConfirmArrivalOverlay()">❌ Annulla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERLAY: Dettagli Documento -->
+    <div id="details-arrival-overlay" class="overlay" style="display: none;">
+        <div class="overlay-content">
+            <h2>👁️ Dettagli Documento</h2>
+            <div id="arrival-details-content">
+                <!-- Contenuto popolato dinamicamente -->
+            </div>
+            <button class="action-btn" onclick="closeDetailsArrivalOverlay()">Chiudi</button>
+        </div>
+    </div>
+
+    <!-- OVERLAY: Mobile Scanner (Full-screen) -->
+    <div id="mobile-scanner-overlay" class="mobile-scanner-overlay" style="display: none;">
+        <div class="scanner-header">
+            <h2>📱 Scansiona Arrivo</h2>
+            <button class="scanner-close-btn" onclick="closeMobileScannerOverlay()">✕</button>
+        </div>
+
+        <div class="scanner-body">
+            <!-- Selezione documento -->
+            <div id="scanner-document-selector" class="scanner-section">
+                <h3>Seleziona Documento</h3>
+                <div id="scanner-arrivals-list">
+                    <!-- Lista documenti popolata dinamicamente -->
+                </div>
+            </div>
+
+            <!-- Scanner area (mostrata dopo selezione documento) -->
+            <div id="scanner-area" class="scanner-section" style="display: none;">
+                <div class="scanner-info">
+                    <h3 id="scanner-arrival-title">-</h3>
+                    <p id="scanner-supplier-name">-</p>
+                </div>
+
+                <div class="scanner-progress">
+                    <div class="progress-bar">
+                        <div id="scanner-progress-fill" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <p id="scanner-progress-text">0/0 prodotti completati</p>
+                </div>
+
+                <div class="scanner-input-area">
+                    <input type="text"
+                           id="scanner-ean-input"
+                           inputmode="none"
+                           readonly
+                           autofocus
+                           placeholder="Scansiona EAN..."
+                           class="scanner-input">
+                </div>
+
+                <div id="scanner-current-product" class="scanner-current-product" style="display: none;">
+                    <h4 id="scanner-product-sku">-</h4>
+                    <p id="scanner-product-description">-</p>
+                    <div class="scanner-quantity">
+                        <span id="scanner-product-received">0</span> /
+                        <span id="scanner-product-expected">0</span>
+                        (<span id="scanner-product-percentage">0%</span>)
+                    </div>
+
+                    <div class="scanner-quantity-input">
+                        <label>Quantità da aggiungere:</label>
+                        <input type="number" id="scanner-quantity-input" value="1" min="1">
+                        <button class="action-btn" onclick="confirmScan()">✅ Conferma</button>
+                    </div>
+                </div>
+
+                <div id="scanner-feedback" class="scanner-feedback"></div>
+            </div>
+        </div>
+    </div>
+
+    </div> <!-- mobile-content -->
+    </div> <!-- protected-content -->
+
+    <!-- Datalist per autocomplete SKU prodotti -->
+    <datalist id="product-sku-list">
+        <!-- Popolato dinamicamente da JavaScript -->
+    </datalist>
+
+    {% include 'partials/footer.html' %}
+
+    <script src="/static/js/modern-auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            window.requirePermission('arrivals_view');
+        });
+    </script>
+    <script src="/static/js/mobile-navbar.js"></script>
+    <script src="/static/js/arrivals.js"></script>
+</body>
+</html>

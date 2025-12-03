@@ -14,6 +14,7 @@
             <li><a href="/products-page" class="{{ 'active' if request.url.path == '/products-page' else '' }}" data-permission="products_view">Prodotti</a></li>
             <li><a href="/inventory/manage" class="{{ 'active' if request.url.path == '/inventory/manage' else '' }}" data-permission="inventory_view">Inventario</a></li>
             <li><a href="/orders/manage" class="{{ 'active' if request.url.path == '/orders/manage' else '' }}" data-permission="orders_view">Ordini</a></li>
+            <li><a href="/arrivals/manage" class="{{ 'active' if request.url.path == '/arrivals/manage' else '' }}" data-permission="arrivals_view">Arrivi</a></li>
             <li><a href="/warehouse/manage" class="{{ 'active' if request.url.path == '/warehouse/manage' else '' }}" data-permission="warehouse_view">Magazzino</a></li>
             <li><a href="/reservations/dashboard" class="{{ 'active' if request.url.path == '/reservations/dashboard' else '' }}" data-permission="reservations_view">Prenotazioni</a></li>
             <li><a href="/serials/manage" class="{{ 'active' if request.url.path == '/serials/manage' else '' }}" data-permission="serials_view">Seriali</a></li>
@@ -65,6 +66,10 @@
     <a href="/orders/manage" class="nav-item {{ 'active' if request.url.path == '/orders/manage' else '' }}" data-permission="orders_view" data-page="orders">
         <div class="nav-icon icon-orders"></div>
         <div class="nav-label">Ordini</div>
+    </a>
+    <a href="/arrivals/manage" class="nav-item {{ 'active' if request.url.path == '/arrivals/manage' else '' }}" data-permission="arrivals_view" data-page="arrivals">
+        <div class="nav-icon icon-arrivals"></div>
+        <div class="nav-label">Arrivi</div>
     </a>
     <a href="/warehouse/manage" class="nav-item {{ 'active' if request.url.path == '/warehouse/manage' else '' }}" data-permission="warehouse_view" data-page="warehouse">
         <div class="nav-icon icon-warehouse"></div>

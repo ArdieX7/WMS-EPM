@@ -5,6 +5,7 @@ from sqlalchemy.sql import func
 from typing import List
 from datetime import datetime
 import io
+import os
 
 from wms_app import models, schemas
 from wms_app.models.ddt import DDT, DDTLine
@@ -124,9 +125,9 @@ def generate_ddt_from_order(ddt_request: schemas.ddt.DDTGenerateRequest, db: Ses
     db.add(ddt)
     db.flush()  # Per ottenere l'ID del DDT
     
-    # Aggiungi righe DDT dalle righe ordine
+    # Aggiungi righe DDT dalle righe ordine (usa quantità ordine, non prelevata)
     for order_line in order.lines:
-        if order_line.picked_quantity > 0:  # Solo prodotti effettivamente prelevati
+        if order_line.requested_quantity > 0:  # Tutte le righe dell'ordine
             # Ottieni descrizione prodotto in modo sicuro
             product_description = order_line.product_sku
             try:
@@ -134,12 +135,12 @@ def generate_ddt_from_order(ddt_request: schemas.ddt.DDTGenerateRequest, db: Ses
                     product_description = order_line.product.description
             except:
                 product_description = order_line.product_sku
-            
+
             ddt_line = DDTLine(
                 ddt_id=ddt.id,
                 product_sku=order_line.product_sku,
                 product_description=product_description,
-                quantity=order_line.picked_quantity,
+                quantity=order_line.requested_quantity,  # Usa quantità richiesta dall'ordine
                 unit_measure="pz"
             )
             db.add(ddt_line)
@@ -200,10 +201,31 @@ def generate_ddt_pdf(ddt_number: str, db: Session = Depends(get_db)):
     
     # Contenuto documento
     story = []
-    
-    # Titolo con numero DDT
-    header_text = f"DOCUMENTO DI TRASPORTO N. {ddt.ddt_number}"
-    story.append(Paragraph(header_text, title_style))
+
+    # Header con logo aziendale e titolo
+    # Logo aziendale (in alto a destra)
+    logo_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "EPM GL -Black4x.png")
+
+    if os.path.exists(logo_path):
+        logo = Image(logo_path, width=4*cm, height=2*cm, kind='proportional')
+    else:
+        # Fallback se logo non trovato
+        logo = Paragraph("<i>Logo non trovato</i>", styles['Normal'])
+
+    # Titolo documento (a sinistra)
+    header_text = f"<b>DOCUMENTO DI TRASPORTO</b><br/>N. {ddt.ddt_number}"
+    header_paragraph = Paragraph(header_text, header_style)
+
+    # Tabella header con titolo a sinistra e logo a destra
+    header_data = [[header_paragraph, logo]]
+    header_table = Table(header_data, colWidths=[12*cm, 5*cm])
+    header_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+
+    story.append(header_table)
     story.append(Spacer(1, 15))
 
     # Layout Mittente e Destinatario a due colonne
@@ -335,7 +357,7 @@ def generate_ddt_pdf(ddt_number: str, db: Session = Depends(get_db)):
     # Firme
     story.append(Spacer(1, 40))
     signature_data = [
-        ["Firma Mittente", "", "Firma Destinatario"],
+        ["Timbro e Firma Trasportatore", "", "Timbro e Firma Destinatario"],
         ["", "", ""],
         ["_____________________", "", "_____________________"]
     ]

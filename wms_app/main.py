@@ -11,8 +11,8 @@ from apscheduler.triggers.cron import CronTrigger
 import atexit
 
 from wms_app.database import database
-from wms_app.models import products, inventory, orders, reservations, serials, ddt, settings, logs, auth
-from wms_app.models.inventory import Location, Inventory  
+from wms_app.models import products, inventory, orders, reservations, serials, ddt, settings, logs, auth, arrivals
+from wms_app.models.inventory import Location, Inventory
 from wms_app.models.orders import Order, OrderLine, OutgoingStock
 from wms_app.models.serials import ProductSerial
 
@@ -28,6 +28,7 @@ ddt.Base.metadata.create_all(bind=database.engine)
 settings.Base.metadata.create_all(bind=database.engine)
 logs.Base.metadata.create_all(bind=database.engine)
 auth.Base.metadata.create_all(bind=database.engine)
+arrivals.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="WMS EPM")
 
@@ -140,7 +141,7 @@ async def test_main_endpoint():
     return {"server": "main", "status": "OK", "message": "Endpoint principale funziona"}
 
 # Qui aggiungeremo i router per le diverse sezioni dell'app
-from wms_app.routers import products, inventory, orders, analysis, warehouse, reservations, serials, ddt, logs, auth, admin
+from wms_app.routers import products, inventory, orders, analysis, warehouse, reservations, serials, ddt, logs, auth, admin, arrivals
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(products.router)
@@ -151,6 +152,7 @@ app.include_router(warehouse.router)
 app.include_router(reservations.router)
 app.include_router(serials.router)
 app.include_router(ddt.router)
+app.include_router(arrivals.router)
 app.include_router(logs.router)
 
 @app.get("/products-page", response_class=HTMLResponse)
