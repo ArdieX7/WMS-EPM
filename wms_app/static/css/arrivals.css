@@ -349,6 +349,18 @@ h1 {
 }
 
 /* Scanner Info */
+.scanner-info {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.scanner-header-left {
+    flex: 1;
+}
+
 .scanner-info h3 {
     margin: 0;
     color: #0066CC;
@@ -461,17 +473,31 @@ h1 {
     text-align: center;
 }
 
-.scanner-feedback.success {
+/* Scanner Feedback Inline (in alto a destra nell'header) */
+.scanner-feedback-inline {
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-align: right;
+    min-width: 120px;
+    white-space: nowrap;
+}
+
+.scanner-feedback.success,
+.scanner-feedback-inline.success {
     background: #d4edda;
     color: #155724;
 }
 
-.scanner-feedback.error {
+.scanner-feedback.error,
+.scanner-feedback-inline.error {
     background: #f8d7da;
     color: #721c24;
 }
 
-.scanner-feedback.warning {
+.scanner-feedback.warning,
+.scanner-feedback-inline.warning {
     background: #fff3cd;
     color: #856404;
 }
@@ -490,6 +516,176 @@ h1 {
     color: #999;
     padding: 2rem;
     font-style: italic;
+}
+
+/* ========== NUOVO: Expected Codes Section (always visible at top) ========== */
+.expected-codes-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    max-height: 40vh;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.expected-codes-section h4 {
+    margin: 0 0 1rem 0;
+    color: #00516E;
+    font-size: 1.1rem;
+}
+
+.expected-codes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.expected-code-item {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 0.5rem;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.expected-code-item.completed {
+    border-color: #28a745;
+    background: #d4edda;
+}
+
+.code-header {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-wrap: nowrap;
+}
+
+.code-info {
+    font-size: 0.75rem;
+    color: #333;
+    font-weight: 600;
+    flex: 0 1 auto;
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.code-quantity {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.85rem;
+    font-weight: bold;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.manual-quantity-input {
+    width: 40px !important;
+    max-width: 40px !important;
+    min-width: 40px !important;
+    padding: 2px !important;
+    margin: 0;
+    border: 1px solid #0097E0;
+    border-radius: 3px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    text-align: center;
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
+.manual-quantity-input:focus {
+    outline: none;
+    border-color: #00516E;
+    box-shadow: 0 0 0 3px rgba(0, 151, 224, 0.2);
+}
+
+.quantity-divider {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.quantity-expected {
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+.quantity-percentage {
+    color: #6c757d;
+    font-size: 0.75rem;
+    margin-left: 0.3rem;
+}
+
+.code-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.code-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0097E0, #00d4ff);
+    transition: width 0.3s ease;
+}
+
+.expected-code-item.completed .code-progress-fill {
+    background: #28a745;
+}
+
+/* ========== NUOVO: Scanner Global Progress ========== */
+.scanner-global-progress {
+    margin: 1.5rem 0;
+}
+
+.scanner-global-progress .progress-bar {
+    height: 30px;
+}
+
+.scanner-global-progress #scanner-progress-text {
+    text-align: center;
+    margin-top: 0.5rem;
+    font-weight: 600;
+    color: #495057;
+}
+
+/* ========== NUOVO: Finalize Button ========== */
+.scanner-finalize-section {
+    margin: 1.5rem 0;
+}
+
+.finalize-btn {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border: none;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.finalize-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
+}
+
+.finalize-btn:active {
+    transform: translateY(0);
 }
 
 /* Mobile Responsive */
@@ -556,6 +752,67 @@ h1 {
 
     .product-row .btn-remove {
         width: 100%;
+    }
+
+    /* NUOVO: Mobile styles for expected codes */
+    .expected-codes-section {
+        max-height: 35vh;
+        padding: 0.5rem;
+    }
+
+    .manual-quantity-input {
+        width: 35px !important;
+        max-width: 35px !important;
+        min-width: 35px !important;
+        font-size: 0.8rem;
+        padding: 2px !important;
+        border-width: 1px;
+    }
+
+    .code-quantity {
+        font-size: 0.9rem;
+        gap: 0.2rem;
+    }
+
+    .code-info {
+        font-size: 0.7rem;
+        max-width: 40%;
+    }
+
+    .code-header {
+        gap: 0.2rem;
+    }
+
+    /* Scanner header con feedback inline */
+    .scanner-info {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .scanner-feedback-inline {
+        text-align: center;
+        font-size: 0.75rem;
+        padding: 0.4rem 0.5rem;
+        min-width: auto;
+    }
+
+    .finalize-btn {
+        font-size: 1rem;
+        padding: 0.75rem;
+    }
+
+    .quantity-percentage {
+        font-size: 0.65rem;
+    }
+
+    .quantity-divider,
+    .quantity-expected {
+        font-size: 0.8rem;
+    }
+
+    .finalize-btn {
+        font-size: 1.1rem;
+        padding: 0.875rem;
     }
 }
 

@@ -9,9 +9,9 @@ class ArrivalLineBase(BaseModel):
     expected_quantity: int
 
     @validator('expected_quantity')
-    def quantity_must_be_positive(cls, v):
-        if v <= 0:
-            raise ValueError('Quantity must be positive')
+    def quantity_must_be_non_negative(cls, v):
+        if v < 0:
+            raise ValueError('Quantity must be non-negative')
         return v
 
 
@@ -86,6 +86,7 @@ class ArrivalScanValidation(BaseModel):
     """Validazione EAN scansionato da mobile"""
     arrival_id: int
     ean_code: str
+    allow_unexpected: bool = False  # Permetti creazione nuove righe per codici non attesi
 
 
 class ArrivalScanValidationResponse(BaseModel):
@@ -96,6 +97,8 @@ class ArrivalScanValidationResponse(BaseModel):
     received_quantity: int = 0
     progress_percentage: float = 0.0
     message: Optional[str] = None
+    unexpected_code: bool = False  # True se codice non era nella lista attesa
+    new_line_created: bool = False  # True se è stata creata una nuova riga
 
 
 class ArrivalScanConfirm(BaseModel):
@@ -112,3 +115,49 @@ class ArrivalScanConfirmResponse(BaseModel):
     expected_quantity: int
     progress_percentage: float
     all_completed: bool
+
+
+# Schema per modifica manuale quantità
+class ManualQuantityUpdate(BaseModel):
+    """Modifica manuale della quantità ricevuta"""
+    product_sku: str
+    received_quantity: int
+
+    @validator('received_quantity')
+    def quantity_must_be_non_negative(cls, v):
+        if v < 0:
+            raise ValueError('Quantity must be non-negative')
+        return v
+
+
+class ManualQuantityUpdateResponse(BaseModel):
+    success: bool
+    message: str
+    product_sku: str
+    received_quantity: int
+    expected_quantity: int
+    progress_percentage: float
+
+
+# Schema per finalizzazione precarico
+class DiscrepancyInfo(BaseModel):
+    """Informazioni su una discrepanza tra atteso e ricevuto"""
+    product_sku: str
+    product_description: Optional[str] = None
+    expected: int
+    received: int
+    difference: int  # received - expected
+
+
+class FinalizeRequest(BaseModel):
+    """Richiesta di finalizzazione precarico"""
+    force: bool = False  # Se True, ignora discrepanze e procedi
+
+
+class FinalizeResponse(BaseModel):
+    success: bool
+    message: str
+    ask_confirmation: bool = False  # Se True, ci sono discrepanze e serve conferma
+    discrepancies: List[DiscrepancyInfo] = []
+    operations_logged: int = 0
+    total_loaded_to_terra: int = 0

@@ -516,12 +516,48 @@ def validate_ean_for_arrival(
             line = arrival_line
             break
 
+    unexpected_code = False
+    new_line_created = False
+
     if not line:
-        return schemas.arrivals.ArrivalScanValidationResponse(
-            valid=False,
-            product_sku=product_sku,
-            message=f"Prodotto {product_sku} NON previsto in questo documento"
-        )
+        # Se allow_unexpected, crea nuova riga
+        if validation.allow_unexpected:
+            # Crea nuova ArrivalLine per questo prodotto non atteso
+            line = models.arrivals.ArrivalLine(
+                arrival_id=arrival.id,
+                product_sku=product_sku,
+                expected_quantity=0,  # Non era atteso
+                received_quantity=0   # Non ancora ricevuto
+            )
+            db.add(line)
+            db.commit()
+            db.refresh(line)
+
+            unexpected_code = True
+            new_line_created = True
+
+            # Log operazione
+            from wms_app.services.logging_service import LoggingService
+            from wms_app.models.logs import OperationType, OperationCategory
+
+            logging_service = LoggingService(db)
+            logging_service.log_operation(
+                operation_type=OperationType.ARRIVO_CODE_UNEXPECTED_ADDED,
+                category=OperationCategory.MANUAL,
+                product_sku=product_sku,
+                quantity=0,
+                details={
+                    "arrival_id": arrival.id,
+                    "arrival_number": arrival.arrival_number,
+                    "product_description": product.description if product else ""
+                }
+            )
+        else:
+            return schemas.arrivals.ArrivalScanValidationResponse(
+                valid=False,
+                product_sku=product_sku,
+                message=f"Prodotto {product_sku} NON previsto in questo documento"
+            )
 
     # Calcola progress
     progress = (line.received_quantity / line.expected_quantity * 100) if line.expected_quantity > 0 else 0
@@ -533,7 +569,9 @@ def validate_ean_for_arrival(
         expected_quantity=line.expected_quantity,
         received_quantity=line.received_quantity,
         progress_percentage=round(progress, 1),
-        message=f"OK - {line.received_quantity}/{line.expected_quantity}"
+        message=f"OK - {line.received_quantity}/{line.expected_quantity}",
+        unexpected_code=unexpected_code,
+        new_line_created=new_line_created
     )
 
 
@@ -621,3 +659,157 @@ def confirm_scan(
         progress_percentage=round(progress, 1),
         all_completed=all_completed
     )
+
+
+@router.post("/{arrival_id}/update-quantity", response_model=schemas.arrivals.ManualQuantityUpdateResponse)
+def update_manual_quantity(
+    arrival_id: int,
+    update: schemas.arrivals.ManualQuantityUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Aggiorna manualmente la quantità ricevuta per un prodotto:
+    - Trova ArrivalLine per SKU
+    - Aggiorna received_quantity con row lock
+    - Logga operazione ARRIVO_QUANTITY_MANUAL_UPDATE
+    - Ritorna nuovo totale
+    """
+    logger = LoggingService(db)
+    product_sku = update.product_sku
+    new_quantity = update.received_quantity
+
+    # Trova riga documento con pessimistic lock per concorrenza
+    line = db.query(models.arrivals.ArrivalLine).filter(
+        and_(
+            models.arrivals.ArrivalLine.arrival_id == arrival_id,
+            models.arrivals.ArrivalLine.product_sku == product_sku
+        )
+    ).with_for_update().first()
+
+    if not line:
+        raise HTTPException(status_code=404, detail="Riga documento non trovata")
+
+    # Salva valore precedente per log
+    old_quantity = line.received_quantity
+
+    # Aggiorna quantità
+    line.received_quantity = new_quantity
+
+    # Calcola progress
+    progress = (line.received_quantity / line.expected_quantity * 100) if line.expected_quantity > 0 else 0
+
+    # Ottieni info arrival per log
+    arrival = db.query(models.arrivals.Arrival).filter(
+        models.arrivals.Arrival.id == arrival_id
+    ).first()
+
+    try:
+        db.commit()
+        db.refresh(line)
+    except Exception as e:
+        db.rollback()
+        logger.log_error(
+            operation_type=OperationType.ARRIVO_QUANTITY_MANUAL_UPDATE,
+            error=str(e),
+            operation_category=OperationCategory.MANUAL,
+            product_sku=product_sku,
+            details={'arrival_id': arrival_id, 'new_quantity': new_quantity}
+        )
+        raise HTTPException(status_code=500, detail="Errore salvataggio quantità")
+
+    # Log modifica manuale
+    logger.log_operation(
+        operation_type=OperationType.ARRIVO_QUANTITY_MANUAL_UPDATE,
+        operation_category=OperationCategory.MANUAL,
+        status=OperationStatus.SUCCESS,
+        product_sku=product_sku,
+        quantity=new_quantity,
+        details={
+            'arrival_id': arrival_id,
+            'arrival_number': arrival.arrival_number if arrival else None,
+            'old_quantity': old_quantity,
+            'new_quantity': new_quantity,
+            'expected_quantity': line.expected_quantity,
+            'progress': round(progress, 1)
+        }
+    )
+    db.commit()
+
+    return schemas.arrivals.ManualQuantityUpdateResponse(
+        success=True,
+        message=f"Quantità aggiornata a {new_quantity}",
+        product_sku=product_sku,
+        received_quantity=line.received_quantity,
+        expected_quantity=line.expected_quantity,
+        progress_percentage=round(progress, 1)
+    )
+
+
+@router.post("/{arrival_id}/finalize", response_model=schemas.arrivals.FinalizeResponse)
+def finalize_arrival(
+    arrival_id: int,
+    request: schemas.arrivals.FinalizeRequest = schemas.arrivals.FinalizeRequest(),
+    db: Session = Depends(get_db)
+):
+    """
+    Finalizza precarico con controllo discrepanze:
+    - Calcola discrepanze (received != expected per ogni riga)
+    - Se discrepanze > 0 E force=False: ritorna lista warnings + ask_confirmation=True
+    - Se confermato O no discrepanze: conferma documento e carica a TERRA
+    - Ritorna success con totali caricati
+    """
+    # Carica documento con righe
+    arrival = db.query(models.arrivals.Arrival).filter(
+        models.arrivals.Arrival.id == arrival_id
+    ).options(
+        joinedload(models.arrivals.Arrival.lines).joinedload(models.arrivals.ArrivalLine.product)
+    ).first()
+
+    if not arrival:
+        raise HTTPException(status_code=404, detail="Documento non trovato")
+
+    if not arrival.is_draft:
+        raise HTTPException(status_code=400, detail="Documento già confermato")
+
+    # Calcola discrepanze
+    discrepancies = []
+    for line in arrival.lines:
+        if line.received_quantity != line.expected_quantity:
+            discrepancy = schemas.arrivals.DiscrepancyInfo(
+                product_sku=line.product_sku,
+                product_description=line.product.description if line.product else "",
+                expected=line.expected_quantity,
+                received=line.received_quantity,
+                difference=line.received_quantity - line.expected_quantity
+            )
+            discrepancies.append(discrepancy)
+
+    # Se ci sono discrepanze e non è forzato, chiedi conferma
+    if discrepancies and not request.force:
+        return schemas.arrivals.FinalizeResponse(
+            success=False,
+            message="Discrepanze rilevate",
+            ask_confirmation=True,
+            discrepancies=discrepancies
+        )
+
+    # Conferma documento (usa endpoint esistente)
+    confirm_request = schemas.arrivals.ArrivalConfirmRequest(
+        arrival_id=arrival_id,
+        modified_lines=None  # Usa quantità attuali
+    )
+
+    try:
+        # Chiama logica di conferma esistente
+        confirm_response = confirm_arrival(confirm_request, db)
+
+        return schemas.arrivals.FinalizeResponse(
+            success=True,
+            message="Precarico finalizzato e caricato a TERRA",
+            ask_confirmation=False,
+            discrepancies=discrepancies,  # Includi anche se confermato
+            operations_logged=confirm_response.operations_logged,
+            total_loaded_to_terra=sum(line.received_quantity for line in arrival.lines)
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore finalizzazione: {str(e)}")

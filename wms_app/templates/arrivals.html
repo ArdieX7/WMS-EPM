@@ -226,45 +226,51 @@
 
             <!-- Scanner area (mostrata dopo selezione documento) -->
             <div id="scanner-area" class="scanner-section" style="display: none;">
+                <!-- Header documento con feedback inline -->
                 <div class="scanner-info">
-                    <h3 id="scanner-arrival-title">-</h3>
-                    <p id="scanner-supplier-name">-</p>
-                </div>
-
-                <div class="scanner-progress">
-                    <div class="progress-bar">
-                        <div id="scanner-progress-fill" class="progress-fill" style="width: 0%"></div>
+                    <div class="scanner-header-left">
+                        <h3 id="scanner-arrival-title">-</h3>
+                        <p id="scanner-supplier-name">-</p>
                     </div>
-                    <p id="scanner-progress-text">0/0 prodotti completati</p>
+                    <!-- Feedback messages (sempre visibile in alto a destra) -->
+                    <div id="scanner-feedback" class="scanner-feedback-inline"></div>
                 </div>
 
+                <!-- NUOVO: Lista codici attesi (sempre visibile in cima) -->
+                <div class="expected-codes-section">
+                    <h4>📋 Referenze Attese</h4>
+                    <div id="expected-codes-list" class="expected-codes-list">
+                        <!-- Popolato dinamicamente da JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Scanner input EAN -->
                 <div class="scanner-input-area">
+                    <label for="scanner-ean-input">🔍 Scansiona EAN/SKU</label>
                     <input type="text"
                            id="scanner-ean-input"
+                           class="scanner-input"
                            inputmode="none"
                            readonly
                            autofocus
-                           placeholder="Scansiona EAN..."
-                           class="scanner-input">
+                           placeholder="Premi qui e spara..."
+                           autocomplete="off">
                 </div>
 
-                <div id="scanner-current-product" class="scanner-current-product" style="display: none;">
-                    <h4 id="scanner-product-sku">-</h4>
-                    <p id="scanner-product-description">-</p>
-                    <div class="scanner-quantity">
-                        <span id="scanner-product-received">0</span> /
-                        <span id="scanner-product-expected">0</span>
-                        (<span id="scanner-product-percentage">0%</span>)
-                    </div>
-
-                    <div class="scanner-quantity-input">
-                        <label>Quantità da aggiungere:</label>
-                        <input type="number" id="scanner-quantity-input" value="1" min="1">
-                        <button class="action-btn" onclick="confirmScan()">✅ Conferma</button>
-                    </div>
+                <!-- NUOVO: Pulsante Finalizza (tra input e progress) -->
+                <div class="scanner-finalize-section">
+                    <button class="action-btn finalize-btn" onclick="finalizeArrival()">
+                        🎯 Finalizza Precarico
+                    </button>
                 </div>
 
-                <div id="scanner-feedback" class="scanner-feedback"></div>
+                <!-- Progress globale -->
+                <div class="scanner-global-progress">
+                    <div class="progress-bar">
+                        <div id="scanner-progress-fill" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <p id="scanner-progress-text">0/0 referenze completate (0%)</p>
+                </div>
             </div>
         </div>
     </div>
