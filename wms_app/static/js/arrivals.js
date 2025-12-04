@@ -11,6 +11,14 @@ let scannerState = {
     isWaitingQuantity: false
 };
 
+// Anti-duplicate system per prevenire scansioni accidentali
+let scanAntiDuplicate = {
+    recentBarcodes: [],      // Sliding window ultimi 5 scan
+    lastScanTime: 0,         // Timestamp ultimo scan
+    lastBarcodeValue: null,  // Ultimo barcode scansionato
+    MIN_SCAN_INTERVAL: 3000  // 3 secondi minimo tra scan dello stesso codice
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Arrivals module inizializzato');
     initializeArrivals();
@@ -382,6 +390,338 @@ async function deleteArrival(arrivalId) {
 
 // ========== MOBILE SCANNER ==========
 
+// ========== ANTI-DUPLICATE SYSTEM ==========
+
+function isDuplicateScan(barcodeValue) {
+    const now = Date.now();
+    const timeSinceLastScan = now - scanAntiDuplicate.lastScanTime;
+
+    // Check SOLO per stesso codice troppo veloce (< 1 secondo)
+    // Questo previene doppi scan accidentali dalla pistola
+    if (scanAntiDuplicate.lastBarcodeValue === barcodeValue &&
+        timeSinceLastScan < 1000) {  // Solo 1 secondo invece di 3
+        console.log('⏳ Scan duplicato troppo veloce (< 1s)');
+        return true;
+    }
+
+    return false;
+}
+
+function updateAntiDuplicateCache(barcodeValue) {
+    scanAntiDuplicate.lastBarcodeValue = barcodeValue;
+    scanAntiDuplicate.lastScanTime = Date.now();
+    scanAntiDuplicate.recentBarcodes.push(barcodeValue);
+
+    // Mantieni solo ultimi 5
+    if (scanAntiDuplicate.recentBarcodes.length > 5) {
+        scanAntiDuplicate.recentBarcodes.shift();
+    }
+}
+
+// ========== EXPECTED CODES LIST ==========
+
+function renderExpectedCodesList(lines) {
+    const container = document.getElementById('expected-codes-list');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    lines.forEach(line => {
+        const itemHtml = `
+            <div class="expected-code-item ${line.received_quantity >= line.expected_quantity ? 'completed' : ''}"
+                 data-sku="${line.product_sku}">
+                <div class="code-header">
+                    <div class="code-info">
+                        <strong>${line.product_sku}</strong> - ${line.product ? line.product.description || '' : ''}
+                    </div>
+                    <div class="code-quantity">
+                        <input type="number"
+                               class="manual-quantity-input"
+                               value="${line.received_quantity}"
+                               min="0"
+                               data-sku="${line.product_sku}"
+                               onchange="handleManualQuantityChange('${line.product_sku}', this.value)">
+                        <span class="quantity-divider">/</span>
+                        <span class="quantity-expected">${line.expected_quantity}</span>
+                        <span class="quantity-percentage">(${calculatePercentage(line.received_quantity, line.expected_quantity)}%)</span>
+                    </div>
+                </div>
+                <div class="code-progress-bar">
+                    <div class="code-progress-fill"
+                         style="width: ${calculatePercentage(line.received_quantity, line.expected_quantity)}%"></div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', itemHtml);
+    });
+}
+
+function updateExpectedCodeItem(sku, received, expected) {
+    const item = document.querySelector(`.expected-code-item[data-sku="${sku}"]`);
+    if (!item) return;
+
+    // Aggiorna input
+    const input = item.querySelector('.manual-quantity-input');
+    if (input) input.value = received;
+
+    // Aggiorna percentuale
+    const percentage = calculatePercentage(received, expected);
+    const percentageSpan = item.querySelector('.quantity-percentage');
+    if (percentageSpan) percentageSpan.textContent = `(${percentage}%)`;
+
+    // Aggiorna progress bar
+    const progressFill = item.querySelector('.code-progress-fill');
+    if (progressFill) progressFill.style.width = `${percentage}%`;
+
+    // Aggiorna classe completed
+    if (received >= expected) {
+        item.classList.add('completed');
+    } else {
+        item.classList.remove('completed');
+    }
+}
+
+function calculatePercentage(received, expected) {
+    if (expected === 0) return 0;
+    return Math.round((received / expected) * 100);
+}
+
+// ========== AUTO-INCREMENT SCAN ==========
+
+async function handleAutoIncrementScan(ean) {
+    // 1. Check duplicate
+    if (isDuplicateScan(ean)) {
+        const remainingSeconds = Math.ceil((scanAntiDuplicate.MIN_SCAN_INTERVAL - (Date.now() - scanAntiDuplicate.lastScanTime)) / 1000);
+        showScannerFeedback(`⏳ Scan troppo veloce, attendi ${remainingSeconds}s...`, 'warning');
+        return;
+    }
+
+    try {
+        // 2. Validate EAN
+        const validationResponse = await fetch('/arrivals/validate-ean', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                arrival_id: scannerState.arrivalId,
+                ean_code: ean,
+                allow_unexpected: true  // NUOVO: permetti creazione nuove righe
+            })
+        });
+
+        if (!validationResponse.ok) {
+            throw new Error('Errore validazione');
+        }
+
+        const validationResult = await validationResponse.json();
+
+        if (!validationResult.valid) {
+            // Usa alert() per errori critici - visibile anche su palmare
+            alert('❌ ERRORE\n\n' + validationResult.message);
+            return;
+        }
+
+        // 3. Se codice non atteso, chiedi conferma
+        if (validationResult.unexpected_code) {
+            const confirmed = confirm(
+                `⚠️ Codice ${validationResult.product_sku} NON previsto.\nVuoi aggiungerlo al documento?`
+            );
+            if (!confirmed) {
+                showScannerFeedback('Scan annullato', 'warning');
+                return;
+            }
+
+            // Aggiungi nuova riga alla UI
+            const newLine = {
+                product_sku: validationResult.product_sku,
+                product: { description: validationResult.product_description },
+                expected_quantity: 0,
+                received_quantity: 0
+            };
+            scannerState.arrivalData.lines.push(newLine);
+            renderExpectedCodesList(scannerState.arrivalData.lines);
+        }
+
+        // 4. Update cache anti-duplicate
+        updateAntiDuplicateCache(ean);
+
+        // 5. Confirm scan with server (NO optimistic update - wait for server)
+        const confirmResponse = await fetch('/arrivals/scan-confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                arrival_id: scannerState.arrivalId,
+                product_sku: validationResult.product_sku,
+                quantity: 1  // Sempre +1 per auto-increment
+            })
+        });
+
+        if (!confirmResponse.ok) {
+            throw new Error('Errore conferma scan');
+        }
+
+        const confirmResult = await confirmResponse.json();
+
+        // 6. Reload documento completo dal server per garantire sync perfetto
+        const reloadResponse = await fetch(`/arrivals/${scannerState.arrivalId}`);
+        if (reloadResponse.ok) {
+            const freshData = await reloadResponse.json();
+            scannerState.arrivalData = freshData;
+
+            // Re-render tutta la lista con dati freschi
+            renderExpectedCodesList(freshData.lines);
+            updateScannerProgress();
+
+            console.log(`✅ Sync completo dopo scan: ${validationResult.product_sku} → ${confirmResult.received_quantity}`);
+        } else {
+            // Fallback: aggiorna solo visualmente
+            const line = scannerState.arrivalData.lines.find(l => l.product_sku === validationResult.product_sku);
+            if (line) {
+                line.received_quantity = confirmResult.received_quantity;
+            }
+            updateExpectedCodeItem(
+                validationResult.product_sku,
+                confirmResult.received_quantity,
+                confirmResult.expected_quantity
+            );
+            updateScannerProgress();
+        }
+
+        // 7. Feedback
+        showScannerFeedback(`✅ +1 aggiunto (${confirmResult.received_quantity}/${confirmResult.expected_quantity})`, 'success');
+
+    } catch (error) {
+        console.error('Errore handleAutoIncrementScan:', error);
+        // Usa alert() per errori critici
+        alert('❌ ERRORE SCANSIONE\n\n' + error.message);
+    }
+}
+
+// ========== MANUAL QUANTITY CHANGE ==========
+
+async function handleManualQuantityChange(sku, newQuantity) {
+    try {
+        const quantity = parseInt(newQuantity);
+        if (isNaN(quantity) || quantity < 0) {
+            showScannerFeedback('❌ Quantità non valida', 'error');
+            return;
+        }
+
+        const response = await fetch(`/arrivals/${scannerState.arrivalId}/update-quantity`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                product_sku: sku,
+                received_quantity: quantity
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Errore aggiornamento');
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            // IMPORTANTE: Ricarica documento dal server per sync perfetto
+            const syncResponse = await fetch(`/arrivals/${scannerState.arrivalId}`);
+            if (!syncResponse.ok) {
+                throw new Error('Errore reload documento');
+            }
+
+            const freshData = await syncResponse.json();
+            scannerState.arrivalData = freshData;
+
+            // Ri-renderizza la lista con dati freschi
+            renderExpectedCodesList(freshData.lines);
+            updateScannerProgress();
+
+            console.log(`✅ Sync completo dopo modifica manuale: ${sku} → ${result.received_quantity}`);
+            showScannerFeedback('💾 Quantità salvata', 'success');
+        }
+    } catch (error) {
+        console.error('Errore handleManualQuantityChange:', error);
+        alert('❌ ERRORE SALVATAGGIO\n\n' + error.message);
+    }
+}
+
+// ========== FINALIZE ARRIVAL ==========
+
+async function finalizeArrival() {
+    try {
+        const response = await fetch(`/arrivals/${scannerState.arrivalId}/finalize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ force: false })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Errore finalizzazione (${response.status}): ${errorText}`);
+        }
+
+        const result = await response.json();
+
+        if (result.ask_confirmation && result.discrepancies.length > 0) {
+            // Mostra recap discrepanze
+            let message = '⚠️ DISCREPANZE RILEVATE:\n\n';
+            result.discrepancies.forEach(d => {
+                const sign = d.difference > 0 ? '+' : '';
+                message += `${d.product_sku}: Ricevuto ${d.received}, Atteso ${d.expected} (${sign}${d.difference})\n`;
+            });
+            message += '\nProcedere comunque con il carico a TERRA?';
+
+            if (!confirm(message)) {
+                return;
+            }
+
+            // Richiama con force=true
+            const forceResponse = await fetch(`/arrivals/${scannerState.arrivalId}/finalize`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ force: true })
+            });
+
+            if (!forceResponse.ok) {
+                throw new Error('Errore finalizzazione forzata');
+            }
+
+            const forceResult = await forceResponse.json();
+
+            if (forceResult.success) {
+                // Mostra alert di successo con dettagli
+                alert(
+                    `✅ PRECARICO FINALIZZATO!\n\n` +
+                    `Operazioni completate: ${forceResult.operations_logged}\n` +
+                    `Totale caricato a TERRA: ${forceResult.total_loaded_to_terra} unità\n\n` +
+                    `La pagina si aggiornerà automaticamente.`
+                );
+                closeMobileScannerOverlay();
+                location.reload();
+            } else {
+                throw new Error(forceResult.message || 'Finalizzazione fallita');
+            }
+        } else if (result.success) {
+            // Mostra alert di successo con dettagli
+            alert(
+                `✅ PRECARICO FINALIZZATO!\n\n` +
+                `Operazioni completate: ${result.operations_logged}\n` +
+                `Totale caricato a TERRA: ${result.total_loaded_to_terra} unità\n\n` +
+                `La pagina si aggiornerà automaticamente.`
+            );
+            closeMobileScannerOverlay();
+            location.reload();
+        } else {
+            // Caso inaspettato: success=false ma nessuna conferma richiesta
+            throw new Error(result.message || 'Finalizzazione fallita senza motivo specificato');
+        }
+    } catch (error) {
+        console.error('Errore finalizeArrival:', error);
+        alert('❌ ERRORE FINALIZZAZIONE\n\n' + error.message);
+    }
+}
+
+// ========== SCANNER LISTENERS ==========
+
 function setupScannerListeners() {
     const eanInput = document.getElementById('scanner-ean-input');
     if (eanInput) {
@@ -503,9 +843,11 @@ async function selectArrivalForScanner(arrivalId) {
         document.getElementById('scanner-document-selector').style.display = 'none';
         document.getElementById('scanner-area').style.display = 'block';
 
-        // Popola info
-        document.getElementById('scanner-arrival-title').textContent = arrival.arrival_number;
-        document.getElementById('scanner-supplier-name').textContent = `Fornitore: ${arrival.supplier_name}`;
+        // Popola numero ordine nell'header
+        document.getElementById('scanner-header-number').textContent = arrival.arrival_number;
+
+        // Render expected codes list (NUOVO)
+        renderExpectedCodesList(arrival.lines);
 
         // Aggiorna progress
         updateScannerProgress();
@@ -543,13 +885,8 @@ async function handleEANInput(ean) {
         return;
     }
 
-    // Se stiamo aspettando quantità, ignora
-    if (scannerState.isWaitingQuantity) {
-        return;
-    }
-
-    // Valida EAN
-    await validateAndShowProduct(ean);
+    // NUOVO: Auto-increment scan (sostituisce il vecchio two-step)
+    await handleAutoIncrementScan(ean);
 }
 
 async function validateAndShowProduct(ean) {

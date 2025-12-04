@@ -305,7 +305,7 @@ h1 {
 }
 
 .scanner-section {
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
 }
 
 .scanner-section h3 {
@@ -399,16 +399,16 @@ h1 {
 
 /* Scanner Input */
 .scanner-input-area {
-    margin: 2rem 0;
+    margin: 0.75rem 0;
 }
 
 .scanner-input {
     width: 100%;
-    padding: 1.5rem;
-    font-size: 1.5rem;
+    padding: 1rem;
+    font-size: 1.3rem;
     text-align: center;
     border: 2px solid #0066CC;
-    border-radius: 12px;
+    border-radius: 8px;
     background: #f8f9fa;
 }
 
@@ -484,20 +484,33 @@ h1 {
     white-space: nowrap;
 }
 
+/* Scanner Feedback Compact (sopra lista referenze) */
+.scanner-feedback-compact {
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
 .scanner-feedback.success,
-.scanner-feedback-inline.success {
+.scanner-feedback-inline.success,
+.scanner-feedback-compact.success {
     background: #d4edda;
     color: #155724;
 }
 
 .scanner-feedback.error,
-.scanner-feedback-inline.error {
+.scanner-feedback-inline.error,
+.scanner-feedback-compact.error {
     background: #f8d7da;
     color: #721c24;
 }
 
 .scanner-feedback.warning,
-.scanner-feedback-inline.warning {
+.scanner-feedback-inline.warning,
+.scanner-feedback-compact.warning {
     background: #fff3cd;
     color: #856404;
 }
@@ -533,26 +546,26 @@ h1 {
 }
 
 .expected-codes-section h4 {
-    margin: 0 0 1rem 0;
+    margin: 0 0 0.5rem 0;
     color: #00516E;
-    font-size: 1.1rem;
+    font-size: 1rem;
 }
 
 .expected-codes-list {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.5rem;
 }
 
 .expected-code-item {
     background: white;
     border: 1px solid #dee2e6;
     border-radius: 6px;
-    padding: 0.5rem;
+    padding: 0.4rem;
     transition: all 0.2s;
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: 0.25rem;
 }
 
 .expected-code-item.completed {
@@ -646,29 +659,30 @@ h1 {
 
 /* ========== NUOVO: Scanner Global Progress ========== */
 .scanner-global-progress {
-    margin: 1.5rem 0;
+    margin: 0.75rem 0;
 }
 
 .scanner-global-progress .progress-bar {
-    height: 30px;
+    height: 24px;
 }
 
 .scanner-global-progress #scanner-progress-text {
     text-align: center;
-    margin-top: 0.5rem;
+    margin-top: 0.4rem;
     font-weight: 600;
+    font-size: 0.9rem;
     color: #495057;
 }
 
 /* ========== NUOVO: Finalize Button ========== */
 .scanner-finalize-section {
-    margin: 1.5rem 0;
+    margin: 0.5rem 0;
 }
 
 .finalize-btn {
     width: 100%;
-    padding: 1rem;
-    font-size: 1.2rem;
+    padding: 0.75rem;
+    font-size: 1.1rem;
     font-weight: bold;
     background: linear-gradient(135deg, #28a745, #20c997);
     border: none;
@@ -754,10 +768,34 @@ h1 {
         width: 100%;
     }
 
+    /* Compatta layout mobile */
+    .scanner-body {
+        padding: 0.5rem;
+    }
+
+    .scanner-input-area {
+        margin: 0.5rem 0;
+    }
+
+    .scanner-input-area label {
+        font-size: 0.9rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .scanner-input {
+        padding: 0.75rem;
+        font-size: 1.1rem;
+    }
+
     /* NUOVO: Mobile styles for expected codes */
     .expected-codes-section {
         max-height: 35vh;
-        padding: 0.5rem;
+        padding: 0.3rem;
+    }
+
+    .expected-codes-section h4 {
+        font-size: 0.9rem;
+        margin-bottom: 0.4rem;
     }
 
     .manual-quantity-input {
@@ -783,22 +821,29 @@ h1 {
         gap: 0.2rem;
     }
 
-    /* Scanner header con feedback inline */
-    .scanner-info {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-
-    .scanner-feedback-inline {
-        text-align: center;
+    /* Scanner feedback compact */
+    .scanner-feedback-compact {
         font-size: 0.75rem;
-        padding: 0.4rem 0.5rem;
-        min-width: auto;
+        padding: 0.3rem 0.5rem;
+        margin-bottom: 0.4rem;
     }
 
     .finalize-btn {
-        font-size: 1rem;
-        padding: 0.75rem;
+        font-size: 0.95rem;
+        padding: 0.6rem;
+    }
+
+    .scanner-global-progress {
+        margin: 0.5rem 0;
+    }
+
+    .scanner-global-progress .progress-bar {
+        height: 20px;
+    }
+
+    .scanner-global-progress #scanner-progress-text {
+        font-size: 0.8rem;
+        margin-top: 0.3rem;
     }
 
     .quantity-percentage {

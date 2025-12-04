@@ -211,7 +211,7 @@
     <!-- OVERLAY: Mobile Scanner (Full-screen) -->
     <div id="mobile-scanner-overlay" class="mobile-scanner-overlay" style="display: none;">
         <div class="scanner-header">
-            <h2>📱 Scansiona Arrivo</h2>
+            <h2>📱 Scansiona Arrivo <span id="scanner-header-number"></span></h2>
             <button class="scanner-close-btn" onclick="closeMobileScannerOverlay()">✕</button>
         </div>
 
@@ -226,15 +226,8 @@
 
             <!-- Scanner area (mostrata dopo selezione documento) -->
             <div id="scanner-area" class="scanner-section" style="display: none;">
-                <!-- Header documento con feedback inline -->
-                <div class="scanner-info">
-                    <div class="scanner-header-left">
-                        <h3 id="scanner-arrival-title">-</h3>
-                        <p id="scanner-supplier-name">-</p>
-                    </div>
-                    <!-- Feedback messages (sempre visibile in alto a destra) -->
-                    <div id="scanner-feedback" class="scanner-feedback-inline"></div>
-                </div>
+                <!-- Feedback messages (sopra lista referenze) -->
+                <div id="scanner-feedback" class="scanner-feedback-compact"></div>
 
                 <!-- NUOVO: Lista codici attesi (sempre visibile in cima) -->
                 <div class="expected-codes-section">
