@@ -35,27 +35,71 @@ router = APIRouter(
     tags=["ddt"],
 )
 
-def generate_ddt_number(db: Session) -> str:
-    """Genera un numero DDT progressivo"""
-    year = datetime.now().year
-    
-    # Trova l'ultimo numero DDT dell'anno corrente
-    # I DDT hanno formato "000001/2025", quindi cerchiamo quelli che finiscono con "/YYYY"
-    last_ddt = db.query(DDT).filter(
+def find_next_available_ddt_number(db: Session, year: int = None) -> int:
+    """
+    Trova il prossimo numero DDT disponibile per l'anno specificato.
+    Se ci sono 'buchi' nella sequenza (es: 1,2,3,8,9), ritorna 4.
+    """
+    if year is None:
+        year = datetime.now().year
+
+    # Ottieni tutti i numeri DDT dell'anno corrente
+    existing_ddts = db.query(DDT).filter(
         DDT.ddt_number.like(f"%/{year}")
-    ).order_by(DDT.ddt_number.desc()).first()
-    
-    if last_ddt:
-        # Estrai il numero progressivo dall'ultimo DDT
+    ).all()
+
+    if not existing_ddts:
+        return 1
+
+    # Estrai i numeri progressivi
+    used_numbers = set()
+    for ddt in existing_ddts:
         try:
-            last_num = int(last_ddt.ddt_number.split("/")[0])
-            next_num = last_num + 1
-        except:
-            next_num = 1
+            num = int(ddt.ddt_number.split("/")[0])
+            used_numbers.add(num)
+        except (ValueError, IndexError):
+            continue
+
+    # Trova il primo numero non usato partendo da 1
+    next_num = 1
+    while next_num in used_numbers:
+        next_num += 1
+
+    return next_num
+
+def generate_ddt_number(db: Session, custom_number: int = None) -> str:
+    """
+    Genera un numero DDT progressivo.
+    Se custom_number è fornito, usa quello (con validazione).
+    Altrimenti trova il prossimo numero disponibile.
+    """
+    year = datetime.now().year
+
+    if custom_number is not None:
+        # Validazione numero custom
+        if custom_number < 1 or custom_number > 999999:
+            raise HTTPException(
+                status_code=400,
+                detail="Numero DDT deve essere tra 1 e 999999"
+            )
+
+        # Verifica che non esista già
+        formatted_number = f"{custom_number:06d}/{year}"
+        existing = db.query(DDT).filter(
+            DDT.ddt_number == formatted_number
+        ).first()
+
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Numero DDT {formatted_number} già esistente"
+            )
+
+        return formatted_number
     else:
-        next_num = 1
-    
-    return f"{next_num:06d}/{year}"
+        # Auto-genera con gap detection
+        next_num = find_next_available_ddt_number(db, year)
+        return f"{next_num:06d}/{year}"
 
 @router.get("/manage", response_class=HTMLResponse)
 async def get_ddt_management_page(request: Request, db: Session = Depends(get_db)):
@@ -81,6 +125,21 @@ async def get_ddt_management_page(request: Request, db: Session = Depends(get_db
         "active_page": "ddt"
     })
 
+@router.get("/next-number")
+def get_next_ddt_number(db: Session = Depends(get_db)):
+    """
+    Ritorna il prossimo numero DDT disponibile per l'anno corrente.
+    Usato dal frontend per pre-compilare il campo numero DDT.
+    """
+    year = datetime.now().year
+    next_num = find_next_available_ddt_number(db, year)
+
+    return {
+        "next_number": next_num,
+        "year": year,
+        "formatted": f"{next_num:06d}/{year}"
+    }
+
 @router.post("/generate")
 def generate_ddt_from_order(ddt_request: schemas.ddt.DDTGenerateRequest, db: Session = Depends(get_db)):
     """Genera DDT da ordine completato"""
@@ -100,9 +159,9 @@ def generate_ddt_from_order(ddt_request: schemas.ddt.DDTGenerateRequest, db: Ses
     
     if existing_ddt:
         raise HTTPException(status_code=400, detail="DDT già esistente per questo ordine")
-    
-    # Genera numero DDT
-    ddt_number = generate_ddt_number(db)
+
+    # Genera numero DDT (usa custom_ddt_number se fornito)
+    ddt_number = generate_ddt_number(db, custom_number=ddt_request.custom_ddt_number)
     
     # Crea DDT
     ddt = DDT(

@@ -60,6 +60,7 @@ class DDTGenerateRequest(BaseModel):
     total_packages: int = 1
     total_weight: Optional[str] = None
     notes: Optional[str] = None
+    custom_ddt_number: Optional[int] = None  # Numero DDT custom (opzionale)
 
 class DDTResponse(BaseModel):
     ddt: DDT
