@@ -266,7 +266,10 @@
                                     <strong>Cliente:</strong> {{ ddt.customer_name }}
                                 </div>
                                 <div class="col-md-4">
-                                    <strong>Data Emissione:</strong> {{ ddt.issue_date.strftime('%d/%m/%Y') }}
+                                    <strong>Data Emissione:</strong> {{ ddt.issue_date.strftime('%d/%m/%Y') }}<br>
+                                    {% if ddt.transporter_name %}
+                                        <strong>Vettore:</strong> {{ ddt.transporter_name }}
+                                    {% endif %}
                                 </div>
                                 <div class="col-md-4">
                                     <strong>N. PLT:</strong> {{ ddt.total_packages }}<br>
@@ -390,6 +393,12 @@
                                     <label for="totalWeight">Peso Totale (opz.)</label>
                                 </div>
                             </div>
+                            <div class="col-md-4">
+                                <div class="form-floating mb-3">
+                                    <input type="text" class="form-control" id="transporterName" placeholder="es. Bartolini">
+                                    <label for="transporterName">Vettore (opz.)</label>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="form-floating">
@@ -488,6 +497,7 @@
             document.getElementById('totalWeight').value = totalWeight || '';
 
             document.getElementById('notes').value = '';
+            document.getElementById('transporterName').value = '';
 
             // Fetch e pre-compila prossimo numero DDT disponibile
             try {
@@ -592,6 +602,7 @@
                     customer_province: document.getElementById('customerProvince').value || null,
                     total_packages: parseInt(document.getElementById('totalPackages').value),
                     total_weight: document.getElementById('totalWeight').value || null,
+                    transporter_name: document.getElementById('transporterName').value || null,
                     notes: document.getElementById('notes').value || null,
                     custom_ddt_number: customNumber  // NUOVO: Aggiungi numero custom
                 };
@@ -660,6 +671,7 @@
                                     <tr><td><strong>Ordine Riferimento:</strong></td><td>${ddt.order_number}</td></tr>
                                     <tr><td><strong>Data Emissione:</strong></td><td>${new Date(ddt.issue_date).toLocaleDateString()}</td></tr>
                                     <tr><td><strong>N. PLT:</strong></td><td>${ddt.total_packages}</td></tr>
+                                    ${ddt.transporter_name ? `<tr><td><strong>Vettore:</strong></td><td>${ddt.transporter_name}</td></tr>` : ''}
                                     ${ddt.total_weight ? `<tr><td><strong>Peso Totale:</strong></td><td>${ddt.total_weight}</td></tr>` : ''}
                                     ${ddt.notes ? `<tr><td><strong>Note:</strong></td><td>${ddt.notes}</td></tr>` : ''}
                                 </table>

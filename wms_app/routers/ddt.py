@@ -172,8 +172,8 @@ def generate_ddt_from_order(ddt_request: schemas.ddt.DDTGenerateRequest, db: Ses
         customer_city=ddt_request.customer_city,
         customer_cap=ddt_request.customer_cap,
         customer_province=ddt_request.customer_province,
+        transporter_name=ddt_request.transporter_name,
         # Campi deprecati - non più usati nei nuovi DDT
-        # transporter_name=ddt_request.transporter_name,
         # transporter_notes=ddt_request.transporter_notes,
         # transport_reason=ddt_request.transport_reason,
         total_packages=ddt_request.total_packages,
@@ -332,7 +332,8 @@ def generate_ddt_pdf(ddt_number: str, db: Session = Depends(get_db)):
     # Informazioni DDT (ordine, data, colli, peso)
     ddt_details_data = [
         ["Ordine Riferimento:", ddt.order_number, "Data Emissione:", ddt.issue_date.strftime("%d/%m/%Y")],
-        ["N. PLT:", str(ddt.total_packages), "Peso Totale:", ddt.total_weight or "N/D"]
+        ["N. PLT:", str(ddt.total_packages), "Peso Totale:", ddt.total_weight or "N/D"],
+        ["Vettore:", ddt.transporter_name or "_____________", "", ""]
     ]
 
     details_table = Table(ddt_details_data, colWidths=[4*cm, 4*cm, 4*cm, 4.5*cm])
