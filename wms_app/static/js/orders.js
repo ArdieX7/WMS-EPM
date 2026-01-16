@@ -301,16 +301,19 @@
                                     </button>
                                 `;
                             } else {
-                                // Ordine in corso: può essere evaso, annullato o eliminato
+                                // Ordine in corso: può essere evaso, annullato, modificato o eliminato
                                 actionButtons += `
                                     <button class="fulfill-order-button" data-order-id="${order.id}">
                                         Evadi
+                                    </button>
+                                    <button class="edit-order-button" data-order-id="${order.id}" style="background-color: #17a2b8; margin-left: 5px;" title="Modifica ordine">
+                                        ✏️ Modifica
                                     </button>
                                     <button class="cancel-order-button" data-order-id="${order.id}" style="background-color: #dc3545; margin-left: 5px;">
                                         ❌
                                     </button>
                                 `;
-                                
+
                                 // Aggiungi pulsante "Elimina" solo se non ha picking iniziato
                                 if (pickingProgress === 0) {
                                     actionButtons += `
@@ -1044,6 +1047,103 @@
                 } catch (error) {
                     console.error("Errore nella creazione ordine:", error);
                     alert("Errore di rete nella creazione ordine.");
+                }
+            });
+
+            // ============================================================================
+            // EDIT ORDER EVENT LISTENERS
+            // ============================================================================
+
+            // Edit add line button
+            const editAddLineButton = document.getElementById('edit-add-line-button');
+            if (editAddLineButton) {
+                editAddLineButton.addEventListener('click', () => addEditLine());
+            }
+
+            // Edit order form submission
+            const editOrderForm = document.getElementById('edit-order-form');
+            if (editOrderForm) {
+                editOrderForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+
+                    const orderId = document.getElementById('edit-order-id').value;
+                    const orderNumber = document.getElementById('edit-order-number').value;
+
+                    // Collect all lines
+                    const lines = [];
+                    const linesContainer = document.getElementById('edit-order-lines-container');
+                    const orderLines = linesContainer.querySelectorAll('.order-line');
+
+                    orderLines.forEach(lineDiv => {
+                        const lineId = lineDiv.dataset.lineId;
+                        const sku = document.getElementById(`edit-line-sku-${lineId}`).value.trim();
+                        const quantity = parseInt(document.getElementById(`edit-line-quantity-${lineId}`).value);
+
+                        if (sku && quantity > 0) {
+                            lines.push({
+                                product_sku: sku,
+                                requested_quantity: quantity
+                            });
+                        }
+                    });
+
+                    if (lines.length === 0) {
+                        alert('❌ Inserisci almeno una riga valida');
+                        return;
+                    }
+
+                    // Confirm submission
+                    if (!confirm(`Confermi la modifica dell'ordine ${orderNumber}?\n\nSe sono presenti prodotti già prelevati che vengono rimossi o ridotti, questi saranno automaticamente trasferiti in TERRA.`)) {
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(`/orders/${orderId}/edit`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ lines })
+                        });
+
+                        const result = await response.json();
+
+                        if (response.ok) {
+                            // Show warnings if present
+                            if (result.warnings && result.warnings.length > 0) {
+                                let warningMessage = '⚠️ Ordine modificato con avvisi:\n\n';
+                                result.warnings.forEach(w => {
+                                    warningMessage += `• ${w.message}\n`;
+                                });
+                                alert(warningMessage);
+                            } else {
+                                alert('✅ Ordine modificato con successo!');
+                            }
+
+                            // Close overlay and refresh
+                            closeOverlay('edit-order-overlay');
+                            window.location.reload();
+                        } else {
+                            alert(`❌ Errore: ${result.detail || result.message}`);
+                        }
+
+                    } catch (error) {
+                        console.error('Error editing order:', error);
+                        alert('❌ Errore durante la modifica dell\'ordine');
+                    }
+                });
+            }
+
+            // Event delegation for edit order buttons in table
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('edit-order-button') ||
+                    e.target.closest('.edit-order-button')) {
+                    const button = e.target.classList.contains('edit-order-button') ?
+                                  e.target : e.target.closest('.edit-order-button');
+                    const orderId = button.dataset.orderId;
+                    if (orderId) {
+                        editOrder(orderId);
+                    }
                 }
             });
 
@@ -4216,7 +4316,138 @@
                 alert('❌ Errore durante l\'aggiornamento del nome cliente');
             }
         }
-        
+
+        // ============================================================================
+        // EDIT ORDER FUNCTIONALITY
+        // ============================================================================
+
+        let editLineCounter = 0;
+
+        // Function to open edit order overlay
+        async function editOrder(orderId) {
+            try {
+                // Fetch order details
+                const response = await fetch(`/orders/${orderId}`);
+                if (!response.ok) throw new Error('Failed to fetch order');
+                const order = await response.json();
+
+                // Populate read-only fields
+                document.getElementById('edit-order-id').value = order.id;
+                document.getElementById('edit-order-number').value = order.order_number;
+                document.getElementById('edit-customer-name').value = order.customer_name;
+
+                // Clear and populate lines container
+                const linesContainer = document.getElementById('edit-order-lines-container');
+                linesContainer.innerHTML = '';
+                editLineCounter = 0;
+
+                // Add existing lines
+                order.lines.forEach((line, index) => {
+                    addEditLine(line.product_sku, line.requested_quantity);
+                });
+
+                // Check for DDT and show warning if exists
+                try {
+                    const ddtResponse = await fetch(`/ddt/check-order/${order.order_number}`);
+                    if (ddtResponse.ok) {
+                        const ddtData = await ddtResponse.json();
+                        if (ddtData.has_ddt) {
+                            showEditWarning([{
+                                type: 'ddt_exists',
+                                message: `ATTENZIONE: Questo ordine ha un DDT collegato (${ddtData.ddt_number}). Modificando l'ordine potrebbe essere necessario aggiornare anche il DDT.`
+                            }]);
+                        } else {
+                            hideEditWarnings();
+                        }
+                    }
+                } catch (ddtError) {
+                    console.warn('DDT check failed:', ddtError);
+                    hideEditWarnings();
+                }
+
+                // Open overlay
+                openOverlay('edit-order-overlay');
+
+            } catch (error) {
+                console.error('Error loading order for edit:', error);
+                alert('❌ Errore nel caricamento dell\'ordine');
+            }
+        }
+
+        // Function to add a line to edit form
+        function addEditLine(sku = '', quantity = '') {
+            editLineCounter++;
+            const linesContainer = document.getElementById('edit-order-lines-container');
+
+            const lineHtml = `
+                <div class="order-line" data-line-id="${editLineCounter}">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-line-sku-${editLineCounter}">SKU Prodotto:</label>
+                            <input type="text"
+                                   id="edit-line-sku-${editLineCounter}"
+                                   list="product-skus"
+                                   value="${sku}"
+                                   required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-line-quantity-${editLineCounter}">Quantità:</label>
+                            <input type="number"
+                                   id="edit-line-quantity-${editLineCounter}"
+                                   value="${quantity}"
+                                   min="1"
+                                   required>
+                        </div>
+                        <button type="button"
+                                class="btn-remove-line"
+                                onclick="removeEditLine(this)"
+                                title="Rimuovi riga">✕</button>
+                    </div>
+                </div>
+            `;
+
+            linesContainer.insertAdjacentHTML('beforeend', lineHtml);
+        }
+
+        // Function to remove a line from edit form
+        function removeEditLine(button) {
+            const orderLine = button.closest('.order-line');
+            const container = document.getElementById('edit-order-lines-container');
+
+            // Prevent removing last line
+            if (container.querySelectorAll('.order-line').length <= 1) {
+                alert('Deve rimanere almeno una riga ordine!');
+                return;
+            }
+
+            orderLine.remove();
+        }
+
+        // Function to show warnings in edit overlay
+        function showEditWarning(warnings) {
+            const warningsContainer = document.getElementById('edit-warnings-container');
+            const warningsList = document.getElementById('edit-warnings-list');
+
+            warningsList.innerHTML = '';
+            warnings.forEach(warning => {
+                const li = document.createElement('li');
+                li.textContent = warning.message;
+                warningsList.appendChild(li);
+            });
+
+            warningsContainer.style.display = 'block';
+        }
+
+        // Function to hide warnings
+        function hideEditWarnings() {
+            document.getElementById('edit-warnings-container').style.display = 'none';
+        }
+
+        // Make functions globally accessible
+        window.editOrder = editOrder;
+        window.addEditLine = addEditLine;
+        window.removeEditLine = removeEditLine;
+
         // Rendi le funzioni globali per i pulsanti inline
         window.skipCurrentPosition = skipCurrentPosition;
         window.exitRealTimePicking = exitRealTimePicking;

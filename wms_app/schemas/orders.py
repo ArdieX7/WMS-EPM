@@ -93,3 +93,39 @@ class OrderImportLine(BaseModel):
     order_number: str
     product_sku: str
     quantity: int
+
+# --- Schema for Order Editing ---
+class OrderLineEdit(BaseModel):
+    """Single line in an order edit request"""
+    product_sku: str
+    requested_quantity: int
+
+    @validator('requested_quantity')
+    def validate_positive_quantity(cls, v):
+        if v <= 0:
+            raise ValueError('Quantity must be positive')
+        return v
+
+class OrderEditRequest(BaseModel):
+    """Request body for editing an order"""
+    lines: List[OrderLineEdit]
+
+    @validator('lines')
+    def validate_lines_not_empty(cls, v):
+        if not v or len(v) == 0:
+            raise ValueError('Order must have at least one line')
+        return v
+
+class OrderEditWarning(BaseModel):
+    """Warning message about TERRA transfers or constraints"""
+    type: str  # 'terra_transfer', 'picked_constraint', 'ddt_exists'
+    product_sku: Optional[str] = None
+    message: str
+    quantity: Optional[int] = None
+
+class OrderEditResponse(BaseModel):
+    """Response from order edit operation"""
+    success: bool
+    message: str
+    warnings: List[OrderEditWarning] = []
+    order: "Order"  # Forward reference

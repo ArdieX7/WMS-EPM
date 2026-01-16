@@ -1957,17 +1957,24 @@ async def get_picking_list_print(order_id: int, db: Session = Depends(get_db)):
             <!-- Colonna Destra: Recap Prodotti -->
             <div class="products-recap">
                 <h3>Quantità Ordine:</h3>"""
-    
-    # Aggiungi il recap dei prodotti richiesti
+
+    # Aggiungi il recap dei prodotti richiesti (quantità totale richiesta, non rimanente)
+    total_pieces_requested = 0
     for line in order.lines:
-        remaining_to_pick = line.requested_quantity - line.picked_quantity
-        if remaining_to_pick > 0:
-            html_content += f"""
+        total_pieces_requested += line.requested_quantity
+        html_content += f"""
                 <div class="product-item">
                     <span class="product-sku">{line.product_sku}</span>
-                    <span class="product-qty">{remaining_to_pick} pz</span>
+                    <span class="product-qty">{line.requested_quantity} pz</span>
                 </div>"""
-    
+
+    # Aggiungi totale pezzi
+    html_content += f"""
+                <div class="product-item" style="border-top: 1px solid #333; margin-top: 8px; padding-top: 8px; font-weight: bold;">
+                    <span>TOTALE COLLI:</span>
+                    <span class="product-qty">{total_pieces_requested} pz</span>
+                </div>"""
+
     html_content += """
             </div>
         </div>
@@ -3698,6 +3705,312 @@ def update_customer_name(
             api_endpoint=f"/orders/{order_number}/customer"
         )
         raise HTTPException(status_code=500, detail=f"Errore durante l'aggiornamento: {str(e)}")
+
+# ============================================================================
+# EDIT ORDER - Helper Function and Endpoint
+# ============================================================================
+
+def _transfer_to_terra(db: Session, product_sku: str, quantity: int, reason: str) -> Dict[str, Any]:
+    """
+    Helper function to transfer inventory back to TERRA location.
+    Creates or updates TERRA inventory record.
+
+    Args:
+        db: Database session
+        product_sku: SKU of the product to transfer
+        quantity: Quantity to transfer
+        reason: Reason for transfer (for logging)
+
+    Returns:
+        Dictionary with transfer details
+    """
+    terra_inventory = db.query(models.Inventory).filter(
+        models.Inventory.product_sku == product_sku,
+        models.Inventory.location_name == "TERRA"
+    ).first()
+
+    if terra_inventory:
+        terra_inventory.quantity += quantity
+    else:
+        new_terra_inventory = models.Inventory(
+            product_sku=product_sku,
+            location_name="TERRA",
+            quantity=quantity
+        )
+        db.add(new_terra_inventory)
+
+    return {
+        "product_sku": product_sku,
+        "quantity": quantity,
+        "location": "TERRA",
+        "reason": reason
+    }
+
+@router.put("/{order_id}/edit")
+def edit_order(
+    order_id: int,
+    edit_request: schemas.OrderEditRequest,
+    db: Session = Depends(get_db)
+    # TODO: Add authentication: current_user = Depends(require_permission("orders_edit"))
+):
+    """
+    Edit an order by modifying its lines (add/remove/modify products).
+
+    Rules:
+    - Cannot edit completed, cancelled, or archived orders
+    - If line has picked_quantity > 0 and is removed/reduced:
+      * Transfer picked_quantity back to TERRA location
+      * Delete corresponding OutgoingStock records
+      * Add warning to response
+    - If DDT exists, warn user but don't block operation
+    - Cannot reduce requested_quantity below picked_quantity (auto-transfers excess to TERRA)
+
+    Args:
+        order_id: ID of the order to edit
+        edit_request: OrderEditRequest with lines array
+        db: Database session
+
+    Returns:
+        OrderEditResponse with success status, message, and warnings
+    """
+    logger = LoggingService(db)
+    warnings = []
+
+    try:
+        # 1. FETCH AND VALIDATE ORDER
+        order = db.query(models.Order).options(
+            joinedload(models.Order.lines)
+        ).filter(
+            models.Order.id == order_id
+        ).first()
+
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        # Validate order state
+        if order.is_completed:
+            raise HTTPException(status_code=400, detail="Cannot edit completed orders")
+        if order.is_cancelled:
+            raise HTTPException(status_code=400, detail="Cannot edit cancelled orders")
+        if order.is_archived:
+            raise HTTPException(status_code=400, detail="Cannot edit archived orders")
+
+        # 2. CHECK FOR DDT (WARNING ONLY)
+        from wms_app.models.ddt import DDT
+        ddt = db.query(DDT).filter(DDT.order_number == order.order_number).first()
+        if ddt:
+            warnings.append({
+                'type': 'ddt_exists',
+                'product_sku': None,
+                'message': f'ATTENZIONE: Questo ordine ha un DDT collegato ({ddt.ddt_number}). Modificando l\'ordine potrebbe essere necessario aggiornare anche il DDT.',
+                'quantity': None
+            })
+
+        # 3. VALIDATE ALL SKUS EXIST
+        requested_skus = set(line.product_sku for line in edit_request.lines)
+        existing_products = db.query(models.Product).filter(
+            models.Product.sku.in_(requested_skus)
+        ).all()
+        existing_skus = set(p.sku for p in existing_products)
+
+        missing_skus = requested_skus - existing_skus
+        if missing_skus:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Products not found: {', '.join(missing_skus)}"
+            )
+
+        # 4. BUILD OLD STATE MAP FOR COMPARISON
+        old_lines_map = {line.product_sku: line for line in order.lines}
+
+        # 5. BUILD NEW STATE MAP FROM REQUEST (consolidate duplicates)
+        new_lines_map = {}
+        for line_req in edit_request.lines:
+            if line_req.product_sku in new_lines_map:
+                new_lines_map[line_req.product_sku] += line_req.requested_quantity
+            else:
+                new_lines_map[line_req.product_sku] = line_req.requested_quantity
+
+        # 5.5. DELETE ALL EXISTING RESERVATIONS FOR THIS ORDER
+        # When order is edited, old reservations become invalid
+        # The system will recreate them on next picking with correct quantities
+        from wms_app.models.reservations import InventoryReservation
+        deleted_reservations = db.query(InventoryReservation).filter(
+            InventoryReservation.order_id == str(order.order_number)
+        ).delete()
+
+        if deleted_reservations > 0:
+            warnings.append({
+                'type': 'reservations_cleared',
+                'product_sku': None,
+                'message': f'Cancellate {deleted_reservations} prenotazioni obsolete. Verranno ricreate al prossimo picking.',
+                'quantity': None
+            })
+
+        # 6. PROCESS CHANGES: REMOVED/REDUCED LINES
+        for sku, old_line in old_lines_map.items():
+            new_quantity = new_lines_map.get(sku, 0)
+
+            if new_quantity == 0:
+                # LINE REMOVED COMPLETELY
+                if old_line.picked_quantity > 0:
+                    # Transfer picked items back to TERRA
+                    _transfer_to_terra(
+                        db=db,
+                        product_sku=sku,
+                        quantity=old_line.picked_quantity,
+                        reason=f"Order {order.order_number} line removed during edit"
+                    )
+
+                    warnings.append({
+                        'type': 'terra_transfer',
+                        'product_sku': sku,
+                        'message': f'{old_line.picked_quantity} unità di {sku} trasferite a TERRA (riga rimossa)',
+                        'quantity': old_line.picked_quantity
+                    })
+
+                    # Delete OutgoingStock records
+                    db.query(models.OutgoingStock).filter(
+                        models.OutgoingStock.order_line_id == old_line.id
+                    ).delete()
+
+                # Delete the order line
+                db.delete(old_line)
+
+            elif new_quantity < old_line.requested_quantity:
+                # LINE QUANTITY REDUCED
+                if new_quantity < old_line.picked_quantity:
+                    # Cannot reduce below picked - calculate excess picked
+                    excess_picked = old_line.picked_quantity - new_quantity
+
+                    # Transfer excess back to TERRA
+                    _transfer_to_terra(
+                        db=db,
+                        product_sku=sku,
+                        quantity=excess_picked,
+                        reason=f"Order {order.order_number} quantity reduced below picked"
+                    )
+
+                    warnings.append({
+                        'type': 'terra_transfer',
+                        'product_sku': sku,
+                        'message': f'{excess_picked} unità di {sku} trasferite a TERRA (quantità ridotta da {old_line.requested_quantity} a {new_quantity}, ma {old_line.picked_quantity} già prelevate)',
+                        'quantity': excess_picked
+                    })
+
+                    # Adjust OutgoingStock to match new quantity
+                    outgoing_items = db.query(models.OutgoingStock).filter(
+                        models.OutgoingStock.order_line_id == old_line.id
+                    ).all()
+
+                    total_outgoing = sum(item.quantity for item in outgoing_items)
+                    if total_outgoing > new_quantity:
+                        # Reduce outgoing stock proportionally
+                        reduction_needed = total_outgoing - new_quantity
+                        for outgoing_item in outgoing_items:
+                            if reduction_needed <= 0:
+                                break
+                            reduction_amount = min(outgoing_item.quantity, reduction_needed)
+                            outgoing_item.quantity -= reduction_amount
+                            reduction_needed -= reduction_amount
+
+                            if outgoing_item.quantity == 0:
+                                db.delete(outgoing_item)
+
+                    # Set picked_quantity to new requested (effectively capping it)
+                    old_line.picked_quantity = new_quantity
+                    old_line.requested_quantity = new_quantity
+                else:
+                    # Simple quantity reduction (no picked overflow)
+                    old_line.requested_quantity = new_quantity
+
+        # 7. PROCESS CHANGES: ADDED/INCREASED LINES
+        for sku, new_quantity in new_lines_map.items():
+            if sku in old_lines_map:
+                old_line = old_lines_map[sku]
+                if new_quantity > old_line.requested_quantity:
+                    # LINE QUANTITY INCREASED
+                    old_line.requested_quantity = new_quantity
+            else:
+                # NEW LINE ADDED
+                new_line = models.OrderLine(
+                    order_id=order.id,
+                    product_sku=sku,
+                    requested_quantity=new_quantity,
+                    picked_quantity=0
+                )
+                db.add(new_line)
+
+        # 8. LOG THE OPERATION
+        before_lines = [
+            f"{line.product_sku}: {line.requested_quantity} (picked: {line.picked_quantity})"
+            for line in old_lines_map.values()
+        ]
+        after_lines = [
+            f"{sku}: {qty}"
+            for sku, qty in new_lines_map.items()
+        ]
+
+        logger.log_operation(
+            operation_type=OperationType.ORDINE_MODIFICATO,
+            operation_category=OperationCategory.MANUAL,
+            status=OperationStatus.WARNING if warnings else OperationStatus.SUCCESS,
+            product_sku=None,
+            location_from=None,
+            location_to=None,
+            quantity=None,
+            user_id="system",  # TODO: Replace with real auth when available
+            file_name=None,
+            details={
+                'order_number': order.order_number,
+                'order_id': order.id,
+                'customer_name': order.customer_name,
+                'operation_description': f"Order {order.order_number} edited: lines modified",
+                'before_lines': before_lines,
+                'after_lines': after_lines,
+                'warnings_count': len(warnings),
+                'has_ddt': ddt is not None,
+                'terra_transfers': [w for w in warnings if w.get('type') == 'terra_transfer']
+            },
+            api_endpoint=f"/orders/{order_id}/edit"
+        )
+
+        # 9. COMMIT TRANSACTION
+        db.commit()
+        db.refresh(order)
+
+        # 10. RETURN SUCCESS WITH WARNINGS
+        return {
+            "success": True,
+            "message": f"Order {order.order_number} updated successfully" +
+                      (f" ({len(warnings)} warnings)" if warnings else ""),
+            "warnings": warnings,
+            "order": order
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+
+        # Log error
+        logger.log_operation(
+            operation_type=OperationType.ORDINE_MODIFICATO,
+            operation_category=OperationCategory.MANUAL,
+            status=OperationStatus.ERROR,
+            error_message=str(e),
+            details={
+                'order_id': order_id,
+                'attempted_lines': [
+                    f"{line.product_sku}: {line.requested_quantity}"
+                    for line in edit_request.lines
+                ],
+                'operation_description': f"Error editing order ID {order_id}"
+            },
+            api_endpoint=f"/orders/{order_id}/edit"
+        )
+
+        raise HTTPException(status_code=500, detail=f"Error editing order: {str(e)}")
 
 @router.get("/{order_number}/pickup-locations")
 def get_order_pickup_locations(
