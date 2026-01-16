@@ -46,10 +46,10 @@ class LabelGenerationRequest(BaseModel):
     campata_end: int
 
 class FrontViewGenerationRequest(BaseModel):
-    fila_start: int
-    fila_end: int
+    fila_singola: int  # Fila singola da stampare
     campata_start: int  # 1=A, 2=B, etc.
     campata_end: int
+    mirror_positions: bool = False  # Flag specchiatura manuale
 
 
 @router.get("/manage", response_class=HTMLResponse)
@@ -340,7 +340,7 @@ def group_locations_by_campata(locations: List[str]) -> Dict[Tuple[int, str], Di
     return grouped
 
 
-def build_campata_grid(fila: int, lettera: str, all_locations: List[str]) -> Dict:
+def build_campata_grid(fila: int, lettera: str, all_locations: List[str], mirror: bool = False) -> Dict:
     """
     Costruisce una griglia [piani x posizioni] per una campata specifica.
 
@@ -348,6 +348,7 @@ def build_campata_grid(fila: int, lettera: str, all_locations: List[str]) -> Dic
         fila: Numero fila
         lettera: Lettera campata (A, B, C, ...)
         all_locations: Lista di tutte le ubicazioni
+        mirror: Se True, inverte l'ordine delle posizioni (per file pari)
 
     Returns:
         {
@@ -355,7 +356,8 @@ def build_campata_grid(fila: int, lettera: str, all_locations: List[str]) -> Dic
             'lettera': str,
             'max_piani': int,
             'max_posizioni': int,
-            'grid': {(piano, posizione): location_name | None}
+            'grid': {(piano, posizione): location_name | None},
+            'mirrored': bool
         }
 
     Raises:
@@ -392,14 +394,22 @@ def build_campata_grid(fila: int, lettera: str, all_locations: List[str]) -> Dic
                 if loc['piano'] == piano and loc['posizione'] == posizione:
                     location_name = loc['name']
                     break
-            grid[(piano, posizione)] = location_name
+
+            # SPECCHIATURA: inverte posizione se mirror=True
+            if mirror:
+                posizione_display = max_posizioni - posizione + 1
+            else:
+                posizione_display = posizione
+
+            grid[(piano, posizione_display)] = location_name
 
     return {
         'fila': fila,
         'lettera': lettera,
         'max_piani': max_piani,
         'max_posizioni': max_posizioni,
-        'grid': grid
+        'grid': grid,
+        'mirrored': mirror
     }
 
 
@@ -523,6 +533,16 @@ def generate_front_view_pdf(campate_grids: List[Dict]) -> io.BytesIO:
         title_width = c.stringWidth(title, "Helvetica-Bold", 24)
         title_x = (page_width - title_width) / 2
         c.drawString(title_x, page_height - margin_top + 0.5 * cm, title)
+
+        # Indicatore specchiatura (se attivo)
+        if campata_data.get('mirrored', False):
+            c.setFont("Helvetica", 14)
+            mirror_text = "(Vista specchiata)"
+            mirror_width = c.stringWidth(mirror_text, "Helvetica", 14)
+            mirror_x = (page_width - mirror_width) / 2
+            c.setFillColor(colors.red)
+            c.drawString(mirror_x, page_height - margin_top + 0.5 * cm - 0.6 * cm, mirror_text)
+            c.setFillColor(colors.black)  # Reset colore
 
         # Calcola dimensioni griglia
         grid_width = page_width - 2 * margin_side
@@ -756,18 +776,16 @@ async def generate_front_view_pdf_endpoint(
     db: Session = Depends(get_db)
 ):
     """
-    Genera PDF con vista frontale per le file e campate specificate.
-    Input: fila_start, fila_end, campata_start (1=A, 2=B, ...), campata_end
+    Genera PDF con vista frontale per una fila singola e campate specificate.
+    Input: fila_singola, campata_start (1=A, 2=B, ...), campata_end, mirror_positions
     """
     # Validazione input
+    if request_data.fila_singola < 1:
+        raise HTTPException(status_code=400, detail="La fila deve essere >= 1")
     if request_data.campata_start < 1 or request_data.campata_end < 1:
         raise HTTPException(status_code=400, detail="Le campate devono essere >= 1")
     if request_data.campata_start > request_data.campata_end:
         raise HTTPException(status_code=400, detail="Campata iniziale deve essere <= campata finale")
-    if request_data.fila_start < 1 or request_data.fila_end < 1:
-        raise HTTPException(status_code=400, detail="Le file devono essere >= 1")
-    if request_data.fila_start > request_data.fila_end:
-        raise HTTPException(status_code=400, detail="Fila iniziale deve essere <= fila finale")
 
     # Converti i numeri delle campate in lettere
     campate_letters = []
@@ -779,30 +797,35 @@ async def generate_front_view_pdf_endpoint(
     all_locations_query = db.query(models.Location.name).all()
     all_locations = [loc[0] for loc in all_locations_query]
 
-    # Costruisce griglie per ogni campata nel range
+    # Costruisce griglie per ogni campata della fila singola
     campate_grids = []
-    for fila in range(request_data.fila_start, request_data.fila_end + 1):
-        for lettera in campate_letters:
-            try:
-                grid_data = build_campata_grid(fila, lettera, all_locations)
-                campate_grids.append(grid_data)
-            except ValueError:
-                # Campata vuota, skip
-                continue
+    fila = request_data.fila_singola
+    for lettera in campate_letters:
+        try:
+            grid_data = build_campata_grid(
+                fila,
+                lettera,
+                all_locations,
+                mirror=request_data.mirror_positions
+            )
+            campate_grids.append(grid_data)
+        except ValueError:
+            # Campata vuota, skip
+            continue
 
     if not campate_grids:
         raise HTTPException(
             status_code=404,
-            detail=f"Nessuna campata valida trovata per File {request_data.fila_start}-{request_data.fila_end}, Campate {campate_letters}"
+            detail=f"Nessuna campata valida trovata per Fila {fila}, Campate {campate_letters}"
         )
 
     # Genera PDF
     pdf_buffer = generate_front_view_pdf(campate_grids)
 
     # Nome file
-    file_range = f"{request_data.fila_start}-{request_data.fila_end}" if request_data.fila_start != request_data.fila_end else str(request_data.fila_start)
     campate_range = f"{campate_letters[0]}-{campate_letters[-1]}" if len(campate_letters) > 1 else campate_letters[0]
-    filename = f"vista_frontale_file{file_range}_campate{campate_range}.pdf"
+    mirror_suffix = "_specchiata" if request_data.mirror_positions else ""
+    filename = f"vista_frontale_fila{fila}_campate{campate_range}{mirror_suffix}.pdf"
 
     return StreamingResponse(
         pdf_buffer,
@@ -812,10 +835,18 @@ async def generate_front_view_pdf_endpoint(
 
 
 @router.get("/generate-all-front-views-pdf")
-async def generate_all_front_views_pdf_endpoint(db: Session = Depends(get_db)):
+async def generate_all_front_views_pdf_endpoint(
+    request: Request,
+    db: Session = Depends(get_db)
+):
     """
     Genera PDF con vista frontale per TUTTE le campate del magazzino.
+    Query params:
+        - mirror_even_rows: 'true' (default) o 'false' - specchia automaticamente file pari
     """
+    # Leggi parametro query per specchiatura file pari
+    mirror_even_rows = request.query_params.get('mirror_even_rows', 'true') == 'true'
+
     # Query tutte le ubicazioni
     all_locations_query = db.query(models.Location.name).all()
     all_locations = [loc[0] for loc in all_locations_query]
@@ -841,7 +872,9 @@ async def generate_all_front_views_pdf_endpoint(db: Session = Depends(get_db)):
 
     for fila, lettera in sorted_campate:
         try:
-            grid_data = build_campata_grid(fila, lettera, all_locations)
+            # Determina se specchiare: file pari se mirror_even_rows=true
+            mirror = mirror_even_rows and (fila % 2 == 0)
+            grid_data = build_campata_grid(fila, lettera, all_locations, mirror=mirror)
             campate_grids.append(grid_data)
         except ValueError:
             continue

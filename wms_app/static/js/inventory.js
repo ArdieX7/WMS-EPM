@@ -888,8 +888,37 @@ document.addEventListener('DOMContentLoaded', function() {
     // Backup
     const backupBtn = document.getElementById('backup-stock-btn');
     if (backupBtn) {
-        backupBtn.addEventListener('click', function() {
-            window.location.href = '/inventory/backup-stock';
+        backupBtn.addEventListener('click', async function() {
+            try {
+                const response = await window.modernAuth.authenticatedFetch('/inventory/backup-stock');
+
+                if (!response.ok) {
+                    throw new Error('Errore durante il backup');
+                }
+
+                // Gestione download file
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+
+                // Estrai filename dall'header Content-Disposition se presente
+                const disposition = response.headers.get('Content-Disposition');
+                const filename = disposition
+                    ? disposition.split('filename=')[1].replace(/"/g, '')
+                    : 'backup_stock.json';
+
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+
+                alert('Backup creato con successo!');
+            } catch (error) {
+                console.error('Errore:', error);
+                alert('Errore durante la creazione del backup: ' + error.message);
+            }
         });
     }
 
@@ -910,7 +939,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const formData = new FormData();
                 formData.append('file', file);
 
-                fetch('/inventory/restore-stock', {
+                window.modernAuth.authenticatedFetch('/inventory/restore-stock', {
                     method: 'POST',
                     body: formData
                 })
@@ -936,7 +965,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (deleteAllBtn) {
         deleteAllBtn.addEventListener('click', function() {
             if (confirm('ATTENZIONE: Stai per eliminare TUTTE le giacenze presenti in magazzino. Sei assolutamente sicuro?')) {
-                fetch('/inventory/delete-all-stock', {
+                window.modernAuth.authenticatedFetch('/inventory/delete-all-stock', {
                     method: 'DELETE'
                 })
                 .then(response => response.json())
@@ -969,7 +998,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             if (confirm(`Sei sicuro di voler eliminare tutte le giacenze nelle ubicazioni che iniziano con "${rowPrefix}"?`)) {
-                fetch(`/inventory/delete-stock-by-row?row_prefix=${encodeURIComponent(rowPrefix)}`, {
+                window.modernAuth.authenticatedFetch(`/inventory/delete-stock-by-row?row_prefix=${encodeURIComponent(rowPrefix)}`, {
                     method: 'DELETE'
                 })
                 .then(response => response.json())
@@ -2005,8 +2034,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!confirm('Vuoi consolidare i record duplicati dello stesso SKU in TERRA?\n\nQuesta operazione unirà tutti i record dello stesso prodotto in un singolo record con la quantità totale.')) {
             return;
         }
-        
-        fetch('/inventory/consolidate-ground-inventory', {
+
+        window.modernAuth.authenticatedFetch('/inventory/consolidate-ground-inventory', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

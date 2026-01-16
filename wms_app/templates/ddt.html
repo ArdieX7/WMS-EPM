@@ -266,7 +266,10 @@
                                     <strong>Cliente:</strong> {{ ddt.customer_name }}
                                 </div>
                                 <div class="col-md-4">
-                                    <strong>Data Emissione:</strong> {{ ddt.issue_date.strftime('%d/%m/%Y') }}
+                                    <strong>Data Emissione:</strong> {{ ddt.issue_date.strftime('%d/%m/%Y') }}<br>
+                                    {% if ddt.transporter_name %}
+                                        <strong>Vettore:</strong> {{ ddt.transporter_name }}
+                                    {% endif %}
                                 </div>
                                 <div class="col-md-4">
                                     <strong>N. PLT:</strong> {{ ddt.total_packages }}<br>
@@ -362,6 +365,24 @@
                             </div>
                             <div class="col-md-4">
                                 <div class="form-floating mb-3">
+                                    <input
+                                        type="number"
+                                        class="form-control"
+                                        id="ddtNumber"
+                                        min="1"
+                                        max="999999"
+                                        placeholder="Es: 8"
+                                        required
+                                    >
+                                    <label for="ddtNumber">Numero DDT *</label>
+                                    <div class="form-text" style="font-size: 0.75rem; margin-top: 0.25rem;">
+                                        <i class="fas fa-info-circle"></i>
+                                        Numero progressivo (es: 8 diventerà 000008/2025)
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-floating mb-3">
                                     <input type="number" class="form-control" id="totalPackages" value="1" min="1">
                                     <label for="totalPackages">N. PLT</label>
                                 </div>
@@ -370,6 +391,12 @@
                                 <div class="form-floating mb-3">
                                     <input type="text" class="form-control" id="totalWeight" placeholder="es. 25.5 kg">
                                     <label for="totalWeight">Peso Totale (opz.)</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-floating mb-3">
+                                    <input type="text" class="form-control" id="transporterName" placeholder="es. Bartolini">
+                                    <label for="transporterName">Vettore (opz.)</label>
                                 </div>
                             </div>
                         </div>
@@ -455,7 +482,7 @@
             }
         }
 
-        function openDDTModal(orderNumber, customerName, totalWeight = '') {
+        async function openDDTModal(orderNumber, customerName, totalWeight = '') {
             document.getElementById('orderNumber').value = orderNumber;
             document.getElementById('customerName').value = customerName;
 
@@ -470,12 +497,102 @@
             document.getElementById('totalWeight').value = totalWeight || '';
 
             document.getElementById('notes').value = '';
+            document.getElementById('transporterName').value = '';
+
+            // Fetch e pre-compila prossimo numero DDT disponibile
+            try {
+                const response = await fetch('/ddt/next-number');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('ddtNumber').value = data.next_number;
+
+                    // Aggiorna testo di aiuto con formato finale
+                    const ddtNumberField = document.getElementById('ddtNumber');
+                    const helpText = ddtNumberField.nextElementSibling.nextElementSibling;
+                    if (helpText) {
+                        helpText.innerHTML = `
+                            <i class="fas fa-info-circle"></i>
+                            Prossimo disponibile: ${data.next_number}
+                            (diventerà ${data.formatted})
+                        `;
+                    }
+                } else {
+                    // Fallback: usa 1 se errore
+                    document.getElementById('ddtNumber').value = '1';
+                }
+            } catch (error) {
+                console.error('Errore caricamento numero DDT:', error);
+                document.getElementById('ddtNumber').value = '1';
+            }
 
             new bootstrap.Modal(document.getElementById('generateDDTModal')).show();
         }
 
+        // Validazione real-time numero DDT
+        document.addEventListener('DOMContentLoaded', function() {
+            const ddtNumberInput = document.getElementById('ddtNumber');
+
+            if (ddtNumberInput) {
+                ddtNumberInput.addEventListener('blur', async function() {
+                    const customNumber = parseInt(this.value);
+
+                    if (!customNumber || customNumber < 1 || customNumber > 999999) {
+                        this.classList.add('is-invalid');
+                        return;
+                    }
+
+                    // Verifica se il numero è già usato
+                    const year = new Date().getFullYear();
+                    const formatted = String(customNumber).padStart(6, '0') + '/' + year;
+
+                    try {
+                        const response = await fetch(`/ddt/${formatted}`);
+
+                        if (response.ok) {
+                            // DDT esiste già
+                            this.classList.add('is-invalid');
+                            this.classList.remove('is-valid');
+
+                            // Mostra errore
+                            let errorDiv = this.parentElement.querySelector('.invalid-feedback');
+                            if (!errorDiv) {
+                                errorDiv = document.createElement('div');
+                                errorDiv.className = 'invalid-feedback';
+                                this.parentElement.appendChild(errorDiv);
+                            }
+                            errorDiv.textContent = `DDT ${formatted} già esistente!`;
+                        } else if (response.status === 404) {
+                            // Numero disponibile
+                            this.classList.remove('is-invalid');
+                            this.classList.add('is-valid');
+                        } else {
+                            // Errore generico
+                            this.classList.remove('is-invalid', 'is-valid');
+                        }
+                    } catch (error) {
+                        console.error('Errore validazione numero DDT:', error);
+                    }
+                });
+
+                // Rimuovi validazione quando l'utente modifica
+                ddtNumberInput.addEventListener('input', function() {
+                    this.classList.remove('is-invalid', 'is-valid');
+                });
+            }
+        });
+
         async function generateDDT() {
             try {
+                // Validazione numero DDT
+                const ddtNumberInput = document.getElementById('ddtNumber');
+                const customNumber = parseInt(ddtNumberInput.value);
+
+                if (!customNumber || customNumber < 1 || customNumber > 999999) {
+                    alert('Inserire un numero DDT valido (1-999999)');
+                    ddtNumberInput.focus();
+                    return;
+                }
+
                 const formData = {
                     order_number: document.getElementById('orderNumber').value,
                     customer_name: document.getElementById('customerName').value,
@@ -485,7 +602,9 @@
                     customer_province: document.getElementById('customerProvince').value || null,
                     total_packages: parseInt(document.getElementById('totalPackages').value),
                     total_weight: document.getElementById('totalWeight').value || null,
-                    notes: document.getElementById('notes').value || null
+                    transporter_name: document.getElementById('transporterName').value || null,
+                    notes: document.getElementById('notes').value || null,
+                    custom_ddt_number: customNumber  // NUOVO: Aggiungi numero custom
                 };
 
                 const response = await fetch('/ddt/generate', {
@@ -503,7 +622,14 @@
                     bootstrap.Modal.getInstance(document.getElementById('generateDDTModal')).hide();
                     location.reload();
                 } else {
-                    alert('Errore: ' + result.detail);
+                    // Gestione errori specifici
+                    if (result.detail.includes('già esistente')) {
+                        alert('ERRORE: ' + result.detail + '\n\nScegli un numero diverso.');
+                        ddtNumberInput.classList.add('is-invalid');
+                        ddtNumberInput.focus();
+                    } else {
+                        alert('Errore: ' + result.detail);
+                    }
                 }
             } catch (error) {
                 console.error('Errore:', error);
@@ -545,6 +671,7 @@
                                     <tr><td><strong>Ordine Riferimento:</strong></td><td>${ddt.order_number}</td></tr>
                                     <tr><td><strong>Data Emissione:</strong></td><td>${new Date(ddt.issue_date).toLocaleDateString()}</td></tr>
                                     <tr><td><strong>N. PLT:</strong></td><td>${ddt.total_packages}</td></tr>
+                                    ${ddt.transporter_name ? `<tr><td><strong>Vettore:</strong></td><td>${ddt.transporter_name}</td></tr>` : ''}
                                     ${ddt.total_weight ? `<tr><td><strong>Peso Totale:</strong></td><td>${ddt.total_weight}</td></tr>` : ''}
                                     ${ddt.notes ? `<tr><td><strong>Note:</strong></td><td>${ddt.notes}</td></tr>` : ''}
                                 </table>

@@ -251,6 +251,44 @@
         </div>
     </div>
 
+    <!-- Overlay Modifica Ordine -->
+    <div id="edit-order-overlay" class="overlay mobile-hide">
+        <div class="overlay-content">
+            <div class="overlay-header">
+                <h3>Modifica Ordine</h3>
+                <button class="overlay-close" onclick="closeOverlay('edit-order-overlay')">&times;</button>
+            </div>
+            <form id="edit-order-form">
+                <input type="hidden" id="edit-order-id">
+
+                <div class="form-group">
+                    <label>Numero Ordine:</label>
+                    <input type="text" id="edit-order-number" readonly style="background-color: #f0f0f0; cursor: not-allowed;">
+                </div>
+                <div class="form-group">
+                    <label>Cliente:</label>
+                    <input type="text" id="edit-customer-name" readonly style="background-color: #f0f0f0; cursor: not-allowed;">
+                </div>
+
+                <h4 style="margin-top: 20px;">Righe Ordine</h4>
+                <div id="edit-order-lines-container">
+                    <!-- Lines will be populated dynamically via JavaScript -->
+                </div>
+                <button type="button" id="edit-add-line-button" class="btn-secondary" style="margin-top: 10px;">➕ Aggiungi Riga</button>
+
+                <div id="edit-warnings-container" style="display: none; margin-top: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+                    <strong>⚠️ Avvisi:</strong>
+                    <ul id="edit-warnings-list" style="margin: 10px 0 0 20px;"></ul>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeOverlay('edit-order-overlay')">✕ Annulla</button>
+                    <button type="submit" class="btn-primary">💾 Salva Modifiche</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Overlay Prelievo da File -->
     <div id="picking-file-overlay" class="overlay">
         <div class="overlay-content">
