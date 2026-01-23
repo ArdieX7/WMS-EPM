@@ -817,16 +817,19 @@ class SerialService:
     
     def get_orders_with_serials(self) -> List[OrderSerialsView]:
         """
-        Ottiene lista ordini con seriali caricati
+        Ottiene lista ordini con seriali caricati, ordinati per ultima modifica (più recenti in cima)
         """
-        # Query per ottenere ordini con seriali - ordina dal più recente al più vecchio
-        orders_with_serials = self.db.query(ProductSerial.order_number).distinct().order_by(ProductSerial.order_number.desc()).all()
-        
+        # Query per ottenere ordini con seriali
+        orders_with_serials = self.db.query(ProductSerial.order_number).distinct().all()
+
         results = []
         for (order_number,) in orders_with_serials:
             order_view = self.get_order_serials_view(order_number)
             results.append(order_view)
-        
+
+        # Ordina per last_upload_date decrescente (più recenti in cima)
+        results.sort(key=lambda x: x.last_upload_date or datetime.min, reverse=True)
+
         return results
     
     def check_serial_exists(self, serial_number: str) -> Optional[ProductSerial]:

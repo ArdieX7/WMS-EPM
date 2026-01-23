@@ -1518,9 +1518,18 @@ function toggleFormatInfo() {
 
 // ========== FUNZIONI PER RICERCA E ORDINAMENTO TABELLA ==========
 
-// Variabili globali per ordinamento
-let currentSortColumn = null;
-let currentSortDirection = 'asc';
+// Variabili globali per ordinamento - Default: ultima modifica decrescente
+let currentSortColumn = 'last_modified';
+let currentSortDirection = 'desc';
+
+// Inizializza icona ordinamento di default al caricamento pagina
+document.addEventListener('DOMContentLoaded', function() {
+    // Imposta l'icona di ordinamento sulla colonna "Ultima Modifica"
+    const sortDateIcon = document.getElementById('sort-date-icon');
+    if (sortDateIcon) {
+        sortDateIcon.textContent = '↓';  // Freccia giù = decrescente (più recenti in cima)
+    }
+});
 
 // Funzione per ordinare la tabella
 function sortTable(column) {
@@ -1649,11 +1658,13 @@ let realtimeScannerState = {
     ordersData: {},
     scannedSerials: [],
     scannedSerialsSet: new Set(),
+    existingSerials: [],       // Seriali già salvati nel DB (caricati all'apertura)
     errors: [],
     productsProgress: {},
     scanStep: 'EAN',           // 'EAN' o 'SERIAL'
     currentEan: null,          // EAN appena scansionato in attesa di seriale
-    currentSku: null           // SKU corrispondente all'EAN
+    currentSku: null,          // SKU corrispondente all'EAN
+    isProcessing: false        // Lock anti-race condition per barcode scanner
 };
 
 // ========================================
@@ -1706,7 +1717,7 @@ function closeOrderSelectionModal() {
     document.getElementById('order-selection-modal').style.display = 'none';
 }
 
-function startRealtimeScanner() {
+async function startRealtimeScanner() {
     const checkboxes = document.querySelectorAll('#open-orders-list input:checked');
 
     if (checkboxes.length === 0) {
@@ -1719,11 +1730,13 @@ function startRealtimeScanner() {
         ordersData: {},
         scannedSerials: [],
         scannedSerialsSet: new Set(),
+        existingSerials: [],  // Verrà popolato dopo il fetch
         errors: [],
         productsProgress: {},
         scanStep: 'EAN',
         currentEan: null,
-        currentSku: null
+        currentSku: null,
+        isProcessing: false  // Reset lock per nuova sessione
     };
 
     checkboxes.forEach(cb => {
@@ -1745,6 +1758,30 @@ function startRealtimeScanner() {
 
     closeOrderSelectionModal();
     document.getElementById('realtime-scanner-overlay').style.display = 'flex';
+
+    // Carica i seriali già salvati nel database per questi ordini
+    try {
+        const response = await fetch('/serials/get-existing-serials', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify(realtimeScannerState.selectedOrders)
+        });
+
+        const result = await response.json();
+
+        if (result.success && result.serials) {
+            realtimeScannerState.existingSerials = result.serials;
+
+            // Aggiungi anche al Set per evitare duplicati
+            result.serials.forEach(s => {
+                realtimeScannerState.scannedSerialsSet.add(s.serial_number);
+            });
+        }
+    } catch (error) {
+        console.error('Errore caricamento seriali esistenti:', error);
+    }
+
     renderScannerState();
 
     // Autofocus con delay per garantire rendering DOM completo
@@ -1767,21 +1804,36 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Gestione scansione a due step
+        // Gestione scansione a due step con lock anti-race condition
         scannerInput.addEventListener('keypress', async function(e) {
             if (e.key === 'Enter') {
+                // LOCK: Ignora se già in elaborazione (evita doppio Enter da scanner CR+LF)
+                if (realtimeScannerState.isProcessing) {
+                    console.log('⚠️ Scansione in corso, ignorato evento duplicato');
+                    this.value = '';  // Svuota per evitare concatenazione con prossima scansione
+                    playErrorBeep();  // Avvisa operatore che deve rallentare
+                    return;
+                }
+
                 const input = this.value.trim();
                 if (!input) return;
 
-                if (realtimeScannerState.scanStep === 'EAN') {
-                    // STEP 1: Scansiona EAN
-                    await handleEanScan(input);
-                } else {
-                    // STEP 2: Scansiona SERIALE
-                    await handleSerialScan(input);
-                }
-
+                // Imposta lock e svuota input PRIMA dell'await
+                realtimeScannerState.isProcessing = true;
                 this.value = '';
+
+                try {
+                    if (realtimeScannerState.scanStep === 'EAN') {
+                        // STEP 1: Scansiona EAN
+                        await handleEanScan(input);
+                    } else {
+                        // STEP 2: Scansiona SERIALE
+                        await handleSerialScan(input);
+                    }
+                } finally {
+                    // Rilascia lock SEMPRE, anche in caso di errore
+                    realtimeScannerState.isProcessing = false;
+                }
             }
         });
     }
@@ -1980,14 +2032,85 @@ function renderProductsTracker() {
 
 function renderScannedSerialsLog() {
     const log = document.getElementById('scanned-serials-log');
-    const recent = realtimeScannerState.scannedSerials.slice(-20).reverse();
+
+    // Combina seriali esistenti (dal DB) e seriali sessione corrente
+    const allSerials = [
+        // Prima i seriali della sessione corrente (più recenti)
+        ...realtimeScannerState.scannedSerials.map(s => ({...s, fromSession: true})),
+        // Poi i seriali già salvati nel DB (caricati all'apertura)
+        ...(realtimeScannerState.existingSerials || []).map(s => ({...s, fromSession: false}))
+    ];
+
+    // Mostra gli ultimi 30 (più spazio per vedere anche quelli esistenti)
+    const recent = allSerials.slice(0, 30);
 
     log.innerHTML = recent.map(item => `
-        <div class="serial-log-item">
+        <div class="serial-log-item ${item.fromSession ? 'session-serial' : 'existing-serial'}">
             <span class="serial-num">${item.serial_number}</span>
             <span class="serial-sku">${item.sku}</span>
+            <button class="delete-serial-btn"
+                    onclick="deleteScannedSerial('${item.serial_number}', '${item.order_number}', '${item.sku}', ${item.fromSession})"
+                    title="Elimina seriale">
+                &times;
+            </button>
         </div>
     `).join('');
+}
+
+async function deleteScannedSerial(serialNumber, orderNumber, sku, fromSession) {
+    if (!confirm(`Eliminare il seriale ${serialNumber}?`)) {
+        return;
+    }
+
+    try {
+        // Elimina dal database
+        const response = await fetch(`/serials/delete-realtime-serial?serial_number=${encodeURIComponent(serialNumber)}&order_number=${encodeURIComponent(orderNumber)}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+            alert(`Errore: ${result.error}`);
+            return;
+        }
+
+        // Aggiorna lo stato locale
+        if (fromSession) {
+            // Rimuovi dall'array della sessione
+            const index = realtimeScannerState.scannedSerials.findIndex(
+                s => s.serial_number === serialNumber && s.order_number === orderNumber
+            );
+            if (index > -1) {
+                realtimeScannerState.scannedSerials.splice(index, 1);
+            }
+            realtimeScannerState.scannedSerialsSet.delete(serialNumber);
+        } else {
+            // Rimuovi dall'array dei seriali esistenti
+            const index = (realtimeScannerState.existingSerials || []).findIndex(
+                s => s.serial_number === serialNumber && s.order_number === orderNumber
+            );
+            if (index > -1) {
+                realtimeScannerState.existingSerials.splice(index, 1);
+            }
+        }
+
+        // Decrementa il contatore del prodotto
+        const key = `${orderNumber}_${sku}`;
+        if (realtimeScannerState.productsProgress[key]) {
+            realtimeScannerState.productsProgress[key].scanned =
+                Math.max(0, realtimeScannerState.productsProgress[key].scanned - 1);
+        }
+
+        // Re-render
+        renderScannerState();
+        showScanFeedback(`Seriale ${serialNumber} eliminato`, 'success');
+
+    } catch (error) {
+        console.error('Errore eliminazione seriale:', error);
+        alert('Errore durante l\'eliminazione del seriale');
+    }
 }
 
 function renderErrorsLog() {
@@ -2058,6 +2181,7 @@ function clearScannedSerials() {
     realtimeScannerState.scannedSerials = [];
     realtimeScannerState.scannedSerialsSet.clear();
     realtimeScannerState.errors = [];
+    realtimeScannerState.isProcessing = false;  // Reset lock
 
     for (const key in realtimeScannerState.productsProgress) {
         realtimeScannerState.productsProgress[key].scanned = 0;
@@ -2067,6 +2191,7 @@ function clearScannedSerials() {
 }
 
 function closeRealtimeScanner() {
+    realtimeScannerState.isProcessing = false;  // Reset lock
     document.getElementById('realtime-scanner-overlay').style.display = 'none';
 }
 
