@@ -782,6 +782,43 @@ async def convert_ean_to_sku(
             "error": str(e)
         }
 
+@router.post("/get-existing-serials")
+async def get_existing_serials(
+    order_numbers: List[str],
+    db: Session = Depends(get_db)
+):
+    """
+    Restituisce i seriali già salvati nel database per gli ordini specificati.
+    Usato per mostrare i seriali esistenti quando si riapre lo scanner.
+    """
+    try:
+        from wms_app.models.serials import ProductSerial
+
+        serials = db.query(ProductSerial).filter(
+            ProductSerial.order_number.in_(order_numbers)
+        ).order_by(ProductSerial.uploaded_at.desc()).all()
+
+        return {
+            "success": True,
+            "serials": [
+                {
+                    "serial_number": s.serial_number,
+                    "sku": s.product_sku,
+                    "ean_code": s.ean_code,
+                    "order_number": s.order_number,
+                    "uploaded_at": s.uploaded_at.isoformat() if s.uploaded_at else None
+                }
+                for s in serials
+            ]
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "serials": []
+        }
+
 @router.post("/validate-serial-realtime")
 async def validate_serial_realtime(
     request: schemas.serials.RealtimeSerialValidation,
@@ -835,6 +872,16 @@ async def validate_serial_realtime(
                 "status": "duplicate_in_session"
             }
 
+        # 3.5 Verifica che il seriale NON sia un codice EAN (errore operatore)
+        if request.serial_number in ean_to_sku:
+            return {
+                "valid": False,
+                "sku": sku,
+                "order_number": matched_order,
+                "error": "Hai scansionato un codice EAN invece del seriale!",
+                "status": "ean_as_serial"
+            }
+
         # 4. Verifica duplicato nel database
         existing_serial = serial_service.check_serial_exists(request.serial_number)
         if existing_serial:
@@ -847,9 +894,8 @@ async def validate_serial_realtime(
             }
 
         # 5. Verifica quantità non superata
-        session_count = sum(1 for s in request.scanned_serials_detail
-                           if s.get('sku') == sku and s.get('order_number') == matched_order)
-
+        # NOTA: Non usiamo più session_count perché con auto-save i seriali
+        # sono già nel DB. Contiamo SOLO dal database per evitare doppio conteggio.
         from wms_app.models.serials import ProductSerial
         db_count = db.query(ProductSerial).filter(
             ProductSerial.order_number == matched_order,
@@ -857,7 +903,7 @@ async def validate_serial_realtime(
         ).count()
 
         expected_qty = all_orders_cache[matched_order]['expected_skus'][sku]
-        total_count = session_count + db_count + 1  # +1 per seriale corrente
+        total_count = db_count + 1  # +1 per seriale corrente (non ancora salvato)
 
         if total_count > expected_qty:
             return {
@@ -916,6 +962,64 @@ async def validate_serial_realtime(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Errore validazione: {str(e)}")
+
+@router.delete("/delete-realtime-serial")
+async def delete_realtime_serial(
+    serial_number: str,
+    order_number: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Elimina un singolo seriale salvato durante scansione real-time
+    Usato quando l'operatore vuole annullare una scansione errata
+    """
+    try:
+        from wms_app.models.serials import ProductSerial
+        from wms_app.services.logging_service import LoggingService
+
+        # Trova il seriale
+        serial_record = db.query(ProductSerial).filter(
+            ProductSerial.serial_number == serial_number,
+            ProductSerial.order_number == order_number
+        ).first()
+
+        if not serial_record:
+            return {
+                "success": False,
+                "error": "Seriale non trovato nel database"
+            }
+
+        # Salva info per logging prima di eliminare
+        sku = serial_record.product_sku
+
+        # Elimina il record
+        db.delete(serial_record)
+        db.commit()
+
+        # Log operazione
+        logging_service = LoggingService(db)
+        logging_service.log_operation(
+            operation_type=OperationType.SERIAL_DELETED,
+            operation_category=OperationCategory.MANUAL,
+            status=OperationStatus.SUCCESS,
+            product_sku=sku,
+            quantity=1,
+            details={
+                'serial_number': serial_number,
+                'order_number': order_number,
+                'reason': 'Cancellazione manuale da scanner real-time'
+            }
+        )
+
+        return {
+            "success": True,
+            "deleted_serial": serial_number,
+            "sku": sku
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore eliminazione: {str(e)}")
 
 @router.post("/commit-realtime-serials")
 async def commit_realtime_serials(

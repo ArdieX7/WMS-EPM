@@ -167,6 +167,50 @@
                         </tbody>
                     </table>
                 </div>
+
+                <!-- MOBILE CARD VIEW - Visibile solo su mobile -->
+                <div id="mobile-orders-cards" class="mobile-orders-cards">
+                    {% for order in orders_with_serials %}
+                    <div class="mobile-order-card" data-order-status="{{ order.order_status if order.order_exists else 'not_found' }}">
+                        <div class="mobile-card-header">
+                            <span class="mobile-order-number">#{{ order.order_number }}</span>
+                            {% if order.validation_summary %}
+                                <span class="mobile-validation-badge validation-{{ order.validation_summary.overall_status }}">
+                                    {% if order.validation_summary.overall_status == 'valid' %}✓ Valido
+                                    {% elif order.validation_summary.overall_status == 'invalid' %}✗ Non Valido
+                                    {% elif order.validation_summary.overall_status == 'partial' %}⚠ Parziale
+                                    {% elif order.validation_summary.overall_status == 'pending' %}⏳ Da Validare
+                                    {% else %}{{ order.validation_summary.overall_status | title }}
+                                    {% endif %}
+                                </span>
+                            {% else %}
+                                <span class="mobile-validation-badge validation-pending">⏳ Da Validare</span>
+                            {% endif %}
+                        </div>
+                        <div class="mobile-card-info">
+                            {% set total_serials = order.found_serials.values() | map('length') | sum %}
+                            {% set total_expected = order.expected_products.values() | sum %}
+                            <span class="mobile-serials-count">
+                                📦 {{ total_serials }}/{{ total_expected }} seriali
+                            </span>
+                            {% if order.order_exists %}
+                                <span class="mobile-order-status status-{{ order.order_status }}">
+                                    {% if order.order_status == 'pending' %}In Attesa
+                                    {% elif order.order_status == 'processing' %}In Lavorazione
+                                    {% elif order.order_status == 'completed' %}Completato
+                                    {% elif order.order_status == 'cancelled' %}Annullato
+                                    {% else %}{{ order.order_status | title }}
+                                    {% endif %}
+                                </span>
+                            {% endif %}
+                        </div>
+                        <button class="mobile-details-btn" onclick="viewOrderDetails('{{ order.order_number }}')">
+                            👁️ Vedi Dettagli
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+
             </div>
         </div>
         </div>
