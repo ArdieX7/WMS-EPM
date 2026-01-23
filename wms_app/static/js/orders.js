@@ -1239,31 +1239,33 @@
                     
                     if (result.success) {
                         console.log('✅ Parsing Excel completato:', result);
-                        
-                        if (excelFileUpload) {
-                            excelFileUpload.setStatus('success', `✅ Import completato: ${result.orders_created} ordini creati, ${result.orders_updated} ordini aggiornati`);
+
+                        // Chiudi l'overlay di import
+                        closeOverlay('import-orders-overlay');
+
+                        // Costruisci messaggio dettagliato con numeri ordine
+                        let createdHtml = '';
+                        let updatedHtml = '';
+                        let skippedHtml = '';
+
+                        if (result.orders_created_list && result.orders_created_list.length > 0) {
+                            createdHtml = `<div style="margin: 10px 0;"><strong>Ordini creati:</strong> ${result.orders_created_list.join(', ')}</div>`;
                         }
-                        
-                        // Mostra risultato diretto
-                        if (importExcelResult) {
-                            importExcelResult.style.color = 'green';
-                            importExcelResult.innerHTML = `
-                            <div class="result-success">
-                                <h4>✅ Import Excel Completato!</h4>
-                                <p><strong>File:</strong> ${result.file_name}</p>
-                                <p><strong>Ordini creati:</strong> ${result.orders_created || 0}</p>
-                                <p><strong>Ordini aggiornati:</strong> ${result.orders_updated || 0}</p>
-                                <p><strong>Righe elaborate:</strong> ${result.summary?.total_lines || 0}</p>
-                                ${result.summary?.errors > 0 ? `<p style="color: orange;"><strong>Avvisi:</strong> ${result.summary.errors} righe con problemi (saltate)</p>` : ''}
-                            </div>
-                        `;
+
+                        if (result.orders_updated_list && result.orders_updated_list.length > 0) {
+                            updatedHtml = `<div style="margin: 10px 0;"><strong>Ordini aggiornati:</strong> ${result.orders_updated_list.join(', ')}</div>`;
                         }
-                        
+
+                        if (result.orders_skipped_list && result.orders_skipped_list.length > 0) {
+                            skippedHtml = `<div style="margin: 10px 0; color: #6c757d;"><strong>Ordini già presenti (nessuna modifica):</strong> ${result.orders_skipped_list.join(', ')}</div>`;
+                        }
+
+                        // Mostra overlay di successo al centro dello schermo
+                        showImportSuccessOverlay(createdHtml, updatedHtml, skippedHtml);
+
                         // Ricarica la lista ordini
-                        setTimeout(() => {
-                            fetchOrders();
-                        }, 1000);
-                        
+                        fetchOrders();
+
                     } else {
                         console.error('❌ Errore parsing Excel:', result);
                         if (excelFileUpload) {
@@ -4153,9 +4155,28 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    alert(`✅ ${result.message}`);
+                    console.log('Import Excel success:', result);  // DEBUG
+
+                    // Chiudi prima l'overlay di import
                     closeExcelRecap();
-                    
+
+                    // Costruisci messaggio dettagliato con numeri ordine
+                    let createdHtml = '';
+                    let updatedHtml = '';
+
+                    if (result.orders_created_list && result.orders_created_list.length > 0) {
+                        createdHtml = `<div style="margin: 10px 0;"><strong>Ordini creati:</strong> ${result.orders_created_list.join(', ')}</div>`;
+                    }
+
+                    if (result.orders_updated_list && result.orders_updated_list.length > 0) {
+                        updatedHtml = `<div style="margin: 10px 0;"><strong>Ordini aggiornati:</strong> ${result.orders_updated_list.join(', ')}</div>`;
+                    }
+
+                    console.log('Showing overlay with:', createdHtml, updatedHtml);  // DEBUG
+
+                    // Mostra overlay di successo al centro dello schermo
+                    showImportSuccessOverlay(createdHtml, updatedHtml);
+
                     // Ricarica la lista ordini
                     await fetchOrders();
                 } else {
@@ -4170,8 +4191,70 @@
             }
         }
 
+        // === OVERLAY SUCCESSO IMPORT EXCEL ===
+
+        function showImportSuccessOverlay(createdHtml, updatedHtml, skippedHtml = '') {
+            // Rimuovi overlay esistente se presente
+            const existing = document.getElementById('import-success-overlay');
+            if (existing) existing.remove();
+
+            const overlay = document.createElement('div');
+            overlay.id = 'import-success-overlay';
+            overlay.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.6); z-index: 10001;
+                display: flex; justify-content: center; align-items: center;
+                animation: fadeIn 0.3s ease;
+            `;
+
+            overlay.innerHTML = `
+                <div style="
+                    background: white;
+                    padding: 30px 40px;
+                    border-radius: 12px;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                    text-align: center;
+                    max-width: 500px;
+                    animation: scaleIn 0.3s ease;
+                ">
+                    <div style="font-size: 60px; margin-bottom: 15px;">✅</div>
+                    <h2 style="margin: 0 0 20px 0; color: #28a745; font-size: 24px;">Import Completato!</h2>
+                    ${createdHtml}
+                    ${updatedHtml}
+                    ${skippedHtml}
+                    <button onclick="document.getElementById('import-success-overlay').remove()" style="
+                        margin-top: 20px;
+                        padding: 12px 40px;
+                        background: #28a745;
+                        color: white;
+                        border: none;
+                        border-radius: 6px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: background 0.2s;
+                    " onmouseover="this.style.background='#218838'" onmouseout="this.style.background='#28a745'">
+                        OK
+                    </button>
+                </div>
+                <style>
+                    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                    @keyframes scaleIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+                </style>
+            `;
+
+            // Chiudi cliccando fuori dal box
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) {
+                    overlay.remove();
+                }
+            });
+
+            document.body.appendChild(overlay);
+        }
+
         // === MODIFICA NOME CLIENTE ===
-        
+
         // Funzione per aprire il popup di modifica cliente
         async function editCustomerName(orderNumber, currentCustomerName, orderId) {
             const overlay = document.createElement('div');

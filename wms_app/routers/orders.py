@@ -3379,6 +3379,10 @@ async def parse_excel_orders(file: UploadFile = File(...), db: Session = Depends
         # Crea gli ordini direttamente (senza recap)
         orders_created = 0
         orders_updated = 0
+        orders_skipped = 0  # Ordini già presenti senza modifiche
+        orders_created_list = []  # Lista numeri ordine creati
+        orders_updated_list = []  # Lista numeri ordine aggiornati
+        orders_skipped_list = []  # Lista numeri ordine già presenti
         logger = LoggingService(db)
         
         for order_number, order_data in orders_data.items():
@@ -3390,25 +3394,49 @@ async def parse_excel_orders(file: UploadFile = File(...), db: Session = Depends
             is_new_order = existing_order is None
             
             if existing_order and not existing_order.is_completed:
-                # Aggiorna ordine esistente
-                for sku, quantity in order_data["lines"].items():
-                    # Controlla se la riga prodotto esiste già
+                # Confronta righe esistenti con nuove per rilevare modifiche
+                existing_lines = {line.product_sku: line.requested_quantity
+                                  for line in existing_order.lines}
+                new_lines = dict(order_data["lines"])
+
+                # Verifica se l'ordine è identico (nessuna modifica necessaria)
+                if existing_lines == new_lines:
+                    orders_skipped += 1
+                    orders_skipped_list.append(str(order_number))
+                    continue  # Salta al prossimo ordine
+
+                # Ci sono differenze, aggiorna l'ordine
+
+                # 1. Rimuovi righe non più presenti nel file Excel
+                for sku in existing_lines:
+                    if sku not in new_lines:
+                        db.query(models.OrderLine).filter(
+                            models.OrderLine.order_id == existing_order.id,
+                            models.OrderLine.product_sku == sku
+                        ).delete()
+
+                # 2. Aggiorna quantità esistenti o aggiungi nuove righe
+                for sku, quantity in new_lines.items():
                     existing_line = db.query(models.OrderLine).filter(
                         models.OrderLine.order_id == existing_order.id,
                         models.OrderLine.product_sku == sku
                     ).first()
-                    
+
                     if existing_line:
-                        existing_line.requested_quantity += quantity
+                        # SOSTITUISCI la quantità (non sommare!)
+                        existing_line.requested_quantity = quantity
                     else:
+                        # Aggiungi nuova riga
                         new_line = models.OrderLine(
                             order_id=existing_order.id,
                             product_sku=sku,
                             requested_quantity=quantity
                         )
                         db.add(new_line)
+
                 orders_updated += 1
-                
+                orders_updated_list.append(str(order_number))
+
             elif not existing_order:
                 # Crea nuovo ordine
                 new_order = models.Order(
@@ -3427,7 +3455,8 @@ async def parse_excel_orders(file: UploadFile = File(...), db: Session = Depends
                     )
                     db.add(order_line)
                 orders_created += 1
-            
+                orders_created_list.append(str(order_number))
+
             # LOGGING: Registra ogni prodotto dell'ordine corrente
             for sku, quantity in order_data["lines"].items():
                 operation_type = OperationType.ORDINE_CREATO if is_new_order else OperationType.ORDINE_MODIFICATO
@@ -3457,12 +3486,29 @@ async def parse_excel_orders(file: UploadFile = File(...), db: Session = Depends
         
         db.commit()
         
+        # Costruisci messaggio finale
+        message_parts = []
+        if orders_created > 0:
+            message_parts.append(f"{orders_created} ordini creati")
+        if orders_updated > 0:
+            message_parts.append(f"{orders_updated} ordini aggiornati")
+        if orders_skipped > 0:
+            message_parts.append(f"{orders_skipped} ordini già presenti")
+        if errors_count > 0:
+            message_parts.append(f"{errors_count} errori saltati")
+
+        message = "Import Excel completato: " + ", ".join(message_parts) if message_parts else "Nessuna operazione eseguita"
+
         # Risposta con risultato finale
         result = {
             "success": True,
             "file_name": file.filename,
             "orders_created": orders_created,
             "orders_updated": orders_updated,
+            "orders_skipped": orders_skipped,
+            "orders_created_list": orders_created_list,
+            "orders_updated_list": orders_updated_list,
+            "orders_skipped_list": orders_skipped_list,
             "summary": {
                 "total_orders": total_orders,
                 "total_lines": total_lines,
@@ -3470,7 +3516,7 @@ async def parse_excel_orders(file: UploadFile = File(...), db: Session = Depends
                 "warnings": warnings_count,
                 "orders_preview": list(orders_data.keys())[:5]
             },
-            "message": f"Import Excel completato: {orders_created} ordini creati, {orders_updated} ordini aggiornati. {errors_count} errori saltati."
+            "message": message
         }
         
         return result
@@ -3512,8 +3558,8 @@ async def commit_excel_orders(
             raise HTTPException(status_code=400, detail="Nessun ordine valido da creare")
         
         # Crea gli ordini nel database con logging integrato
-        orders_created = 0
-        orders_updated = 0
+        orders_created_list = []  # Lista di numeri ordine creati
+        orders_updated_list = []  # Lista di numeri ordine aggiornati
         logger = LoggingService(db)
         
         for order_number, order_data in orders_to_create.items():
@@ -3539,7 +3585,7 @@ async def commit_excel_orders(
                             requested_quantity=line_data["requested_quantity"]
                         )
                         db.add(new_line)
-                orders_updated += 1
+                orders_updated_list.append(order_number)
                 
             elif not existing_order:
                 # Crea nuovo ordine
@@ -3558,7 +3604,7 @@ async def commit_excel_orders(
                         requested_quantity=line_data["requested_quantity"]
                     )
                     db.add(order_line)
-                orders_created += 1
+                orders_created_list.append(order_number)
             
             # LOGGING: Registra ogni prodotto dell'ordine corrente
             for line_data in order_data["lines"]:
@@ -3579,8 +3625,8 @@ async def commit_excel_orders(
                         'source_file': file_name,
                         'operation_description': f"Import Excel: {operation_type.value.lower()} ordine {order_number}, aggiunto {line_data['requested_quantity']}x {line_data['product_sku']} per cliente {order_data['customer_name']}",
                         'import_stats': {
-                            'orders_created': orders_created,
-                            'orders_updated': orders_updated,
+                            'orders_created': len(orders_created_list),
+                            'orders_updated': len(orders_updated_list),
                             'source_filename': file_name
                         }
                     },
@@ -3591,9 +3637,11 @@ async def commit_excel_orders(
         
         return {
             "success": True,
-            "message": f"Import Excel completato: {orders_created} ordini creati, {orders_updated} ordini aggiornati",
-            "orders_created": orders_created,
-            "orders_updated": orders_updated,
+            "message": f"Import Excel completato: {len(orders_created_list)} ordini creati, {len(orders_updated_list)} ordini aggiornati",
+            "orders_created": len(orders_created_list),
+            "orders_updated": len(orders_updated_list),
+            "orders_created_list": orders_created_list,
+            "orders_updated_list": orders_updated_list,
             "file_name": file_name
         }
         
