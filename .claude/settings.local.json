@@ -50,7 +50,11 @@
       "Bash(venv/bin/pip install:*)",
       "Read(/tmp/**)",
       "Read(/tmp/**)",
-      "Read(/tmp/**)"
+      "Read(/tmp/**)",
+      "Bash(journalctl:*)",
+      "Bash(chmod:*)",
+      "Bash(xargs:*)",
+      "Bash(wc:*)"
     ],
     "deny": []
   }

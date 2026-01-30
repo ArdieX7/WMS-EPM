@@ -36,17 +36,11 @@ async def get_arrivals_management_page(request: Request, db: Session = Depends(g
         joinedload(models.arrivals.Arrival.lines).joinedload(models.arrivals.ArrivalLine.product)
     ).order_by(desc(models.arrivals.Arrival.created_date)).all()
 
-    # Carica anche storico completati (ultimi 50)
-    completed_arrivals = db.query(models.arrivals.Arrival).filter(
-        models.arrivals.Arrival.is_completed == True
-    ).options(
-        joinedload(models.arrivals.Arrival.lines)
-    ).order_by(desc(models.arrivals.Arrival.completed_date)).limit(50).all()
+    # Storico completati ora caricato via AJAX con paginazione
 
     return get_templates().TemplateResponse("arrivals.html", {
         "request": request,
         "arrivals": arrivals,
-        "completed_arrivals": completed_arrivals,
         "active_page": "arrivals"
     })
 
@@ -174,6 +168,65 @@ def list_arrivals(
         query = query.filter(models.arrivals.Arrival.is_completed == False)
 
     return query.order_by(desc(models.arrivals.Arrival.created_date)).all()
+
+
+@router.get("/completed/paginated")
+def list_completed_arrivals_paginated(
+    page: int = 1,
+    per_page: int = 20,
+    db: Session = Depends(get_db)
+):
+    """Lista arrivi completati con paginazione"""
+    # Conta totale per calcolare pagine
+    total = db.query(models.arrivals.Arrival).filter(
+        models.arrivals.Arrival.is_completed == True
+    ).count()
+
+    # Calcola offset
+    offset = (page - 1) * per_page
+
+    # Query paginata
+    arrivals = db.query(models.arrivals.Arrival).filter(
+        models.arrivals.Arrival.is_completed == True
+    ).options(
+        joinedload(models.arrivals.Arrival.lines)
+    ).order_by(
+        desc(models.arrivals.Arrival.completed_date)
+    ).offset(offset).limit(per_page).all()
+
+    # Calcola numero totale pagine
+    total_pages = (total + per_page - 1) // per_page
+
+    # Converti a dizionari per serializzazione JSON
+    arrivals_data = []
+    for arrival in arrivals:
+        arrivals_data.append({
+            "id": arrival.id,
+            "arrival_number": arrival.arrival_number,
+            "supplier_name": arrival.supplier_name,
+            "completed_date": arrival.completed_date.isoformat() if arrival.completed_date else None,
+            "lines": [
+                {
+                    "id": line.id,
+                    "product_sku": line.product_sku,
+                    "expected_quantity": line.expected_quantity,
+                    "received_quantity": line.received_quantity
+                }
+                for line in arrival.lines
+            ]
+        })
+
+    return {
+        "arrivals": arrivals_data,
+        "pagination": {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "total_pages": total_pages,
+            "has_prev": page > 1,
+            "has_next": page < total_pages
+        }
+    }
 
 
 @router.get("/{arrival_id}", response_model=schemas.arrivals.Arrival)

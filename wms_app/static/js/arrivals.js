@@ -1010,6 +1010,10 @@ function showScannerFeedback(message, type) {
 
 // ========== UTILITY FUNCTIONS ==========
 
+// Variabile globale per paginazione storico completati
+let currentCompletedPage = 1;
+let completedArrivalsLoaded = false;
+
 function toggleCompletedSection() {
     const section = document.getElementById('completed-arrivals-section');
     const icon = document.getElementById('toggle-icon');
@@ -1017,10 +1021,105 @@ function toggleCompletedSection() {
     if (section.style.display === 'none') {
         section.style.display = 'block';
         icon.textContent = '▲';
+        // Carica i dati solo la prima volta che viene aperta la sezione
+        if (!completedArrivalsLoaded) {
+            loadCompletedArrivals(1);
+        }
     } else {
         section.style.display = 'none';
         icon.textContent = '▼';
     }
+}
+
+// Carica arrivi completati con paginazione
+async function loadCompletedArrivals(page = 1) {
+    const container = document.getElementById('completed-arrivals-container');
+    const pagination = document.getElementById('completed-pagination');
+    const totalCount = document.getElementById('completed-total-count');
+
+    container.innerHTML = '<p class="no-data">Caricamento...</p>';
+
+    try {
+        const response = await fetch(`/arrivals/completed/paginated?page=${page}&per_page=20`);
+        if (!response.ok) throw new Error('Errore caricamento');
+
+        const data = await response.json();
+        currentCompletedPage = page;
+        completedArrivalsLoaded = true;
+
+        // Aggiorna contatore totale
+        if (totalCount) {
+            totalCount.textContent = `(${data.pagination.total} totali)`;
+        }
+
+        // Renderizza tabella
+        if (data.arrivals && data.arrivals.length > 0) {
+            container.innerHTML = `
+                <table class="arrivals-table">
+                    <thead>
+                        <tr>
+                            <th>Numero Doc</th>
+                            <th>Fornitore</th>
+                            <th>Data Completamento</th>
+                            <th>Referenze</th>
+                            <th>Quantità Colli</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.arrivals.map(arrival => `
+                            <tr>
+                                <td><strong>${arrival.arrival_number}</strong></td>
+                                <td>${arrival.supplier_name || '-'}</td>
+                                <td>${arrival.completed_date ? formatDateTime(arrival.completed_date) : '-'}</td>
+                                <td>${arrival.lines ? arrival.lines.length : 0}</td>
+                                <td>${arrival.lines ? arrival.lines.reduce((sum, line) => sum + (line.expected_quantity || 0), 0) : 0}</td>
+                                <td>
+                                    <button class="btn-icon" onclick="viewArrivalDetails(${arrival.id})" title="Dettagli">👁️</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            // Mostra/aggiorna paginazione
+            if (data.pagination.total_pages > 1) {
+                pagination.style.display = 'block';
+                document.getElementById('page-info').textContent =
+                    `Pagina ${data.pagination.page} di ${data.pagination.total_pages}`;
+                document.getElementById('prev-page-btn').disabled = !data.pagination.has_prev;
+                document.getElementById('next-page-btn').disabled = !data.pagination.has_next;
+
+                // Stile pulsanti disabilitati
+                document.getElementById('prev-page-btn').style.opacity = data.pagination.has_prev ? '1' : '0.5';
+                document.getElementById('next-page-btn').style.opacity = data.pagination.has_next ? '1' : '0.5';
+            } else {
+                pagination.style.display = 'none';
+            }
+        } else {
+            container.innerHTML = '<p class="no-data">Nessun documento completato</p>';
+            pagination.style.display = 'none';
+        }
+
+    } catch (error) {
+        console.error('Errore caricamento storico completati:', error);
+        container.innerHTML = '<p class="no-data" style="color: red;">Errore nel caricamento</p>';
+        pagination.style.display = 'none';
+    }
+}
+
+// Formatta data/ora per visualizzazione
+function formatDateTime(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleString('it-IT', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 }
 
 // ========== AUTOCOMPLETE PRODOTTI ==========

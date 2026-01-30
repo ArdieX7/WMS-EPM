@@ -84,40 +84,25 @@
     <!-- Storico completati (collapsible) -->
     <section class="arrivals-section mobile-hide">
         <h2 onclick="toggleCompletedSection()" style="cursor: pointer;">
-            📋 Storico Completati <span id="toggle-icon">▼</span>
+            📋 Storico Completati <span id="toggle-icon">▼</span> <span id="completed-total-count" style="font-size: 14px; font-weight: normal; color: #666;"></span>
         </h2>
 
         <div id="completed-arrivals-section" style="display: none;">
-            {% if completed_arrivals %}
-            <table class="arrivals-table">
-                <thead>
-                    <tr>
-                        <th>Numero Doc</th>
-                        <th>Fornitore</th>
-                        <th>Data Completamento</th>
-                        <th>Referenze</th>
-                        <th>Quantità Colli</th>
-                        <th>Azioni</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for arrival in completed_arrivals %}
-                    <tr>
-                        <td><strong>{{ arrival.arrival_number }}</strong></td>
-                        <td>{{ arrival.supplier_name }}</td>
-                        <td>{{ arrival.completed_date.strftime('%d/%m/%Y %H:%M') if arrival.completed_date else '-' }}</td>
-                        <td>{{ arrival.lines|length }}</td>
-                        <td>{{ arrival.lines|sum(attribute='expected_quantity') }}</td>
-                        <td>
-                            <button class="btn-icon" onclick="viewArrivalDetails({{ arrival.id }})" title="Dettagli">👁️</button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p class="no-data">Nessun documento completato</p>
-            {% endif %}
+            <div id="completed-arrivals-container">
+                <!-- Caricato dinamicamente via JavaScript -->
+                <p class="no-data">Caricamento...</p>
+            </div>
+
+            <!-- Paginazione -->
+            <div id="completed-pagination" style="display: none; margin-top: 20px; text-align: center;">
+                <button id="prev-page-btn" class="action-btn secondary" onclick="loadCompletedArrivals(currentCompletedPage - 1)" style="margin-right: 10px;">
+                    ← Precedente
+                </button>
+                <span id="page-info" style="margin: 0 15px; font-weight: 500;"></span>
+                <button id="next-page-btn" class="action-btn secondary" onclick="loadCompletedArrivals(currentCompletedPage + 1)" style="margin-left: 10px;">
+                    Successiva →
+                </button>
+            </div>
         </div>
     </section>
 
