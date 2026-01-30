@@ -1,10 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, desc
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, date
 import uuid
+import io
+
+# Import per export Excel e PDF
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    EXCEL_AVAILABLE = True
+except ImportError:
+    EXCEL_AVAILABLE = False
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.units import inch
 
 from wms_app import models, schemas
 from wms_app.database import get_db
@@ -227,6 +242,564 @@ def list_completed_arrivals_paginated(
             "has_next": page < total_pages
         }
     }
+
+
+# ==================== EXPORT ENDPOINTS ====================
+
+@router.get("/export-excel")
+async def export_arrivals_excel(
+    from_date: Optional[date] = Query(None, description="Data inizio (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Data fine (YYYY-MM-DD)"),
+    include_drafts: bool = Query(False, description="Includi bozze non completate"),
+    db: Session = Depends(get_db)
+):
+    """
+    Esporta arrivi in formato Excel (sommario - una riga per documento).
+    Di default filtra su completed_date, con include_drafts usa anche created_date.
+    """
+    if not EXCEL_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Export Excel non disponibile. Installare openpyxl.")
+
+    try:
+        # Query base con righe
+        query = db.query(models.arrivals.Arrival).options(
+            joinedload(models.arrivals.Arrival.lines)
+        )
+
+        # Applica filtri
+        if include_drafts:
+            # Includi bozze: filtra su created_date per le bozze
+            if from_date:
+                query = query.filter(
+                    (models.arrivals.Arrival.completed_date >= from_date) |
+                    ((models.arrivals.Arrival.completed_date == None) & (models.arrivals.Arrival.created_date >= from_date))
+                )
+            if to_date:
+                query = query.filter(
+                    (models.arrivals.Arrival.completed_date <= to_date) |
+                    ((models.arrivals.Arrival.completed_date == None) & (models.arrivals.Arrival.created_date <= to_date))
+                )
+        else:
+            # Solo completati: filtra su completed_date
+            query = query.filter(models.arrivals.Arrival.is_completed == True)
+            if from_date:
+                query = query.filter(models.arrivals.Arrival.completed_date >= from_date)
+            if to_date:
+                query = query.filter(models.arrivals.Arrival.completed_date <= to_date)
+
+        arrivals = query.order_by(desc(models.arrivals.Arrival.completed_date)).all()
+
+        # Crea workbook Excel
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Export Arrivi"
+
+        # Headers
+        headers = [
+            "N° Documento", "Fornitore", "Data Arrivo", "Data Completamento",
+            "N° Referenze", "Qtà Attesa", "Qtà Ricevuta", "Stato"
+        ]
+
+        # Styling headers
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+        header_alignment = Alignment(horizontal="center")
+
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+
+        # Popola dati
+        for row, arrival in enumerate(arrivals, 2):
+            # Calcola totali
+            total_expected = sum(line.expected_quantity for line in arrival.lines)
+            total_received = sum(line.received_quantity for line in arrival.lines)
+
+            # Determina stato
+            if arrival.is_completed:
+                status = "Completato"
+            elif arrival.is_draft:
+                status = "Bozza"
+            else:
+                status = "In Lavorazione"
+
+            # Popola riga
+            ws.cell(row=row, column=1, value=arrival.arrival_number)
+            ws.cell(row=row, column=2, value=arrival.supplier_name or "")
+            ws.cell(row=row, column=3, value=arrival.arrival_date.strftime("%d/%m/%Y") if arrival.arrival_date else "")
+            ws.cell(row=row, column=4, value=arrival.completed_date.strftime("%d/%m/%Y") if arrival.completed_date else "")
+            ws.cell(row=row, column=5, value=len(arrival.lines))
+            ws.cell(row=row, column=6, value=total_expected)
+            ws.cell(row=row, column=7, value=total_received)
+            ws.cell(row=row, column=8, value=status)
+
+        # Auto-dimensiona colonne
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+        # Salva in buffer
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        # Nome file con date
+        date_suffix = ""
+        if from_date and to_date:
+            date_suffix = f"_{from_date.strftime('%Y%m%d')}_{to_date.strftime('%Y%m%d')}"
+        elif from_date:
+            date_suffix = f"_dal_{from_date.strftime('%Y%m%d')}"
+        elif to_date:
+            date_suffix = f"_fino_{to_date.strftime('%Y%m%d')}"
+
+        filename = f"export_arrivi{date_suffix}.xlsx"
+
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante l'export Excel: {str(e)}")
+
+
+@router.get("/export-pdf")
+async def export_arrivals_pdf(
+    from_date: Optional[date] = Query(None, description="Data inizio (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Data fine (YYYY-MM-DD)"),
+    include_drafts: bool = Query(False, description="Includi bozze non completate"),
+    db: Session = Depends(get_db)
+):
+    """
+    Esporta arrivi in formato PDF (sommario - una riga per documento).
+    """
+    try:
+        # Query base con righe
+        query = db.query(models.arrivals.Arrival).options(
+            joinedload(models.arrivals.Arrival.lines)
+        )
+
+        # Applica filtri
+        if include_drafts:
+            if from_date:
+                query = query.filter(
+                    (models.arrivals.Arrival.completed_date >= from_date) |
+                    ((models.arrivals.Arrival.completed_date == None) & (models.arrivals.Arrival.created_date >= from_date))
+                )
+            if to_date:
+                query = query.filter(
+                    (models.arrivals.Arrival.completed_date <= to_date) |
+                    ((models.arrivals.Arrival.completed_date == None) & (models.arrivals.Arrival.created_date <= to_date))
+                )
+        else:
+            query = query.filter(models.arrivals.Arrival.is_completed == True)
+            if from_date:
+                query = query.filter(models.arrivals.Arrival.completed_date >= from_date)
+            if to_date:
+                query = query.filter(models.arrivals.Arrival.completed_date <= to_date)
+
+        arrivals = query.order_by(desc(models.arrivals.Arrival.completed_date)).all()
+
+        # Crea PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=30)
+
+        # Stili
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=30,
+            alignment=1  # Center
+        )
+
+        # Contenuto PDF
+        story = []
+
+        # Titolo
+        date_range = ""
+        if from_date and to_date:
+            date_range = f" ({from_date.strftime('%d/%m/%Y')} - {to_date.strftime('%d/%m/%Y')})"
+        elif from_date:
+            date_range = f" (dal {from_date.strftime('%d/%m/%Y')})"
+        elif to_date:
+            date_range = f" (fino al {to_date.strftime('%d/%m/%Y')})"
+
+        title = Paragraph(f"Export Arrivi{date_range}", title_style)
+        story.append(title)
+        story.append(Spacer(1, 12))
+
+        # Prepara dati tabella
+        table_data = []
+        table_data.append(["N° Doc", "Fornitore", "Data Arrivo", "Completato", "Ref", "Attesa", "Ricevuta", "Stato"])
+
+        for arrival in arrivals:
+            total_expected = sum(line.expected_quantity for line in arrival.lines)
+            total_received = sum(line.received_quantity for line in arrival.lines)
+
+            if arrival.is_completed:
+                status = "Completato"
+            elif arrival.is_draft:
+                status = "Bozza"
+            else:
+                status = "In Lav."
+
+            table_data.append([
+                arrival.arrival_number[:15] + "..." if len(arrival.arrival_number or "") > 18 else (arrival.arrival_number or ""),
+                arrival.supplier_name[:15] + "..." if len(arrival.supplier_name or "") > 18 else (arrival.supplier_name or ""),
+                arrival.arrival_date.strftime("%d/%m/%Y") if arrival.arrival_date else "",
+                arrival.completed_date.strftime("%d/%m/%Y") if arrival.completed_date else "",
+                str(len(arrival.lines)),
+                str(total_expected),
+                str(total_received),
+                status
+            ])
+
+        # Crea tabella
+        table = Table(table_data, colWidths=[1.0*inch, 1.2*inch, 0.8*inch, 0.8*inch, 0.4*inch, 0.5*inch, 0.6*inch, 0.7*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.16, 0.65, 0.27)),  # Verde
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ]))
+
+        story.append(table)
+
+        # Genera PDF
+        doc.build(story)
+        buffer.seek(0)
+
+        # Nome file con date
+        date_suffix = ""
+        if from_date and to_date:
+            date_suffix = f"_{from_date.strftime('%Y%m%d')}_{to_date.strftime('%Y%m%d')}"
+        elif from_date:
+            date_suffix = f"_dal_{from_date.strftime('%Y%m%d')}"
+        elif to_date:
+            date_suffix = f"_fino_{to_date.strftime('%Y%m%d')}"
+
+        filename = f"export_arrivi{date_suffix}.pdf"
+
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante l'export PDF: {str(e)}")
+
+
+@router.get("/export-products-excel")
+async def export_arrivals_products_excel(
+    from_date: Optional[date] = Query(None, description="Data inizio (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Data fine (YYYY-MM-DD)"),
+    include_drafts: bool = Query(False, description="Includi bozze non completate"),
+    db: Session = Depends(get_db)
+):
+    """
+    Esporta prodotti arrivati in formato Excel (dettagliato - una riga per prodotto-arrivo).
+    """
+    if not EXCEL_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Export Excel non disponibile. Installare openpyxl.")
+
+    try:
+        # Query base con righe e prodotti
+        query = db.query(models.arrivals.Arrival).options(
+            joinedload(models.arrivals.Arrival.lines).joinedload(models.arrivals.ArrivalLine.product)
+        )
+
+        # Applica filtri
+        if include_drafts:
+            if from_date:
+                query = query.filter(
+                    (models.arrivals.Arrival.completed_date >= from_date) |
+                    ((models.arrivals.Arrival.completed_date == None) & (models.arrivals.Arrival.created_date >= from_date))
+                )
+            if to_date:
+                query = query.filter(
+                    (models.arrivals.Arrival.completed_date <= to_date) |
+                    ((models.arrivals.Arrival.completed_date == None) & (models.arrivals.Arrival.created_date <= to_date))
+                )
+        else:
+            query = query.filter(models.arrivals.Arrival.is_completed == True)
+            if from_date:
+                query = query.filter(models.arrivals.Arrival.completed_date >= from_date)
+            if to_date:
+                query = query.filter(models.arrivals.Arrival.completed_date <= to_date)
+
+        arrivals = query.order_by(desc(models.arrivals.Arrival.completed_date)).all()
+
+        if not arrivals:
+            raise HTTPException(status_code=404, detail="Nessun arrivo trovato per il periodo specificato.")
+
+        # Estrai tutte le righe prodotto
+        product_lines = []
+        for arrival in arrivals:
+            for line in arrival.lines:
+                product_lines.append({
+                    'arrival_number': arrival.arrival_number,
+                    'supplier_name': arrival.supplier_name,
+                    'arrival_date': arrival.arrival_date,
+                    'completed_date': arrival.completed_date,
+                    'is_completed': arrival.is_completed,
+                    'is_draft': arrival.is_draft,
+                    'product_sku': line.product_sku,
+                    'expected_quantity': line.expected_quantity,
+                    'received_quantity': line.received_quantity,
+                    'description': line.product.description if line.product else ""
+                })
+
+        if not product_lines:
+            raise HTTPException(status_code=404, detail="Nessun prodotto trovato negli arrivi del periodo specificato.")
+
+        # Crea workbook Excel
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Prodotti Arrivati"
+
+        # Headers
+        headers = [
+            "N° Documento", "Fornitore", "Data Arrivo", "Data Complet.",
+            "SKU", "Descrizione", "Qtà Attesa", "Qtà Ricevuta", "Differenza", "Stato"
+        ]
+
+        # Styling headers
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        # Popola dati
+        for row, pl in enumerate(product_lines, 2):
+            # Calcola differenza
+            difference = pl['received_quantity'] - pl['expected_quantity']
+
+            # Determina stato riga
+            if pl['received_quantity'] == 0:
+                riga_status = "Non Ricevuto"
+            elif pl['received_quantity'] >= pl['expected_quantity']:
+                riga_status = "Completo"
+            else:
+                riga_status = "Parziale"
+
+            ws.cell(row=row, column=1, value=pl['arrival_number'])
+            ws.cell(row=row, column=2, value=pl['supplier_name'] or "")
+            ws.cell(row=row, column=3, value=pl['arrival_date'].strftime("%d/%m/%Y") if pl['arrival_date'] else "")
+            ws.cell(row=row, column=4, value=pl['completed_date'].strftime("%d/%m/%Y") if pl['completed_date'] else "")
+            ws.cell(row=row, column=5, value=pl['product_sku'])
+            ws.cell(row=row, column=6, value=pl['description'] or "")
+            ws.cell(row=row, column=7, value=pl['expected_quantity'])
+            ws.cell(row=row, column=8, value=pl['received_quantity'])
+            ws.cell(row=row, column=9, value=difference)
+            ws.cell(row=row, column=10, value=riga_status)
+
+        # Auto-dimensiona colonne
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+        # Salva in buffer
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        # Nome file
+        filename = "export_prodotti_arrivi"
+        if from_date or to_date:
+            filename += f"_{from_date or 'inizio'}_{to_date or 'fine'}"
+        filename += ".xlsx"
+
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante l'export Excel prodotti: {str(e)}")
+
+
+@router.get("/export-products-pdf")
+async def export_arrivals_products_pdf(
+    from_date: Optional[date] = Query(None, description="Data inizio (YYYY-MM-DD)"),
+    to_date: Optional[date] = Query(None, description="Data fine (YYYY-MM-DD)"),
+    include_drafts: bool = Query(False, description="Includi bozze non completate"),
+    db: Session = Depends(get_db)
+):
+    """
+    Esporta prodotti arrivati in formato PDF (dettagliato - una riga per prodotto-arrivo).
+    """
+    try:
+        # Query base con righe e prodotti
+        query = db.query(models.arrivals.Arrival).options(
+            joinedload(models.arrivals.Arrival.lines).joinedload(models.arrivals.ArrivalLine.product)
+        )
+
+        # Applica filtri
+        if include_drafts:
+            if from_date:
+                query = query.filter(
+                    (models.arrivals.Arrival.completed_date >= from_date) |
+                    ((models.arrivals.Arrival.completed_date == None) & (models.arrivals.Arrival.created_date >= from_date))
+                )
+            if to_date:
+                query = query.filter(
+                    (models.arrivals.Arrival.completed_date <= to_date) |
+                    ((models.arrivals.Arrival.completed_date == None) & (models.arrivals.Arrival.created_date <= to_date))
+                )
+        else:
+            query = query.filter(models.arrivals.Arrival.is_completed == True)
+            if from_date:
+                query = query.filter(models.arrivals.Arrival.completed_date >= from_date)
+            if to_date:
+                query = query.filter(models.arrivals.Arrival.completed_date <= to_date)
+
+        arrivals = query.order_by(desc(models.arrivals.Arrival.completed_date)).all()
+
+        if not arrivals:
+            raise HTTPException(status_code=404, detail="Nessun arrivo trovato per il periodo specificato.")
+
+        # Estrai tutte le righe prodotto
+        product_lines = []
+        for arrival in arrivals:
+            for line in arrival.lines:
+                product_lines.append({
+                    'arrival_number': arrival.arrival_number,
+                    'supplier_name': arrival.supplier_name,
+                    'arrival_date': arrival.arrival_date,
+                    'completed_date': arrival.completed_date,
+                    'product_sku': line.product_sku,
+                    'expected_quantity': line.expected_quantity,
+                    'received_quantity': line.received_quantity,
+                    'description': line.product.description if line.product else ""
+                })
+
+        if not product_lines:
+            raise HTTPException(status_code=404, detail="Nessun prodotto trovato negli arrivi del periodo specificato.")
+
+        # Crea PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=40, bottomMargin=30)
+
+        # Stili
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=14,
+            spaceAfter=20,
+            alignment=1
+        )
+
+        # Contenuto PDF
+        story = []
+
+        # Titolo
+        period_text = ""
+        if from_date or to_date:
+            period_text = f" ({from_date or 'inizio'} - {to_date or 'fine'})"
+        title = Paragraph(f"Report Prodotti Arrivati{period_text}", title_style)
+        story.append(title)
+        story.append(Spacer(1, 15))
+
+        # Tabella
+        table_data = [
+            ['N° Doc', 'Fornitore', 'Data', 'SKU', 'Descrizione', 'Attesa', 'Ricevuta', 'Diff', 'Stato']
+        ]
+
+        for pl in product_lines:
+            difference = pl['received_quantity'] - pl['expected_quantity']
+
+            if pl['received_quantity'] == 0:
+                riga_status = "Non Ric."
+            elif pl['received_quantity'] >= pl['expected_quantity']:
+                riga_status = "OK"
+            else:
+                riga_status = "Parziale"
+
+            table_data.append([
+                pl['arrival_number'][:10] + "..." if len(pl['arrival_number'] or "") > 13 else (pl['arrival_number'] or ""),
+                pl['supplier_name'][:12] + "..." if len(pl['supplier_name'] or "") > 15 else (pl['supplier_name'] or ""),
+                pl['arrival_date'].strftime("%d/%m/%y") if pl['arrival_date'] else "",
+                pl['product_sku'][:10] + "..." if len(pl['product_sku'] or "") > 13 else (pl['product_sku'] or ""),
+                (pl['description'][:15] + "..." if len(pl['description'] or "") > 18 else pl['description'] or ""),
+                str(pl['expected_quantity']),
+                str(pl['received_quantity']),
+                str(difference) if difference != 0 else "0",
+                riga_status
+            ])
+
+        # Crea tabella
+        table = Table(table_data, colWidths=[55, 70, 45, 60, 90, 35, 40, 30, 45])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.16, 0.65, 0.27)),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 7),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+
+        story.append(table)
+
+        # Genera PDF
+        doc.build(story)
+        pdf_content = buffer.getvalue()
+        buffer.close()
+
+        # Nome file
+        filename = "export_prodotti_arrivi"
+        if from_date or to_date:
+            filename += f"_{from_date or 'inizio'}_{to_date or 'fine'}"
+        filename += ".pdf"
+
+        return Response(
+            content=pdf_content,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante l'export PDF prodotti: {str(e)}")
 
 
 @router.get("/{arrival_id}", response_model=schemas.arrivals.Arrival)

@@ -27,6 +27,7 @@
     <!-- Azioni principali -->
     <div class="action-buttons" data-permission="arrivals_create">
         <button class="action-btn mobile-hide" onclick="openCreateArrivalOverlay()">➕ Nuovo Documento Arrivo</button>
+        <button class="action-btn mobile-hide" onclick="openExportArrivalsOverlay()">📤 Esporta Dati</button>
         <button class="action-btn mobile-only" onclick="openMobileScannerOverlay()">📱 Scansiona Arrivo</button>
     </div>
 
@@ -105,6 +106,83 @@
             </div>
         </div>
     </section>
+
+    <!-- OVERLAY: Export Dati Arrivi -->
+    <div id="export-arrivals-overlay" class="overlay" style="display: none;">
+        <div class="overlay-content" style="max-width: 720px; padding: 1.5rem;">
+            <h2>📤 Esporta Dati Arrivi</h2>
+
+            <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; padding: 1rem 0.5rem;">
+                <!-- Export Prodotti Arrivati -->
+                <div style="flex: 1; min-width: 280px;">
+                    <h3 style="color: #28a745; margin-bottom: 1rem; font-size: 1.1rem;">📦 Export Prodotti Arrivati</h3>
+                    <div style="background: #e8f8eb; padding: 1.25rem; border-radius: 8px; border-left: 4px solid #28a745;">
+                        <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+                            <div>
+                                <label style="display: block; margin-bottom: 0.3rem; font-weight: 600; color: #495057; font-size: 0.85rem;">📅 Da:</label>
+                                <input type="date" id="export-products-from-date" style="width: 130px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.85rem;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.3rem; font-weight: 600; color: #495057; font-size: 0.85rem;">📅 A:</label>
+                                <input type="date" id="export-products-to-date" style="width: 130px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.85rem;">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
+                            <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: #495057; cursor: pointer;">
+                                <input type="checkbox" id="export-products-include-drafts" style="width: 16px; height: 16px;">
+                                Includi Bozze
+                            </label>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="action-btn" onclick="exportArrivalsProductsExcel()" style="flex: 1; padding: 0.6rem;">
+                                📊 Excel
+                            </button>
+                            <button class="action-btn secondary" onclick="exportArrivalsProductsPdf()" style="flex: 1; padding: 0.6rem;">
+                                📄 PDF
+                            </button>
+                        </div>
+                        <p style="margin-top: 0.75rem; font-size: 0.8rem; color: #6c757d;">Una riga per ogni prodotto-arrivo</p>
+                    </div>
+                </div>
+
+                <!-- Export Dati Arrivi (Sommario) -->
+                <div style="flex: 1; min-width: 280px;">
+                    <h3 style="color: #28a745; margin-bottom: 1rem; font-size: 1.1rem;">📈 Export Dati Arrivi</h3>
+                    <div style="background: #f8f9fa; padding: 1.25rem; border-radius: 8px; border-left: 4px solid #28a745;">
+                        <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+                            <div>
+                                <label style="display: block; margin-bottom: 0.3rem; font-weight: 600; color: #495057; font-size: 0.85rem;">📅 Da:</label>
+                                <input type="date" id="export-arrivals-from-date" style="width: 130px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.85rem;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.3rem; font-weight: 600; color: #495057; font-size: 0.85rem;">📅 A:</label>
+                                <input type="date" id="export-arrivals-to-date" style="width: 130px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.85rem;">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
+                            <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: #495057; cursor: pointer;">
+                                <input type="checkbox" id="export-arrivals-include-drafts" style="width: 16px; height: 16px;">
+                                Includi Bozze
+                            </label>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="action-btn" onclick="exportArrivalsExcel()" style="flex: 1; padding: 0.6rem;">
+                                📊 Excel
+                            </button>
+                            <button class="action-btn secondary" onclick="exportArrivalsPdf()" style="flex: 1; padding: 0.6rem;">
+                                📄 PDF
+                            </button>
+                        </div>
+                        <p style="margin-top: 0.75rem; font-size: 0.8rem; color: #6c757d;">Una riga per documento</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions" style="margin-top: 1rem; padding-top: 1rem;">
+                <button type="button" class="action-btn secondary" onclick="closeExportArrivalsOverlay()">❌ Chiudi</button>
+            </div>
+        </div>
+    </div>
 
     <!-- OVERLAY: Crea Documento (Desktop) -->
     <div id="create-arrival-overlay" class="overlay" style="display: none;">

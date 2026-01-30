@@ -1182,4 +1182,308 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
+// ========== EXPORT FUNCTIONS ==========
+
+// Apri overlay export
+window.openExportArrivalsOverlay = function() {
+    document.getElementById('export-arrivals-overlay').style.display = 'flex';
+    // Inizializza date ogni volta che si apre l'overlay
+    initializeExportDates();
+}
+
+// Chiudi overlay export
+window.closeExportArrivalsOverlay = function() {
+    document.getElementById('export-arrivals-overlay').style.display = 'none';
+}
+
+// Inizializza date export al primo giorno del mese -> oggi
+function initializeExportDates() {
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const todayStr = formatDate(today);
+    const firstDayStr = formatDate(firstDayOfMonth);
+
+    // Set date per export prodotti (Da: inizio mese, A: oggi)
+    const productsFromDate = document.getElementById('export-products-from-date');
+    const productsToDate = document.getElementById('export-products-to-date');
+    if (productsFromDate) productsFromDate.value = firstDayStr;
+    if (productsToDate) productsToDate.value = todayStr;
+
+    // Set date per export sommario (Da: inizio mese, A: oggi)
+    const arrivalsFromDate = document.getElementById('export-arrivals-from-date');
+    const arrivalsToDate = document.getElementById('export-arrivals-to-date');
+    if (arrivalsFromDate) arrivalsFromDate.value = firstDayStr;
+    if (arrivalsToDate) arrivalsToDate.value = todayStr;
+
+    console.log('📅 Date export inizializzate: Da', firstDayStr, 'A', todayStr);
+}
+
+// Export Sommario Excel
+window.exportArrivalsExcel = async function() {
+    try {
+        const fromDate = document.getElementById('export-arrivals-from-date').value;
+        const toDate = document.getElementById('export-arrivals-to-date').value;
+        const includeDrafts = document.getElementById('export-arrivals-include-drafts').checked;
+
+        // Costruisci URL con parametri
+        let url = '/arrivals/export-excel';
+        const params = new URLSearchParams();
+        if (fromDate) params.append('from_date', fromDate);
+        if (toDate) params.append('to_date', toDate);
+        if (includeDrafts) params.append('include_drafts', 'true');
+        if (params.toString()) url += '?' + params.toString();
+
+        // Mostra loading
+        const loadingMsg = document.createElement('div');
+        loadingMsg.innerHTML = '⏳ Generazione file Excel arrivi in corso...';
+        loadingMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#28a745;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+        document.body.appendChild(loadingMsg);
+
+        const response = await fetch(url);
+
+        // Rimuovi loading
+        document.body.removeChild(loadingMsg);
+
+        if (!response.ok) {
+            const error = await response.json();
+            alert(`Errore generazione Excel: ${error.detail || 'Errore sconosciuto'}`);
+            return;
+        }
+
+        // Download del file
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+
+        // Estrai nome file dalla response header
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = 'export_arrivi.xlsx';
+        if (contentDisposition) {
+            const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
+            if (matches && matches[1]) {
+                filename = matches[1];
+            }
+        }
+
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(downloadUrl);
+        document.body.removeChild(a);
+
+        // Feedback successo
+        const successMsg = document.createElement('div');
+        successMsg.innerHTML = '✅ File Excel arrivi scaricato con successo!';
+        successMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#28a745;color:white;padding:12px 18px;border-radius:6px;z-index:10000;font-weight:500;';
+        document.body.appendChild(successMsg);
+        setTimeout(() => document.body.removeChild(successMsg), 3000);
+
+    } catch (error) {
+        console.error('Errore export Excel arrivi:', error);
+        alert('Errore di rete durante la generazione del file Excel.');
+    }
+}
+
+// Export Sommario PDF
+window.exportArrivalsPdf = async function() {
+    try {
+        const fromDate = document.getElementById('export-arrivals-from-date').value;
+        const toDate = document.getElementById('export-arrivals-to-date').value;
+        const includeDrafts = document.getElementById('export-arrivals-include-drafts').checked;
+
+        // Costruisci URL con parametri
+        let url = '/arrivals/export-pdf';
+        const params = new URLSearchParams();
+        if (fromDate) params.append('from_date', fromDate);
+        if (toDate) params.append('to_date', toDate);
+        if (includeDrafts) params.append('include_drafts', 'true');
+        if (params.toString()) url += '?' + params.toString();
+
+        // Mostra loading
+        const loadingMsg = document.createElement('div');
+        loadingMsg.innerHTML = '⏳ Generazione file PDF arrivi in corso...';
+        loadingMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+        document.body.appendChild(loadingMsg);
+
+        const response = await fetch(url);
+
+        // Rimuovi loading
+        document.body.removeChild(loadingMsg);
+
+        if (!response.ok) {
+            const error = await response.json();
+            alert(`Errore generazione PDF: ${error.detail || 'Errore sconosciuto'}`);
+            return;
+        }
+
+        // Download del file
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+
+        // Estrai nome file dalla response header
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = 'export_arrivi.pdf';
+        if (contentDisposition) {
+            const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
+            if (matches && matches[1]) {
+                filename = matches[1];
+            }
+        }
+
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(downloadUrl);
+        document.body.removeChild(a);
+
+        // Feedback successo
+        const successMsg = document.createElement('div');
+        successMsg.innerHTML = '✅ File PDF arrivi scaricato con successo!';
+        successMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#28a745;color:white;padding:12px 18px;border-radius:6px;z-index:10000;font-weight:500;';
+        document.body.appendChild(successMsg);
+        setTimeout(() => document.body.removeChild(successMsg), 3000);
+
+    } catch (error) {
+        console.error('Errore export PDF arrivi:', error);
+        alert('Errore di rete durante la generazione del file PDF.');
+    }
+}
+
+// Export Prodotti Excel
+window.exportArrivalsProductsExcel = async function() {
+    try {
+        const fromDate = document.getElementById('export-products-from-date').value;
+        const toDate = document.getElementById('export-products-to-date').value;
+        const includeDrafts = document.getElementById('export-products-include-drafts').checked;
+
+        // Costruisci URL con parametri
+        let url = '/arrivals/export-products-excel';
+        const params = new URLSearchParams();
+        if (fromDate) params.append('from_date', fromDate);
+        if (toDate) params.append('to_date', toDate);
+        if (includeDrafts) params.append('include_drafts', 'true');
+        if (params.toString()) url += '?' + params.toString();
+
+        // Mostra loading
+        const loadingMsg = document.createElement('div');
+        loadingMsg.innerHTML = '⏳ Generazione file Excel prodotti in corso...';
+        loadingMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#28a745;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+        document.body.appendChild(loadingMsg);
+
+        const response = await fetch(url);
+
+        if (response.ok) {
+            // Download del file
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+
+            // Genera nome file
+            let fileName = 'export_prodotti_arrivi';
+            if (fromDate || toDate) {
+                fileName += `_${fromDate || 'inizio'}_${toDate || 'fine'}`;
+            }
+            fileName += '.xlsx';
+
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+
+            // Mostra successo
+            loadingMsg.innerHTML = '✅ File Excel prodotti scaricato con successo!';
+            loadingMsg.style.background = '#28a745';
+            setTimeout(() => loadingMsg.remove(), 3000);
+        } else {
+            loadingMsg.remove();
+            const error = await response.json();
+            alert(`Errore: ${error.detail || 'Errore sconosciuto'}`);
+        }
+
+    } catch (error) {
+        console.error('Errore export Excel prodotti:', error);
+        const errorMsg = document.createElement('div');
+        errorMsg.innerHTML = '❌ Errore durante il download del file Excel prodotti';
+        errorMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+        document.body.appendChild(errorMsg);
+        setTimeout(() => errorMsg.remove(), 5000);
+    }
+}
+
+// Export Prodotti PDF
+window.exportArrivalsProductsPdf = async function() {
+    try {
+        const fromDate = document.getElementById('export-products-from-date').value;
+        const toDate = document.getElementById('export-products-to-date').value;
+        const includeDrafts = document.getElementById('export-products-include-drafts').checked;
+
+        // Costruisci URL con parametri
+        let url = '/arrivals/export-products-pdf';
+        const params = new URLSearchParams();
+        if (fromDate) params.append('from_date', fromDate);
+        if (toDate) params.append('to_date', toDate);
+        if (includeDrafts) params.append('include_drafts', 'true');
+        if (params.toString()) url += '?' + params.toString();
+
+        // Mostra loading
+        const loadingMsg = document.createElement('div');
+        loadingMsg.innerHTML = '⏳ Generazione file PDF prodotti in corso...';
+        loadingMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+        document.body.appendChild(loadingMsg);
+
+        const response = await fetch(url);
+
+        if (response.ok) {
+            // Download del file
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+
+            // Genera nome file
+            let fileName = 'export_prodotti_arrivi';
+            if (fromDate || toDate) {
+                fileName += `_${fromDate || 'inizio'}_${toDate || 'fine'}`;
+            }
+            fileName += '.pdf';
+
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+
+            // Mostra successo
+            loadingMsg.innerHTML = '✅ File PDF prodotti scaricato con successo!';
+            loadingMsg.style.background = '#28a745';
+            setTimeout(() => loadingMsg.remove(), 3000);
+        } else {
+            loadingMsg.remove();
+            const error = await response.json();
+            alert(`Errore: ${error.detail || 'Errore sconosciuto'}`);
+        }
+
+    } catch (error) {
+        console.error('Errore export PDF prodotti:', error);
+        const errorMsg = document.createElement('div');
+        errorMsg.innerHTML = '❌ Errore durante il download del file PDF prodotti';
+        errorMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px 20px;border-radius:8px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-weight:600;';
+        document.body.appendChild(errorMsg);
+        setTimeout(() => errorMsg.remove(), 5000);
+    }
+}
+
 console.log('✅ arrivals.js loaded');

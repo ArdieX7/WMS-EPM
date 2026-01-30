@@ -4543,15 +4543,24 @@
         // Aggiorna il contatore all'avvio
         updateOutgoingStockCounter();
 
-        // Precompila date export al caricamento pagina
-        initializeExportDates();
-
         // --- FUNZIONI EXPORT ORDINI ---
+
+        // Apri overlay export ordini
+        window.openExportOrdersOverlay = function() {
+            document.getElementById('export-orders-overlay').style.display = 'flex';
+            // Inizializza date ogni volta che si apre l'overlay
+            initializeExportDates();
+        }
+
+        // Chiudi overlay export ordini
+        window.closeExportOrdersOverlay = function() {
+            document.getElementById('export-orders-overlay').style.display = 'none';
+        }
 
         function initializeExportDates() {
             const today = new Date();
             const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-            
+
             // Formatta le date in formato YYYY-MM-DD evitando problemi fuso orario
             const formatDate = (date) => {
                 const year = date.getFullYear();
@@ -4559,20 +4568,34 @@
                 const day = String(date.getDate()).padStart(2, '0');
                 return `${year}-${month}-${day}`;
             };
-            
-            // Precompila i campi
+
+            // Precompila i campi sommario ordini
             const fromDateField = document.getElementById('export-from-date');
             const toDateField = document.getElementById('export-to-date');
-            
+
             if (fromDateField) {
                 fromDateField.value = formatDate(firstDayOfMonth);
             }
-            
+
             if (toDateField) {
                 toDateField.value = formatDate(today);
             }
+
+            // Precompila i campi prodotti per ordine
+            const productsFromDateField = document.getElementById('export-products-from-date');
+            const productsToDateField = document.getElementById('export-products-to-date');
+
+            if (productsFromDateField) {
+                productsFromDateField.value = formatDate(firstDayOfMonth);
+            }
+
+            if (productsToDateField) {
+                productsToDateField.value = formatDate(today);
+            }
+
+            console.log('📅 Date export inizializzate: Da', formatDate(firstDayOfMonth), 'A', formatDate(today));
         }
-        
+
         // Export Excel
         window.exportOrdersExcel = async function() {
             try {
@@ -4822,39 +4845,6 @@
                 setTimeout(() => errorMsg.remove(), 5000);
             }
         };
-
-        // Inizializza date di default per export prodotti
-        function initializeProductsExportDates() {
-            const today = new Date();
-            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-            
-            // Funzione helper per formattare date
-            const formatDate = (date) => {
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            };
-            
-            // Precompila i campi export prodotti
-            const productsFromDateField = document.getElementById('export-products-from-date');
-            const productsToDateField = document.getElementById('export-products-to-date');
-            
-            if (productsFromDateField) {
-                productsFromDateField.value = formatDate(firstDayOfMonth);
-            }
-            
-            if (productsToDateField) {
-                productsToDateField.value = formatDate(today);
-            }
-        }
-
-        // Inizializza le date quando il documento è pronto
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initializeProductsExportDates);
-        } else {
-            initializeProductsExportDates();
-        }
 
         // ============== FUNZIONI MODIFICA DATA ARCHIVIAZIONE ==============
 
