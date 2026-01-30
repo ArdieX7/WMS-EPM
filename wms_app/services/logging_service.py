@@ -315,10 +315,23 @@ class LoggingService:
         if user_id:
             query = query.filter(OperationLog.user_id.ilike(f"%{user_id}%"))
         
-        # Filtro numero ordine (cerca nel campo details JSON)
+        # Filtro numero ordine (cerca corrispondenza ESATTA nel campo details JSON)
         if order_number:
-            order_pattern = f"%{order_number}%"
-            query = query.filter(OperationLog.details.ilike(order_pattern))
+            # Cerca pattern esatti per evitare match parziali (es. "9" non deve matchare "19", "29", etc.)
+            # Il JSON può contenere: "order_number": "value" oppure "order_number": value
+            exact_patterns = [
+                f'%"order_number": "{order_number}"%',      # "order_number": "9"
+                f'%"order_number":"{order_number}"%',       # "order_number":"9"
+                f'%"order_number": {order_number},%',       # "order_number": 9,
+                f'%"order_number": {order_number}}}%',      # "order_number": 9}
+                f'%"order_number":{order_number},%',        # "order_number":9,
+                f'%"order_number":{order_number}}}%',       # "order_number":9}
+            ]
+            query = query.filter(
+                or_(
+                    *[OperationLog.details.ilike(pattern) for pattern in exact_patterns]
+                )
+            )
         
         # Ricerca testuale
         if search_text:
