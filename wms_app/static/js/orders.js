@@ -674,11 +674,17 @@
             async function loadPickupLocations(orderNumber) {
                 const pickupSection = document.getElementById('pickup-locations-section');
                 const pickupBody = document.getElementById('pickup-locations-body');
-                
+
                 try {
                     // Mostra loading nella sezione
                     pickupSection.style.display = 'block';
                     pickupBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 1rem;">🔄 Caricamento posizioni prelievo...</td></tr>';
+
+                    // Imposta i pulsanti di export con il numero ordine corretto
+                    const excelBtn = document.getElementById('export-pickup-excel-btn');
+                    const pdfBtn = document.getElementById('export-pickup-pdf-btn');
+                    if (excelBtn) excelBtn.onclick = () => exportPickupLocationsExcel(orderNumber);
+                    if (pdfBtn) pdfBtn.onclick = () => exportPickupLocationsPdf(orderNumber);
                     
                     const response = await window.modernAuth.authenticatedFetch(`/orders/${orderNumber}/pickup-locations`);
                     if (!response.ok) {
@@ -1686,9 +1692,21 @@
                             border: 2px solid #00516E;
                             display: none;
                         ">
-                            <h3 style="margin: 0 0 20px 0; color: #00516E; font-size: 20px;">
-                                📍 Posizioni di Prelievo Effettuate
-                            </h3>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <h3 style="margin: 0; color: #00516E; font-size: 20px;">
+                                    📍 Posizioni di Prelievo Effettuate
+                                </h3>
+                                <div style="display: flex; gap: 8px;">
+                                    <button onclick="exportPickupLocationsExcel('${Object.keys(validationData.order_summaries)[0]}')"
+                                            style="background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+                                        📊 Excel
+                                    </button>
+                                    <button onclick="exportPickupLocationsPdf('${Object.keys(validationData.order_summaries)[0]}')"
+                                            style="background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+                                        📄 PDF
+                                    </button>
+                                </div>
+                            </div>
                             <div style="overflow-x: auto;">
                                 <table style="
                                     width: 100%;
@@ -1867,6 +1885,67 @@
                 } catch (error) {
                     console.error('Errore nel caricamento posizioni prelievo:', error);
                     pickupSection.style.display = 'none';
+                }
+            }
+
+            // Funzioni per export posizioni di prelievo
+            window.exportPickupLocationsExcel = async function(orderNumber) {
+                try {
+                    const response = await window.modernAuth.authenticatedFetch(`/orders/${orderNumber}/pickup-locations/export-excel`);
+                    if (!response.ok) {
+                        throw new Error(`Errore ${response.status}: ${response.statusText}`);
+                    }
+
+                    const blob = await response.blob();
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `prelievi_ordine_${orderNumber}.xlsx`;
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename=(.+)/);
+                        if (match) filename = match[1];
+                    }
+
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+
+                } catch (error) {
+                    console.error('Errore export Excel:', error);
+                    alert('Errore durante l\'export Excel: ' + error.message);
+                }
+            }
+
+            window.exportPickupLocationsPdf = async function(orderNumber) {
+                try {
+                    const response = await window.modernAuth.authenticatedFetch(`/orders/${orderNumber}/pickup-locations/export-pdf`);
+                    if (!response.ok) {
+                        throw new Error(`Errore ${response.status}: ${response.statusText}`);
+                    }
+
+                    const blob = await response.blob();
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `prelievi_ordine_${orderNumber}.pdf`;
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename=(.+)/);
+                        if (match) filename = match[1];
+                    }
+
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+
+                } catch (error) {
+                    console.error('Errore export PDF:', error);
+                    alert('Errore durante l\'export PDF: ' + error.message);
                 }
             }
 

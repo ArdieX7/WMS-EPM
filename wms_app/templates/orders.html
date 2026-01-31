@@ -661,8 +661,20 @@
                 
                 <!-- Nuova sezione: Dettagli Posizioni di Prelievo -->
                 <div class="form-group" id="pickup-locations-section" style="display: none;">
-                    <label><strong>📍 Posizioni di Prelievo</strong></label>
-                    <table class="recap-table mobile-order-details-table" style="margin-top: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <label style="margin: 0;"><strong>📍 Posizioni di Prelievo</strong></label>
+                        <div style="display: flex; gap: 8px;">
+                            <button id="export-pickup-excel-btn" onclick=""
+                                    style="background: #28a745; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; display: flex; align-items: center; gap: 4px;">
+                                📊 Excel
+                            </button>
+                            <button id="export-pickup-pdf-btn" onclick=""
+                                    style="background: #dc3545; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; display: flex; align-items: center; gap: 4px;">
+                                📄 PDF
+                            </button>
+                        </div>
+                    </div>
+                    <table class="recap-table mobile-order-details-table" style="margin-top: 0;">
                         <thead>
                             <tr>
                                 <th class="mobile-sku-col" style="width: 120px;">SKU Prodotto</th>

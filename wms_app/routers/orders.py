@@ -4120,3 +4120,206 @@ def get_order_pickup_locations(
         raise HTTPException(status_code=500, detail=f"Errore nel recupero posizioni prelievo: {str(e)}")
 
 
+@router.get("/{order_number}/pickup-locations/export-excel")
+def export_pickup_locations_excel(
+    order_number: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("orders_view"))
+):
+    """
+    Esporta le posizioni di prelievo di un ordine in formato Excel.
+    """
+    if not EXCEL_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Libreria openpyxl non disponibile")
+
+    try:
+        # Verifica che l'ordine esista
+        order = db.query(models.Order).filter(
+            models.Order.order_number == order_number
+        ).first()
+
+        if not order:
+            raise HTTPException(status_code=404, detail=f"Ordine '{order_number}' non trovato")
+
+        # Recupera i log di prelievo
+        logger = LoggingService(db)
+        pickup_logs = logger.get_logs(
+            operation_types=[
+                OperationType.PRELIEVO_MANUALE,
+                OperationType.PRELIEVO_FILE,
+                OperationType.PRELIEVO_TEMPO_REALE,
+                OperationType.PICKING_CONFERMATO
+            ],
+            order_number=order_number,
+            limit=1000,
+            order_by="timestamp",
+            order_direction="asc"
+        )
+
+        # Crea il workbook Excel
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"Prelievi Ordine {order_number}"
+
+        # Stili
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="00516E", end_color="00516E", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center")
+
+        # Intestazioni
+        headers = ["SKU Prodotto", "Ubicazione", "Quantità", "Data/Ora", "Operatore"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+
+        # Dati
+        for row_idx, log in enumerate(pickup_logs['logs'], 2):
+            ws.cell(row=row_idx, column=1, value=log.product_sku)
+            ws.cell(row=row_idx, column=2, value=log.location_from or 'N/D')
+            ws.cell(row=row_idx, column=3, value=log.quantity)
+            ws.cell(row=row_idx, column=4, value=log.timestamp.strftime('%d/%m/%Y %H:%M'))
+            ws.cell(row=row_idx, column=5, value=log.user_id or 'Sistema')
+
+        # Larghezza colonne
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 15
+        ws.column_dimensions['C'].width = 12
+        ws.column_dimensions['D'].width = 18
+        ws.column_dimensions['E'].width = 15
+
+        # Salva in buffer
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        filename = f"prelievi_ordine_{order_number}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        return Response(
+            content=output.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore export Excel: {str(e)}")
+
+
+@router.get("/{order_number}/pickup-locations/export-pdf")
+def export_pickup_locations_pdf(
+    order_number: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("orders_view"))
+):
+    """
+    Esporta le posizioni di prelievo di un ordine in formato PDF.
+    """
+    try:
+        # Verifica che l'ordine esista
+        order = db.query(models.Order).filter(
+            models.Order.order_number == order_number
+        ).first()
+
+        if not order:
+            raise HTTPException(status_code=404, detail=f"Ordine '{order_number}' non trovato")
+
+        # Recupera i log di prelievo
+        logger = LoggingService(db)
+        pickup_logs = logger.get_logs(
+            operation_types=[
+                OperationType.PRELIEVO_MANUALE,
+                OperationType.PRELIEVO_FILE,
+                OperationType.PRELIEVO_TEMPO_REALE,
+                OperationType.PICKING_CONFERMATO
+            ],
+            order_number=order_number,
+            limit=1000,
+            order_by="timestamp",
+            order_direction="asc"
+        )
+
+        # Crea il PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=30, bottomMargin=30)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Titolo
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=20,
+            alignment=1  # Center
+        )
+        elements.append(Paragraph(f"Posizioni di Prelievo - Ordine {order_number}", title_style))
+
+        # Info ordine
+        info_style = ParagraphStyle(
+            'Info',
+            parent=styles['Normal'],
+            fontSize=10,
+            spaceAfter=15,
+            alignment=1
+        )
+        elements.append(Paragraph(f"Cliente: {order.customer_name or 'N/D'} | Data export: {datetime.now().strftime('%d/%m/%Y %H:%M')}", info_style))
+        elements.append(Spacer(1, 10))
+
+        # Tabella
+        table_data = [["SKU", "Ubicazione", "Qtà", "Data/Ora", "Operatore"]]
+
+        for log in pickup_logs['logs']:
+            table_data.append([
+                log.product_sku,
+                log.location_from or 'N/D',
+                str(log.quantity),
+                log.timestamp.strftime('%d/%m/%Y %H:%M'),
+                log.user_id or 'Sistema'
+            ])
+
+        # Riga totale
+        total_qty = sum(log.quantity for log in pickup_logs['logs'])
+        table_data.append(["TOTALE", "", str(total_qty), f"{len(pickup_logs['logs'])} operazioni", ""])
+
+        # Stile tabella
+        table = Table(table_data, colWidths=[120, 70, 50, 100, 80])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#00516E')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -2), colors.white),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#F2F2F2')),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('TEXTCOLOR', (0, -1), (-1, -1), colors.HexColor('#00516E')),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#DEE2E6')),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('TOPPADDING', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+        ]))
+
+        elements.append(table)
+
+        # Build PDF
+        doc.build(elements)
+        buffer.seek(0)
+
+        filename = f"prelievi_ordine_{order_number}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore export PDF: {str(e)}")
+
+
