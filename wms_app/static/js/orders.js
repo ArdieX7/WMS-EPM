@@ -1676,6 +1676,43 @@
                                 ">✅ Conferma Prelievo</button>
                             </form>
                         </div>
+
+                        <!-- Sezione Posizioni di Prelievo per ordini aperti -->
+                        <div id="open-order-pickup-locations-section" style="
+                            margin-top: 30px;
+                            padding: 25px;
+                            background: #FFFFFF;
+                            border-radius: 12px;
+                            border: 2px solid #00516E;
+                            display: none;
+                        ">
+                            <h3 style="margin: 0 0 20px 0; color: #00516E; font-size: 20px;">
+                                📍 Posizioni di Prelievo Effettuate
+                            </h3>
+                            <div style="overflow-x: auto;">
+                                <table style="
+                                    width: 100%;
+                                    border-collapse: collapse;
+                                    background: white;
+                                    border-radius: 8px;
+                                    overflow: hidden;
+                                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                                ">
+                                    <thead>
+                                        <tr style="background: #f8f9fa;">
+                                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600;">SKU</th>
+                                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600;">Ubicazione</th>
+                                            <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6; font-weight: 600;">Qtà Prelevata</th>
+                                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600;">Data/Ora</th>
+                                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600;">Operatore</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="open-order-pickup-locations-body">
+                                        <tr><td colspan="5" style="text-align: center; padding: 1rem;">🔄 Caricamento posizioni prelievo...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     `;
                 }
 
@@ -1765,7 +1802,71 @@
                                 startRealTimePicking(orderData, validationData);
                             });
                         }
+
+                        // Carica le posizioni di prelievo per l'ordine aperto
+                        const orderData = Object.values(validationData.order_summaries)[0];
+                        if (orderData) {
+                            const orderNumber = Object.keys(validationData.order_summaries)[0];
+                            loadOpenOrderPickupLocations(orderNumber);
+                        }
                     }, 100);
+                }
+            }
+
+            // Funzione per caricare le posizioni di prelievo per ordini aperti
+            async function loadOpenOrderPickupLocations(orderNumber) {
+                const pickupSection = document.getElementById('open-order-pickup-locations-section');
+                const pickupBody = document.getElementById('open-order-pickup-locations-body');
+
+                if (!pickupSection || !pickupBody) {
+                    console.log('Sezione posizioni prelievo non trovata');
+                    return;
+                }
+
+                try {
+                    const response = await window.modernAuth.authenticatedFetch(`/orders/${orderNumber}/pickup-locations`);
+                    if (!response.ok) {
+                        throw new Error(`Errore ${response.status}: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+
+                    // Popola la tabella con i dati delle posizioni
+                    if (data.pickup_locations && data.pickup_locations.length > 0) {
+                        pickupSection.style.display = 'block';
+                        pickupBody.innerHTML = '';
+
+                        data.pickup_locations.forEach(pickup => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">${pickup.product_sku}</td>
+                                <td style="padding: 12px; border-bottom: 1px solid #dee2e6;"><strong>${pickup.location_from || 'N/D'}</strong></td>
+                                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #dee2e6; font-weight: bold; color: #0066CC;">${pickup.quantity_picked}</td>
+                                <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-size: 0.9rem;">${pickup.timestamp}</td>
+                                <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-size: 0.9rem;">${pickup.operator}</td>
+                            `;
+                            pickupBody.appendChild(row);
+                        });
+
+                        // Aggiungi riga riepilogativa
+                        const totalOperations = data.total_operations;
+                        const totalRow = document.createElement('tr');
+                        totalRow.style.backgroundColor = '#f8f9fa';
+                        totalRow.style.borderTop = '2px solid #0066CC';
+                        totalRow.style.fontWeight = 'bold';
+                        totalRow.innerHTML = `
+                            <td colspan="2" style="padding: 12px; font-weight: bold; color: #0066CC;">TOTALE OPERAZIONI</td>
+                            <td colspan="3" style="padding: 12px; text-align: center; font-weight: bold; color: #0066CC;">${totalOperations}</td>
+                        `;
+                        pickupBody.appendChild(totalRow);
+                    } else {
+                        // Nessuna posizione trovata - nascondi la sezione
+                        pickupSection.style.display = 'none';
+                    }
+
+                } catch (error) {
+                    console.error('Errore nel caricamento posizioni prelievo:', error);
+                    pickupSection.style.display = 'none';
                 }
             }
 
