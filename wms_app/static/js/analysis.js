@@ -249,19 +249,22 @@ document.addEventListener("DOMContentLoaded", function() {
     productsByRowForm.addEventListener("submit", async function(event) {
         event.preventDefault();
         const rowNumber = document.getElementById("row-number").value;
+        const includeEmpty = document.getElementById("include-empty-locations").checked;
         currentRowForExport = rowNumber;
 
         try {
-            const response = await fetch(`/analysis/products-by-row/${rowNumber}`);
+            const params = includeEmpty ? '?include_empty=true' : '';
+            const response = await fetch(`/analysis/products-by-row/${rowNumber}${params}`);
             const data = await response.json();
 
-            productsByRowModal.querySelector("#row-modal-title").innerText = `Prodotti nella Fila: ${rowNumber}`;
+            productsByRowModal.querySelector("#row-modal-title").innerText = `Prodotti nella Fila: ${rowNumber}${includeEmpty ? ' (tutte le locazioni)' : ''}`;
             let modalBodyHtml = '<table><thead><tr><th>Ubicazione</th><th>SKU</th><th>Descrizione</th><th>Quantità</th></tr></thead><tbody>';
             if (!response.ok) {
                 modalBodyHtml += `<tr><td colspan="4">${data.detail}</td></tr>`;
             } else {
                 data.forEach(item => {
-                    modalBodyHtml += `<tr><td>${item.location_name}</td><td>${item.product_sku}</td><td>${item.product_description || 'N/D'}</td><td>${item.quantity}</td></tr>`;
+                    const isEmpty = !item.product_sku;
+                    modalBodyHtml += `<tr${isEmpty ? ' style="color: #999;"' : ''}><td>${item.location_name}</td><td>${item.product_sku || ''}</td><td>${item.product_description || ''}</td><td>${item.quantity != null ? item.quantity : ''}</td></tr>`;
                 });
             }
             modalBodyHtml += '</tbody></table>';
@@ -291,13 +294,17 @@ document.addEventListener("DOMContentLoaded", function() {
     // Export buttons per ricerca fila
     document.getElementById("export-row-csv").addEventListener("click", function() {
         if (currentRowForExport) {
-            window.location.href = `/analysis/export-products-by-row/${currentRowForExport}`;
+            const includeEmpty = document.getElementById("include-empty-locations").checked;
+            const params = includeEmpty ? '?include_empty=true' : '';
+            window.location.href = `/analysis/export-products-by-row/${currentRowForExport}${params}`;
         }
     });
 
     document.getElementById("export-row-pdf").addEventListener("click", function() {
         if (currentRowForExport) {
-            window.location.href = `/analysis/export-products-by-row-pdf/${currentRowForExport}`;
+            const includeEmpty = document.getElementById("include-empty-locations").checked;
+            const params = includeEmpty ? '?include_empty=true' : '';
+            window.location.href = `/analysis/export-products-by-row-pdf/${currentRowForExport}${params}`;
         }
     });
 

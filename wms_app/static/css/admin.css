@@ -902,6 +902,15 @@ body {
     background: linear-gradient(135deg, #c82333 0%, #dc2d2d 100%);
 }
 
+.btn-small.btn-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+}
+
+.btn-small.btn-info:hover {
+    background: linear-gradient(135deg, #138496 0%, #117a8b 100%);
+}
+
 /* Backup Info Panel */
 .backup-info-panel {
     background: white;

@@ -44,18 +44,18 @@
         <!-- Layout sezioni in stile inventory -->
         <div class="serials-sections">
             <!-- Sezione Gestione File Seriali - Solo per utenti con permessi di gestione -->
-            <div class="serials-section" data-permission="serials_manage">
+            <div class="serials-section" data-permission="serials_upload">
                 <h2 class="serials-section-title">📁 Gestione File Seriali</h2>
                 <p style="margin-bottom: 1.5rem; color: #6c757d;">Carica file seriali per assegnazione automatica ai prodotti degli ordini</p>
                 <div class="serials-action-buttons">
-                    <button class="serials-action-btn" onclick="openSerialUploadOverlay()" data-permission="serials_manage">
+                    <button class="serials-action-btn" onclick="openSerialUploadOverlay()" data-permission="serials_upload">
                         📤 Carica File Seriali
                     </button>
-                    <button class="serials-action-btn secondary mobile-hide" onclick="exportAllSerialsExcel()" data-permission="serials_view">
+                    <button class="serials-action-btn secondary mobile-hide" onclick="exportAllSerialsExcel()" data-permission="serials_export">
                         📈 Esporta Tutti Excel
                     </button>
                     <!-- MOBILE ONLY: Scansione Real-Time -->
-                    <button class="serials-action-btn mobile-only" onclick="openOrderSelectionModal()" data-permission="serials_manage" style="display: none;">
+                    <button class="serials-action-btn mobile-only" onclick="openOrderSelectionModal()" data-permission="serials_scan" style="display: none;">
                         📷 Scansione Real-Time
                     </button>
                 </div>
@@ -138,27 +138,33 @@
                                 </td>
                                 <td class="actions">
                                     <button onclick="viewOrderDetails('{{ order.order_number }}')"
-                                            class="btn btn-small btn-info" title="Visualizza Dettagli">
+                                            class="btn btn-small btn-info" title="Visualizza Dettagli"
+                                            data-permission="serials_view_details">
                                         👁️ Dettagli
                                     </button>
                                     <button onclick="validateOrder('{{ order.order_number }}')"
-                                            class="btn btn-small btn-warning mobile-hide" title="Valida Seriali">
+                                            class="btn btn-small btn-warning mobile-hide" title="Valida Seriali"
+                                            data-permission="serials_validate">
                                         ✅ Valida
                                     </button>
                                     <button onclick="generateOrderPDF('{{ order.order_number }}')"
-                                            class="btn btn-small btn-success mobile-hide" title="Genera PDF">
+                                            class="btn btn-small btn-success mobile-hide" title="Genera PDF"
+                                            data-permission="serials_export">
                                         📄 PDF
                                     </button>
                                     <button onclick="generateOrderCSV('{{ order.order_number }}')"
-                                            class="btn btn-small btn-primary mobile-hide" title="Esporta CSV">
+                                            class="btn btn-small btn-primary mobile-hide" title="Esporta CSV"
+                                            data-permission="serials_export">
                                         📊 CSV
                                     </button>
                                     <button onclick="generateOrderExcel('{{ order.order_number }}')"
-                                            class="btn btn-small btn-info mobile-hide" title="Esporta Excel">
+                                            class="btn btn-small btn-info mobile-hide" title="Esporta Excel"
+                                            data-permission="serials_export">
                                         📈 Excel
                                     </button>
                                     <button onclick="deleteOrderSerials('{{ order.order_number }}')"
-                                            class="btn btn-small btn-danger mobile-hide" title="Elimina Seriali">
+                                            class="btn btn-small btn-danger mobile-hide" title="Elimina Seriali"
+                                            data-permission="serials_delete">
                                         🗑️ Elimina
                                     </button>
                                 </td>
@@ -450,9 +456,9 @@ SN100</code></pre>
                         <div id="scanned-serials-log"></div>
                     </div>
 
-                    <!-- 5. Log Errori -->
+                    <!-- 5. Segnalazioni -->
                     <div class="section" id="errors-section" style="display: none;">
-                        <h3>❌ Errori (<span id="error-count">0</span>)</h3>
+                        <h3>⚠️ Segnalazioni (<span id="error-count">0</span>)</h3>
                         <div id="scan-errors-log"></div>
                     </div>
                 </div>

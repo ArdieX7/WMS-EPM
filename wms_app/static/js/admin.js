@@ -868,6 +868,9 @@ function displayBackupList(backups) {
                         <button class="btn-small btn-secondary" onclick="validateBackup('${backup.backup_id}')" title="Valida Backup">
                             ✅
                         </button>
+                        <button class="btn-small btn-info" onclick="downloadBackup('${backup.backup_id}', '${backup.filename}')" title="Scarica Backup">
+                            📥
+                        </button>
                         <button class="btn-small btn-primary" onclick="showRestoreBackupModal('${backup.backup_id}', '${backup.filename}')" title="Ripristina Backup">
                             🔄
                         </button>
@@ -1122,6 +1125,36 @@ async function confirmDeleteBackup() {
         }
     } catch (error) {
         console.error('Errore eliminazione backup:', error);
+        showError('Errore di connessione');
+    }
+}
+
+async function downloadBackup(backupId, filename) {
+    try {
+        const token = await window.modernAuth.getValidAccessToken();
+        const response = await fetch(`/admin/api/backup/download/${backupId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            showSuccess(`Download avviato: ${filename}`);
+        } else {
+            const error = await response.json();
+            showError(error.detail || 'Errore durante il download');
+        }
+    } catch (error) {
+        console.error('Errore download backup:', error);
         showError('Errore di connessione');
     }
 }

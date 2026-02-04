@@ -39,9 +39,9 @@ class ProductLocationItem(BaseModel):
 class ProductInRowItem(BaseModel):
     """Rappresenta un prodotto trovato in una specifica ubicazione all'interno di una fila."""
     location_name: str
-    product_sku: str
-    product_description: Optional[str]
-    quantity: int
+    product_sku: Optional[str] = None
+    product_description: Optional[str] = None
+    quantity: Optional[int] = None
 
 class PalletSummary(BaseModel):
     """Rappresenta il riassunto totale dei pallet nel magazzino."""

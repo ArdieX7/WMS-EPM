@@ -37,7 +37,7 @@ router = APIRouter(
 # --- Viste HTML ---
 
 @router.get("/manage", response_class=HTMLResponse)
-async def get_serials_management_page(request: Request, db: Session = Depends(get_db)): 
+async def get_serials_management_page(request: Request, db: Session = Depends(get_db)):
     """Pagina di gestione seriali prodotto"""
     serial_service = SerialService(db)
     orders_with_serials = serial_service.get_orders_with_serials()
@@ -52,9 +52,10 @@ async def get_serials_management_page(request: Request, db: Session = Depends(ge
 
 @router.post("/upload", response_model=schemas.serials.SerialUploadResult)
 async def upload_serials_file(
-    file: UploadFile = File(...), 
+    file: UploadFile = File(...),
     uploaded_by: str = "system",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("serials_upload"))
 ):
     """
     Upload e parsing del file seriali
@@ -85,25 +86,25 @@ async def upload_serials_file(
         raise HTTPException(status_code=500, detail=f"Errore durante il caricamento: {str(e)}")
 
 @router.get("/orders", response_model=List[schemas.serials.OrderSerialsView])
-def get_orders_with_serials(db: Session = Depends(get_db)):
+def get_orders_with_serials(db: Session = Depends(get_db), current_user = Depends(require_permission("serials_view"))):
     """Lista ordini con seriali caricati"""
     serial_service = SerialService(db)
     return serial_service.get_orders_with_serials()
 
 @router.get("/orders/{order_number}", response_model=schemas.serials.OrderSerialsView)
-def get_order_serials(order_number: str, db: Session = Depends(get_db)):
+def get_order_serials(order_number: str, db: Session = Depends(get_db), current_user = Depends(require_permission("serials_view_details"))):
     """Dettaglio seriali per un ordine specifico"""
     serial_service = SerialService(db)
     return serial_service.get_order_serials_view(order_number)
 
 @router.get("/orders/{order_number}/validate", response_model=schemas.serials.SerialValidationSummary)
-def validate_order_serials(order_number: str, db: Session = Depends(get_db)):
+def validate_order_serials(order_number: str, db: Session = Depends(get_db), current_user = Depends(require_permission("serials_validate"))):
     """Validazione seriali di un ordine"""
     serial_service = SerialService(db)
     return serial_service.validate_serials_for_order(order_number)
 
 @router.get("/orders/{order_number}/pdf")
-async def generate_serials_pdf(order_number: str, db: Session = Depends(get_db)):
+async def generate_serials_pdf(order_number: str, db: Session = Depends(get_db), current_user = Depends(require_permission("serials_export"))):
     """
     Genera PDF con seriali per un ordine
     """
@@ -192,7 +193,7 @@ async def generate_serials_pdf(order_number: str, db: Session = Depends(get_db))
     )
 
 @router.get("/orders/{order_number}/csv")
-async def generate_serials_csv(order_number: str, db: Session = Depends(get_db)):
+async def generate_serials_csv(order_number: str, db: Session = Depends(get_db), current_user = Depends(require_permission("serials_export"))):
     """
     Genera CSV con seriali per un ordine
     """
@@ -225,7 +226,7 @@ async def generate_serials_csv(order_number: str, db: Session = Depends(get_db))
     )
 
 @router.get("/orders/{order_number}/excel")
-async def generate_serials_excel(order_number: str, db: Session = Depends(get_db)):
+async def generate_serials_excel(order_number: str, db: Session = Depends(get_db), current_user = Depends(require_permission("serials_export"))):
     """
     Genera Excel con seriali per un ordine usando il template
     """
@@ -442,7 +443,7 @@ async def generate_serials_excel(order_number: str, db: Session = Depends(get_db
     )
 
 @router.get("/export-all-excel")
-async def export_all_serials_excel(db: Session = Depends(get_db)):
+async def export_all_serials_excel(db: Session = Depends(get_db), current_user = Depends(require_permission("serials_export"))):
     """
     Esporta tutti i seriali del sistema in formato Excel usando il template
     """
@@ -540,13 +541,13 @@ def get_file_format_info():
     return schemas.serials.SerialFileFormat()
 
 @router.get("/duplicates")
-def get_duplicate_serials(db: Session = Depends(get_db)):
+def get_duplicate_serials(db: Session = Depends(get_db), current_user = Depends(require_permission("serials_view"))):
     """Trova tutti i seriali duplicati nel sistema"""
     serial_service = SerialService(db)
     return serial_service.get_duplicate_serials_in_system()
 
 @router.get("/check/{serial_number}")
-def check_serial_exists(serial_number: str, db: Session = Depends(get_db)):
+def check_serial_exists(serial_number: str, db: Session = Depends(get_db), current_user = Depends(require_permission("serials_view"))):
     """Verifica se un seriale specifico esiste già"""
     serial_service = SerialService(db)
     existing = serial_service.check_serial_exists(serial_number)
@@ -567,7 +568,7 @@ def check_serial_exists(serial_number: str, db: Session = Depends(get_db)):
         }
 
 @router.delete("/orders/{order_number}")
-def delete_order_serials(order_number: str, db: Session = Depends(get_db)):
+def delete_order_serials(order_number: str, db: Session = Depends(get_db), current_user = Depends(require_permission("serials_delete"))):
     """Elimina tutti i seriali di un ordine"""
     # Log dell'operazione prima della cancellazione
     logger = LoggingService(db)
@@ -596,7 +597,7 @@ def delete_order_serials(order_number: str, db: Session = Depends(get_db)):
     return {"message": f"Eliminati {deleted_count} seriali per ordine {order_number}"}
 
 @router.delete("/batch/{upload_batch_id}")
-def delete_batch_serials(upload_batch_id: str, db: Session = Depends(get_db)):
+def delete_batch_serials(upload_batch_id: str, db: Session = Depends(get_db), current_user = Depends(require_permission("serials_delete"))):
     """Elimina tutti i seriali di un batch upload"""
     # Log dell'operazione prima della cancellazione
     logger = LoggingService(db)
@@ -627,7 +628,8 @@ def delete_batch_serials(upload_batch_id: str, db: Session = Depends(get_db)):
 @router.post("/parse-file", response_model=schemas.serials.SerialParseResult)
 async def parse_serial_file(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("serials_upload"))
 ):
     """
     Parsing del file seriali con recap modificabile
@@ -656,7 +658,8 @@ async def parse_serial_file(
 @router.post("/commit-operations", response_model=schemas.serials.SerialUploadResult)
 async def commit_serial_operations(
     request: schemas.serials.SerialCommitRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("serials_upload"))
 ):
     """
     Commit delle operazioni seriali dopo validazione recap
@@ -679,7 +682,8 @@ async def commit_serial_operations(
 
 @router.get("/open-orders-for-scanning")
 async def get_open_orders_for_scanning(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("serials_scan"))
 ):
     """
     Ritorna ordini aperti con prodotti attesi per scansione real-time
@@ -739,7 +743,8 @@ async def get_open_orders_for_scanning(
 @router.post("/convert-ean-to-sku")
 async def convert_ean_to_sku(
     request: dict,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("serials_scan"))
 ):
     """
     Converte EAN in SKU e verifica che sia negli ordini selezionati
@@ -765,7 +770,7 @@ async def convert_ean_to_sku(
         if not found:
             return {
                 "valid": False,
-                "sku": None,
+                "sku": sku,
                 "error": "Prodotto non trovato negli ordini selezionati"
             }
 
@@ -785,7 +790,8 @@ async def convert_ean_to_sku(
 @router.post("/get-existing-serials")
 async def get_existing_serials(
     order_numbers: List[str],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("serials_scan"))
 ):
     """
     Restituisce i seriali già salvati nel database per gli ordini specificati.
@@ -822,7 +828,8 @@ async def get_existing_serials(
 @router.post("/validate-serial-realtime")
 async def validate_serial_realtime(
     request: schemas.serials.RealtimeSerialValidation,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("serials_scan"))
 ):
     """
     Valida un singolo seriale in tempo reale durante scansione
@@ -967,7 +974,8 @@ async def validate_serial_realtime(
 async def delete_realtime_serial(
     serial_number: str,
     order_number: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("serials_scan"))
 ):
     """
     Elimina un singolo seriale salvato durante scansione real-time
@@ -1024,7 +1032,8 @@ async def delete_realtime_serial(
 @router.post("/commit-realtime-serials")
 async def commit_realtime_serials(
     request: schemas.serials.RealtimeSerialCommit,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("serials_scan"))
 ):
     """
     Salva seriali scansionati in tempo reale

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import List
@@ -325,6 +325,42 @@ async def validate_backup(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore durante validazione backup: {str(e)}")
+
+@router.get("/api/backup/download/{backup_id}")
+async def download_backup(
+    backup_id: str,
+    current_user = Depends(require_role("admin")),
+    db: Session = Depends(get_db)
+):
+    """Scarica un file di backup - solo per admin"""
+    try:
+        backup_service = BackupService(db)
+        backups = backup_service.list_backups()
+
+        backup_meta = None
+        for b in backups:
+            if b.get("backup_id") == backup_id:
+                backup_meta = b
+                break
+
+        if not backup_meta:
+            raise HTTPException(status_code=404, detail="Backup non trovato")
+
+        from pathlib import Path
+        filepath = Path(backup_meta["filepath"])
+        if not filepath.exists():
+            raise HTTPException(status_code=404, detail="File di backup non trovato sul disco")
+
+        return FileResponse(
+            path=str(filepath),
+            filename=backup_meta["filename"],
+            media_type="application/octet-stream"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore durante download backup: {str(e)}")
 
 @router.post("/api/backup/cleanup")
 async def cleanup_old_backups(
