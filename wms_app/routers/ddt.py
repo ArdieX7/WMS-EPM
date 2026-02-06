@@ -291,9 +291,9 @@ def generate_ddt_pdf(ddt_number: str, db: Session = Depends(get_db)):
     # Mittente (colonna sinistra - hardcoded)
     mittente_text = """
     <b>EPM</b><br/>
-    Luogo di carico c/o magazzino LD Tyres srl<br/>
-    Via Campobello 20/22<br/>
-    00071 Pomezia (RM)
+    c/o Interporto di Santa Palomba <br/>
+    Via dell'informatica SNC <br/>
+    00134 Roma (RM)
     """
 
     # Destinatario (colonna destra - da DDT)

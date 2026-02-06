@@ -1077,6 +1077,11 @@ body {
     display: none;
 }
 
+/* Mobile order cards - nascosto su desktop */
+.mobile-orders-cards {
+    display: none;
+}
+
 #realtime-scanner-overlay .scanner-content {
     background: white;
     display: flex;
@@ -1127,52 +1132,152 @@ body {
         justify-content: center;
     }
 
-    /* ========== MOBILE OPTIMIZATION - TABLE COLUMNS ========== */
+    /* ========== MOBILE OPTIMIZATION - HIDE TABLE, SHOW CARDS ========== */
 
-    /* Nascondi colonne non essenziali: Stato Ordine, Prodotti Attesi, Seriali Trovati, Ultima Modifica */
-    #ordersTable th:nth-child(2),
-    #ordersTable td:nth-child(2),
-    #ordersTable th:nth-child(3),
-    #ordersTable td:nth-child(3),
-    #ordersTable th:nth-child(4),
-    #ordersTable td:nth-child(4),
-    #ordersTable th:nth-child(6),
-    #ordersTable td:nth-child(6) {
-        display: none;
-    }
-
-    /* Larghezze responsive colonne visibili */
-    #ordersTable th:nth-child(1),
-    #ordersTable td:nth-child(1) {
-        width: 30%;  /* Numero Ordine */
-        word-wrap: break-word;
-        white-space: normal;
-        overflow-wrap: break-word;
-    }
-
-    #ordersTable th:nth-child(5),
-    #ordersTable td:nth-child(5) {
-        width: 40%;  /* Stato Validazione */
-    }
-
-    #ordersTable th:nth-child(7),
-    #ordersTable td:nth-child(7) {
-        width: 30%;  /* Azioni */
-    }
-
-    /* ========== MOBILE OPTIMIZATION - ACTION BUTTONS ========== */
-
-    /* Nascondi tutti i pulsanti azione tranne "Dettagli" (btn-info) */
-    .actions .btn-small:not(.btn-info) {
+    /* Nascondi la tabella su mobile */
+    .table-container {
         display: none !important;
     }
 
-    .actions .btn-small.btn-info {
-        width: 100%;
-        padding: 0.6rem 0.4rem;
+    /* Mostra le card su mobile */
+    .mobile-orders-cards {
+        display: flex !important;
+        flex-direction: column;
+        gap: 12px;
+        padding: 0;
+    }
+
+    /* Stile singola card ordine */
+    .mobile-order-card {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-left: 4px solid #6c757d;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    /* Card con stato specifico */
+    .mobile-order-card[data-order-status="completed"] {
+        border-left-color: #28a745;
+    }
+    .mobile-order-card[data-order-status="processing"] {
+        border-left-color: #ffc107;
+    }
+    .mobile-order-card[data-order-status="pending"] {
+        border-left-color: #17a2b8;
+    }
+    .mobile-order-card[data-order-status="cancelled"] {
+        border-left-color: #dc3545;
+        opacity: 0.7;
+    }
+
+    /* Header card: numero ordine + badge validazione */
+    .mobile-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .mobile-order-number {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #212529;
+    }
+
+    .mobile-validation-badge {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .mobile-validation-badge.validation-valid {
+        background: #d4edda;
+        color: #155724;
+    }
+    .mobile-validation-badge.validation-invalid {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .mobile-validation-badge.validation-partial {
+        background: #fff3cd;
+        color: #856404;
+    }
+    .mobile-validation-badge.validation-pending {
+        background: #e2e3e5;
+        color: #383d41;
+    }
+
+    /* Info card: conteggio seriali e stato ordine */
+    .mobile-card-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-top: 1px solid #eee;
+        border-bottom: 1px solid #eee;
+    }
+
+    .mobile-serials-count {
+        font-size: 0.9rem;
+        color: #495057;
+        font-weight: 500;
+    }
+
+    .mobile-order-status {
         font-size: 0.75rem;
-        min-height: 44px;  /* Touch-friendly */
-        text-align: center;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+    .mobile-order-status.status-pending {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+    .mobile-order-status.status-processing {
+        background: #fff3cd;
+        color: #856404;
+    }
+    .mobile-order-status.status-completed {
+        background: #d4edda;
+        color: #155724;
+    }
+    .mobile-order-status.status-cancelled {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    /* Pulsante dettagli */
+    .mobile-details-btn {
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        color: white;
+        border: none;
+        padding: 14px 20px;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        width: 100%;
+        min-height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    }
+
+    .mobile-details-btn:hover {
+        background: linear-gradient(135deg, #0056b3, #004085);
+        transform: translateY(-1px);
+    }
+
+    .mobile-details-btn:active {
+        transform: translateY(0);
     }
 
     /* ========== MOBILE OPTIMIZATION - TOOLBAR ========== */
@@ -1720,8 +1825,49 @@ body {
         margin-bottom: 4px;
         display: flex;
         justify-content: space-between;
+        align-items: center;
         font-size: 12px;
         font-family: monospace;
+        gap: 8px;
+    }
+
+    /* Seriali della sessione corrente - verde */
+    .serial-log-item.session-serial {
+        background: #d4edda;
+        border-left: 3px solid #28a745;
+    }
+
+    /* Seriali già salvati in precedenza - blu */
+    .serial-log-item.existing-serial {
+        background: #d1ecf1;
+        border-left: 3px solid #17a2b8;
+    }
+
+    /* Pulsante elimina seriale */
+    .delete-serial-btn {
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 22px;
+        height: 22px;
+        font-size: 14px;
+        font-weight: bold;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        line-height: 1;
+        padding: 0;
+    }
+
+    .delete-serial-btn:hover {
+        background: #c82333;
+    }
+
+    .delete-serial-btn:active {
+        transform: scale(0.95);
     }
 
     .error-log-item {
@@ -1972,4 +2118,23 @@ body {
     color: #721c24;
     border: 1px solid #f5c6cb;
 }
+}
+
+/* Flash feedback bordo schermata scanner */
+@keyframes flash-success {
+    0%   { box-shadow: inset 0 0 0 6px rgba(40, 167, 69, 0.9); }
+    100% { box-shadow: inset 0 0 0 6px rgba(40, 167, 69, 0); }
+}
+
+@keyframes flash-error {
+    0%   { box-shadow: inset 0 0 0 6px rgba(220, 53, 69, 0.9); }
+    100% { box-shadow: inset 0 0 0 6px rgba(220, 53, 69, 0); }
+}
+
+.scanner-content.flash-success {
+    animation: flash-success 0.8s ease-out;
+}
+
+.scanner-content.flash-error {
+    animation: flash-error 0.8s ease-out;
 }

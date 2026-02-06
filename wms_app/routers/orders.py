@@ -3379,6 +3379,10 @@ async def parse_excel_orders(file: UploadFile = File(...), db: Session = Depends
         # Crea gli ordini direttamente (senza recap)
         orders_created = 0
         orders_updated = 0
+        orders_skipped = 0  # Ordini già presenti senza modifiche
+        orders_created_list = []  # Lista numeri ordine creati
+        orders_updated_list = []  # Lista numeri ordine aggiornati
+        orders_skipped_list = []  # Lista numeri ordine già presenti
         logger = LoggingService(db)
         
         for order_number, order_data in orders_data.items():
@@ -3390,25 +3394,49 @@ async def parse_excel_orders(file: UploadFile = File(...), db: Session = Depends
             is_new_order = existing_order is None
             
             if existing_order and not existing_order.is_completed:
-                # Aggiorna ordine esistente
-                for sku, quantity in order_data["lines"].items():
-                    # Controlla se la riga prodotto esiste già
+                # Confronta righe esistenti con nuove per rilevare modifiche
+                existing_lines = {line.product_sku: line.requested_quantity
+                                  for line in existing_order.lines}
+                new_lines = dict(order_data["lines"])
+
+                # Verifica se l'ordine è identico (nessuna modifica necessaria)
+                if existing_lines == new_lines:
+                    orders_skipped += 1
+                    orders_skipped_list.append(str(order_number))
+                    continue  # Salta al prossimo ordine
+
+                # Ci sono differenze, aggiorna l'ordine
+
+                # 1. Rimuovi righe non più presenti nel file Excel
+                for sku in existing_lines:
+                    if sku not in new_lines:
+                        db.query(models.OrderLine).filter(
+                            models.OrderLine.order_id == existing_order.id,
+                            models.OrderLine.product_sku == sku
+                        ).delete()
+
+                # 2. Aggiorna quantità esistenti o aggiungi nuove righe
+                for sku, quantity in new_lines.items():
                     existing_line = db.query(models.OrderLine).filter(
                         models.OrderLine.order_id == existing_order.id,
                         models.OrderLine.product_sku == sku
                     ).first()
-                    
+
                     if existing_line:
-                        existing_line.requested_quantity += quantity
+                        # SOSTITUISCI la quantità (non sommare!)
+                        existing_line.requested_quantity = quantity
                     else:
+                        # Aggiungi nuova riga
                         new_line = models.OrderLine(
                             order_id=existing_order.id,
                             product_sku=sku,
                             requested_quantity=quantity
                         )
                         db.add(new_line)
+
                 orders_updated += 1
-                
+                orders_updated_list.append(str(order_number))
+
             elif not existing_order:
                 # Crea nuovo ordine
                 new_order = models.Order(
@@ -3427,7 +3455,8 @@ async def parse_excel_orders(file: UploadFile = File(...), db: Session = Depends
                     )
                     db.add(order_line)
                 orders_created += 1
-            
+                orders_created_list.append(str(order_number))
+
             # LOGGING: Registra ogni prodotto dell'ordine corrente
             for sku, quantity in order_data["lines"].items():
                 operation_type = OperationType.ORDINE_CREATO if is_new_order else OperationType.ORDINE_MODIFICATO
@@ -3457,12 +3486,29 @@ async def parse_excel_orders(file: UploadFile = File(...), db: Session = Depends
         
         db.commit()
         
+        # Costruisci messaggio finale
+        message_parts = []
+        if orders_created > 0:
+            message_parts.append(f"{orders_created} ordini creati")
+        if orders_updated > 0:
+            message_parts.append(f"{orders_updated} ordini aggiornati")
+        if orders_skipped > 0:
+            message_parts.append(f"{orders_skipped} ordini già presenti")
+        if errors_count > 0:
+            message_parts.append(f"{errors_count} errori saltati")
+
+        message = "Import Excel completato: " + ", ".join(message_parts) if message_parts else "Nessuna operazione eseguita"
+
         # Risposta con risultato finale
         result = {
             "success": True,
             "file_name": file.filename,
             "orders_created": orders_created,
             "orders_updated": orders_updated,
+            "orders_skipped": orders_skipped,
+            "orders_created_list": orders_created_list,
+            "orders_updated_list": orders_updated_list,
+            "orders_skipped_list": orders_skipped_list,
             "summary": {
                 "total_orders": total_orders,
                 "total_lines": total_lines,
@@ -3470,7 +3516,7 @@ async def parse_excel_orders(file: UploadFile = File(...), db: Session = Depends
                 "warnings": warnings_count,
                 "orders_preview": list(orders_data.keys())[:5]
             },
-            "message": f"Import Excel completato: {orders_created} ordini creati, {orders_updated} ordini aggiornati. {errors_count} errori saltati."
+            "message": message
         }
         
         return result
@@ -3512,8 +3558,8 @@ async def commit_excel_orders(
             raise HTTPException(status_code=400, detail="Nessun ordine valido da creare")
         
         # Crea gli ordini nel database con logging integrato
-        orders_created = 0
-        orders_updated = 0
+        orders_created_list = []  # Lista di numeri ordine creati
+        orders_updated_list = []  # Lista di numeri ordine aggiornati
         logger = LoggingService(db)
         
         for order_number, order_data in orders_to_create.items():
@@ -3539,7 +3585,7 @@ async def commit_excel_orders(
                             requested_quantity=line_data["requested_quantity"]
                         )
                         db.add(new_line)
-                orders_updated += 1
+                orders_updated_list.append(order_number)
                 
             elif not existing_order:
                 # Crea nuovo ordine
@@ -3558,7 +3604,7 @@ async def commit_excel_orders(
                         requested_quantity=line_data["requested_quantity"]
                     )
                     db.add(order_line)
-                orders_created += 1
+                orders_created_list.append(order_number)
             
             # LOGGING: Registra ogni prodotto dell'ordine corrente
             for line_data in order_data["lines"]:
@@ -3579,8 +3625,8 @@ async def commit_excel_orders(
                         'source_file': file_name,
                         'operation_description': f"Import Excel: {operation_type.value.lower()} ordine {order_number}, aggiunto {line_data['requested_quantity']}x {line_data['product_sku']} per cliente {order_data['customer_name']}",
                         'import_stats': {
-                            'orders_created': orders_created,
-                            'orders_updated': orders_updated,
+                            'orders_created': len(orders_created_list),
+                            'orders_updated': len(orders_updated_list),
                             'source_filename': file_name
                         }
                     },
@@ -3591,9 +3637,11 @@ async def commit_excel_orders(
         
         return {
             "success": True,
-            "message": f"Import Excel completato: {orders_created} ordini creati, {orders_updated} ordini aggiornati",
-            "orders_created": orders_created,
-            "orders_updated": orders_updated,
+            "message": f"Import Excel completato: {len(orders_created_list)} ordini creati, {len(orders_updated_list)} ordini aggiornati",
+            "orders_created": len(orders_created_list),
+            "orders_updated": len(orders_updated_list),
+            "orders_created_list": orders_created_list,
+            "orders_updated_list": orders_updated_list,
             "file_name": file_name
         }
         
@@ -4070,5 +4118,208 @@ def get_order_pickup_locations(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore nel recupero posizioni prelievo: {str(e)}")
+
+
+@router.get("/{order_number}/pickup-locations/export-excel")
+def export_pickup_locations_excel(
+    order_number: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("orders_view"))
+):
+    """
+    Esporta le posizioni di prelievo di un ordine in formato Excel.
+    """
+    if not EXCEL_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Libreria openpyxl non disponibile")
+
+    try:
+        # Verifica che l'ordine esista
+        order = db.query(models.Order).filter(
+            models.Order.order_number == order_number
+        ).first()
+
+        if not order:
+            raise HTTPException(status_code=404, detail=f"Ordine '{order_number}' non trovato")
+
+        # Recupera i log di prelievo
+        logger = LoggingService(db)
+        pickup_logs = logger.get_logs(
+            operation_types=[
+                OperationType.PRELIEVO_MANUALE,
+                OperationType.PRELIEVO_FILE,
+                OperationType.PRELIEVO_TEMPO_REALE,
+                OperationType.PICKING_CONFERMATO
+            ],
+            order_number=order_number,
+            limit=1000,
+            order_by="timestamp",
+            order_direction="asc"
+        )
+
+        # Crea il workbook Excel
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"Prelievi Ordine {order_number}"
+
+        # Stili
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="00516E", end_color="00516E", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center")
+
+        # Intestazioni
+        headers = ["SKU Prodotto", "Ubicazione", "Quantità", "Data/Ora", "Operatore"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+
+        # Dati
+        for row_idx, log in enumerate(pickup_logs['logs'], 2):
+            ws.cell(row=row_idx, column=1, value=log.product_sku)
+            ws.cell(row=row_idx, column=2, value=log.location_from or 'N/D')
+            ws.cell(row=row_idx, column=3, value=log.quantity)
+            ws.cell(row=row_idx, column=4, value=log.timestamp.strftime('%d/%m/%Y %H:%M'))
+            ws.cell(row=row_idx, column=5, value=log.user_id or 'Sistema')
+
+        # Larghezza colonne
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 15
+        ws.column_dimensions['C'].width = 12
+        ws.column_dimensions['D'].width = 18
+        ws.column_dimensions['E'].width = 15
+
+        # Salva in buffer
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        filename = f"prelievi_ordine_{order_number}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        return Response(
+            content=output.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore export Excel: {str(e)}")
+
+
+@router.get("/{order_number}/pickup-locations/export-pdf")
+def export_pickup_locations_pdf(
+    order_number: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("orders_view"))
+):
+    """
+    Esporta le posizioni di prelievo di un ordine in formato PDF.
+    """
+    try:
+        # Verifica che l'ordine esista
+        order = db.query(models.Order).filter(
+            models.Order.order_number == order_number
+        ).first()
+
+        if not order:
+            raise HTTPException(status_code=404, detail=f"Ordine '{order_number}' non trovato")
+
+        # Recupera i log di prelievo
+        logger = LoggingService(db)
+        pickup_logs = logger.get_logs(
+            operation_types=[
+                OperationType.PRELIEVO_MANUALE,
+                OperationType.PRELIEVO_FILE,
+                OperationType.PRELIEVO_TEMPO_REALE,
+                OperationType.PICKING_CONFERMATO
+            ],
+            order_number=order_number,
+            limit=1000,
+            order_by="timestamp",
+            order_direction="asc"
+        )
+
+        # Crea il PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=30, bottomMargin=30)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Titolo
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=20,
+            alignment=1  # Center
+        )
+        elements.append(Paragraph(f"Posizioni di Prelievo - Ordine {order_number}", title_style))
+
+        # Info ordine
+        info_style = ParagraphStyle(
+            'Info',
+            parent=styles['Normal'],
+            fontSize=10,
+            spaceAfter=15,
+            alignment=1
+        )
+        elements.append(Paragraph(f"Cliente: {order.customer_name or 'N/D'} | Data export: {datetime.now().strftime('%d/%m/%Y %H:%M')}", info_style))
+        elements.append(Spacer(1, 10))
+
+        # Tabella
+        table_data = [["SKU", "Ubicazione", "Qtà", "Data/Ora", "Operatore"]]
+
+        for log in pickup_logs['logs']:
+            table_data.append([
+                log.product_sku,
+                log.location_from or 'N/D',
+                str(log.quantity),
+                log.timestamp.strftime('%d/%m/%Y %H:%M'),
+                log.user_id or 'Sistema'
+            ])
+
+        # Riga totale
+        total_qty = sum(log.quantity for log in pickup_logs['logs'])
+        table_data.append(["TOTALE", "", str(total_qty), f"{len(pickup_logs['logs'])} operazioni", ""])
+
+        # Stile tabella
+        table = Table(table_data, colWidths=[120, 70, 50, 100, 80])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#00516E')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -2), colors.white),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#F2F2F2')),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('TEXTCOLOR', (0, -1), (-1, -1), colors.HexColor('#00516E')),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#DEE2E6')),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('TOPPADDING', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+        ]))
+
+        elements.append(table)
+
+        # Build PDF
+        doc.build(elements)
+        buffer.seek(0)
+
+        filename = f"prelievi_ordine_{order_number}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore export PDF: {str(e)}")
 
 

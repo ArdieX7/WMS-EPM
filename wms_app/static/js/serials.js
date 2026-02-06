@@ -159,7 +159,7 @@ async function handleSerialFileUpload(event) {
         submitBtn.disabled = true;
         
         // Chiamata API per parsing
-        const response = await fetch('/serials/parse-file', {
+        const response = await window.modernAuth.authenticatedFetch('/serials/parse-file', {
             method: 'POST',
             body: formData
         });
@@ -761,7 +761,7 @@ async function revalidateAllOperations() {
         formData.append('file', blob, currentSerialFileName || 'rivalidated_file.txt');
         
         // Chiamata API per re-parsing
-        const response = await fetch('/serials/parse-file', {
+        const response = await window.modernAuth.authenticatedFetch('/serials/parse-file', {
             method: 'POST',
             body: formData
         });
@@ -891,7 +891,7 @@ async function executeSerialOperations() {
             uploaded_by: currentSerialRecapData.uploaded_by || 'file_user'
         };
         
-        const response = await fetch('/serials/commit-operations', {
+        const response = await window.modernAuth.authenticatedFetch('/serials/commit-operations', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -937,7 +937,7 @@ async function handleFileUpload(event) {
     resultDiv.style.display = 'none';
     
     try {
-        const response = await fetch('/serials/upload', {
+        const response = await window.modernAuth.authenticatedFetch('/serials/upload', {
             method: 'POST',
             body: formData
         });
@@ -1039,7 +1039,7 @@ function hideLoading(element) {
 
 async function refreshOrdersList() {
     try {
-        const response = await fetch('/serials/orders');
+        const response = await window.modernAuth.authenticatedFetch('/serials/orders');
         const orders = await response.json();
         
         const tableBody = document.querySelector('#ordersTable tbody');
@@ -1148,7 +1148,7 @@ function getValidationStatusBadge(status) {
 
 async function viewOrderDetails(orderNumber) {
     try {
-        const response = await fetch(`/serials/orders/${orderNumber}`);
+        const response = await window.modernAuth.authenticatedFetch(`/serials/orders/${orderNumber}`);
         const orderData = await response.json();
         
         if (!response.ok) {
@@ -1237,15 +1237,24 @@ function showOrderDetailsModal(orderData) {
         html += '</div>';
     }
 
-    // MOBILE OPTIMIZATION: Aggiungi pulsanti azione per mobile
+    // MOBILE OPTIMIZATION: Aggiungi pulsanti azione per mobile (con controllo permessi)
     if (window.innerWidth <= 768) {
-        html += '<div class="modal-actions" style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem;">';
-        html += `<button onclick="validateOrder('${orderData.order_number}')" class="btn btn-warning" style="width: 100%; min-height: 44px;">✅ Valida Seriali</button>`;
-        html += `<button onclick="generateOrderPDF('${orderData.order_number}')" class="btn btn-success" style="width: 100%; min-height: 44px;">📄 Genera PDF</button>`;
-        html += `<button onclick="generateOrderCSV('${orderData.order_number}')" class="btn btn-primary" style="width: 100%; min-height: 44px;">📊 Esporta CSV</button>`;
-        html += `<button onclick="generateOrderExcel('${orderData.order_number}')" class="btn btn-info" style="width: 100%; min-height: 44px;">📈 Esporta Excel</button>`;
-        html += `<button onclick="if(confirm('Sei sicuro di voler eliminare i seriali per questo ordine?')) deleteOrderSerials('${orderData.order_number}')" class="btn btn-danger" style="width: 100%; min-height: 44px;">🗑️ Elimina Seriali</button>`;
-        html += '</div>';
+        const hp = (p) => window.modernAuth && window.modernAuth.hasPermission(p);
+        let mobileButtons = '';
+        if (hp('serials_validate'))
+            mobileButtons += `<button onclick="validateOrder('${orderData.order_number}')" class="btn btn-warning" style="width: 100%; min-height: 44px;">✅ Valida Seriali</button>`;
+        if (hp('serials_export')) {
+            mobileButtons += `<button onclick="generateOrderPDF('${orderData.order_number}')" class="btn btn-success" style="width: 100%; min-height: 44px;">📄 Genera PDF</button>`;
+            mobileButtons += `<button onclick="generateOrderCSV('${orderData.order_number}')" class="btn btn-primary" style="width: 100%; min-height: 44px;">📊 Esporta CSV</button>`;
+            mobileButtons += `<button onclick="generateOrderExcel('${orderData.order_number}')" class="btn btn-info" style="width: 100%; min-height: 44px;">📈 Esporta Excel</button>`;
+        }
+        if (hp('serials_delete'))
+            mobileButtons += `<button onclick="if(confirm('Sei sicuro di voler eliminare i seriali per questo ordine?')) deleteOrderSerials('${orderData.order_number}')" class="btn btn-danger" style="width: 100%; min-height: 44px;">🗑️ Elimina Seriali</button>`;
+        if (mobileButtons) {
+            html += '<div class="modal-actions" style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem;">';
+            html += mobileButtons;
+            html += '</div>';
+        }
     }
 
     content.innerHTML = html;
@@ -1254,7 +1263,7 @@ function showOrderDetailsModal(orderData) {
 
 async function validateOrder(orderNumber) {
     try {
-        const response = await fetch(`/serials/orders/${orderNumber}/validate`);
+        const response = await window.modernAuth.authenticatedFetch(`/serials/orders/${orderNumber}/validate`);
         const validationData = await response.json();
         
         if (!response.ok) {
@@ -1322,7 +1331,7 @@ function showValidationModal(validationData) {
 
 async function generateOrderPDF(orderNumber) {
     try {
-        const response = await fetch(`/serials/orders/${orderNumber}/pdf`);
+        const response = await window.modernAuth.authenticatedFetch(`/serials/orders/${orderNumber}/pdf`);
         
         if (!response.ok) {
             const error = await response.json();
@@ -1349,7 +1358,7 @@ async function generateOrderPDF(orderNumber) {
 
 async function generateOrderCSV(orderNumber) {
     try {
-        const response = await fetch(`/serials/orders/${orderNumber}/csv`);
+        const response = await window.modernAuth.authenticatedFetch(`/serials/orders/${orderNumber}/csv`);
         
         if (!response.ok) {
             const error = await response.json();
@@ -1376,7 +1385,7 @@ async function generateOrderCSV(orderNumber) {
 
 async function generateOrderExcel(orderNumber) {
     try {
-        const response = await fetch(`/serials/orders/${orderNumber}/excel`);
+        const response = await window.modernAuth.authenticatedFetch(`/serials/orders/${orderNumber}/excel`);
         
         if (!response.ok) {
             const error = await response.json();
@@ -1409,7 +1418,7 @@ async function exportAllSerialsExcel() {
         loadingMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#007bff;color:white;padding:10px;border-radius:5px;z-index:10000;';
         document.body.appendChild(loadingMsg);
         
-        const response = await fetch('/serials/export-all-excel');
+        const response = await window.modernAuth.authenticatedFetch('/serials/export-all-excel');
         
         if (!response.ok) {
             const error = await response.json();
@@ -1460,7 +1469,7 @@ async function deleteOrderSerials(orderNumber) {
     }
     
     try {
-        const response = await fetch(`/serials/orders/${orderNumber}`, {
+        const response = await window.modernAuth.authenticatedFetch(`/serials/orders/${orderNumber}`, {
             method: 'DELETE'
         });
         
@@ -1518,9 +1527,18 @@ function toggleFormatInfo() {
 
 // ========== FUNZIONI PER RICERCA E ORDINAMENTO TABELLA ==========
 
-// Variabili globali per ordinamento
-let currentSortColumn = null;
-let currentSortDirection = 'asc';
+// Variabili globali per ordinamento - Default: ultima modifica decrescente
+let currentSortColumn = 'last_modified';
+let currentSortDirection = 'desc';
+
+// Inizializza icona ordinamento di default al caricamento pagina
+document.addEventListener('DOMContentLoaded', function() {
+    // Imposta l'icona di ordinamento sulla colonna "Ultima Modifica"
+    const sortDateIcon = document.getElementById('sort-date-icon');
+    if (sortDateIcon) {
+        sortDateIcon.textContent = '↓';  // Freccia giù = decrescente (più recenti in cima)
+    }
+});
 
 // Funzione per ordinare la tabella
 function sortTable(column) {
@@ -1649,11 +1667,13 @@ let realtimeScannerState = {
     ordersData: {},
     scannedSerials: [],
     scannedSerialsSet: new Set(),
+    existingSerials: [],       // Seriali già salvati nel DB (caricati all'apertura)
     errors: [],
     productsProgress: {},
     scanStep: 'EAN',           // 'EAN' o 'SERIAL'
     currentEan: null,          // EAN appena scansionato in attesa di seriale
-    currentSku: null           // SKU corrispondente all'EAN
+    currentSku: null,          // SKU corrispondente all'EAN
+    isProcessing: false        // Lock anti-race condition per barcode scanner
 };
 
 // ========================================
@@ -1662,7 +1682,7 @@ let realtimeScannerState = {
 
 async function openOrderSelectionModal() {
     try {
-        const response = await fetch('/serials/open-orders-for-scanning', {
+        const response = await window.modernAuth.authenticatedFetch('/serials/open-orders-for-scanning', {
             credentials: 'include'
         });
 
@@ -1678,11 +1698,14 @@ async function openOrderSelectionModal() {
         }
 
         const list = document.getElementById('open-orders-list');
-        list.innerHTML = data.orders.map(order => `
+        list.innerHTML = data.orders.map(order => {
+            // Codifica il JSON per evitare problemi con caratteri speciali (apostrofi, virgolette, etc.)
+            const encodedOrder = encodeURIComponent(JSON.stringify(order));
+            return `
             <label class="order-checkbox">
                 <input type="checkbox"
                        value="${order.order_number}"
-                       data-order='${JSON.stringify(order)}'>
+                       data-order="${encodedOrder}">
                 <div class="order-details">
                     <div class="order-num">#${order.order_number}</div>
                     <div class="order-customer">${order.customer_name}</div>
@@ -1692,7 +1715,8 @@ async function openOrderSelectionModal() {
                     </div>
                 </div>
             </label>
-        `).join('');
+        `;
+        }).join('');
 
         document.getElementById('order-selection-modal').style.display = 'flex';
 
@@ -1706,7 +1730,7 @@ function closeOrderSelectionModal() {
     document.getElementById('order-selection-modal').style.display = 'none';
 }
 
-function startRealtimeScanner() {
+async function startRealtimeScanner() {
     const checkboxes = document.querySelectorAll('#open-orders-list input:checked');
 
     if (checkboxes.length === 0) {
@@ -1719,15 +1743,17 @@ function startRealtimeScanner() {
         ordersData: {},
         scannedSerials: [],
         scannedSerialsSet: new Set(),
+        existingSerials: [],  // Verrà popolato dopo il fetch
         errors: [],
         productsProgress: {},
         scanStep: 'EAN',
         currentEan: null,
-        currentSku: null
+        currentSku: null,
+        isProcessing: false  // Reset lock per nuova sessione
     };
 
     checkboxes.forEach(cb => {
-        const orderData = JSON.parse(cb.dataset.order);
+        const orderData = JSON.parse(decodeURIComponent(cb.dataset.order));
         realtimeScannerState.selectedOrders.push(orderData.order_number);
         realtimeScannerState.ordersData[orderData.order_number] = orderData;
 
@@ -1745,6 +1771,30 @@ function startRealtimeScanner() {
 
     closeOrderSelectionModal();
     document.getElementById('realtime-scanner-overlay').style.display = 'flex';
+
+    // Carica i seriali già salvati nel database per questi ordini
+    try {
+        const response = await window.modernAuth.authenticatedFetch('/serials/get-existing-serials', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify(realtimeScannerState.selectedOrders)
+        });
+
+        const result = await response.json();
+
+        if (result.success && result.serials) {
+            realtimeScannerState.existingSerials = result.serials;
+
+            // Aggiungi anche al Set per evitare duplicati
+            result.serials.forEach(s => {
+                realtimeScannerState.scannedSerialsSet.add(s.serial_number);
+            });
+        }
+    } catch (error) {
+        console.error('Errore caricamento seriali esistenti:', error);
+    }
+
     renderScannerState();
 
     // Autofocus con delay per garantire rendering DOM completo
@@ -1767,21 +1817,36 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Gestione scansione a due step
+        // Gestione scansione a due step con lock anti-race condition
         scannerInput.addEventListener('keypress', async function(e) {
             if (e.key === 'Enter') {
+                // LOCK: Ignora se già in elaborazione (evita doppio Enter da scanner CR+LF)
+                if (realtimeScannerState.isProcessing) {
+                    console.log('⚠️ Scansione in corso, ignorato evento duplicato');
+                    this.value = '';  // Svuota per evitare concatenazione con prossima scansione
+                    playErrorBeep();  // Avvisa operatore che deve rallentare
+                    return;
+                }
+
                 const input = this.value.trim();
                 if (!input) return;
 
-                if (realtimeScannerState.scanStep === 'EAN') {
-                    // STEP 1: Scansiona EAN
-                    await handleEanScan(input);
-                } else {
-                    // STEP 2: Scansiona SERIALE
-                    await handleSerialScan(input);
-                }
-
+                // Imposta lock e svuota input PRIMA dell'await
+                realtimeScannerState.isProcessing = true;
                 this.value = '';
+
+                try {
+                    if (realtimeScannerState.scanStep === 'EAN') {
+                        // STEP 1: Scansiona EAN
+                        await handleEanScan(input);
+                    } else {
+                        // STEP 2: Scansiona SERIALE
+                        await handleSerialScan(input);
+                    }
+                } finally {
+                    // Rilascia lock SEMPRE, anche in caso di errore
+                    realtimeScannerState.isProcessing = false;
+                }
             }
         });
     }
@@ -1803,7 +1868,7 @@ async function handleEanScan(eanCode) {
 
     try {
         // Converti EAN→SKU tramite backend
-        const response = await fetch('/serials/convert-ean-to-sku', {
+        const response = await window.modernAuth.authenticatedFetch('/serials/convert-ean-to-sku', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             credentials: 'include',
@@ -1816,6 +1881,16 @@ async function handleEanScan(eanCode) {
         const result = await response.json();
 
         if (!result.valid) {
+            // Registra il prodotto non in ordine nella lista segnalazioni
+            realtimeScannerState.errors.push({
+                ean_code: eanCode.trim(),
+                serial_number: null,
+                sku: result.sku || eanCode.trim(),
+                error: result.error,
+                status: 'not_in_order',
+                timestamp: new Date().toISOString()
+            });
+            renderScannerState();
             showScanFeedback(`❌ ${result.error}`, 'error');
             playErrorBeep();
             return;
@@ -1861,7 +1936,7 @@ async function validateAndAddSerial(eanCode, serialNumber) {
     feedback.textContent = '⏳ Validazione...';
 
     try {
-        const response = await fetch('/serials/validate-serial-realtime', {
+        const response = await window.modernAuth.authenticatedFetch('/serials/validate-serial-realtime', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             credentials: 'include',
@@ -1897,13 +1972,18 @@ async function validateAndAddSerial(eanCode, serialNumber) {
             playSuccessBeep();
 
         } else {
-            realtimeScannerState.errors.push({
-                ean_code: eanCode,
-                serial_number: serialNumber,
-                error: result.error,
-                status: result.status,
-                timestamp: new Date().toISOString()
-            });
+            // Errori transitori: solo feedback temporaneo, non nella lista
+            const transientErrors = ['duplicate_in_session', 'ean_as_serial'];
+            if (!transientErrors.includes(result.status)) {
+                realtimeScannerState.errors.push({
+                    ean_code: eanCode,
+                    serial_number: serialNumber,
+                    sku: result.sku || eanCode,
+                    error: result.error,
+                    status: result.status,
+                    timestamp: new Date().toISOString()
+                });
+            }
 
             showScanFeedback(`❌ ${result.error}`, 'error');
             playErrorBeep();
@@ -1980,14 +2060,85 @@ function renderProductsTracker() {
 
 function renderScannedSerialsLog() {
     const log = document.getElementById('scanned-serials-log');
-    const recent = realtimeScannerState.scannedSerials.slice(-20).reverse();
+
+    // Combina seriali esistenti (dal DB) e seriali sessione corrente
+    const allSerials = [
+        // Prima i seriali della sessione corrente (più recenti)
+        ...realtimeScannerState.scannedSerials.map(s => ({...s, fromSession: true})),
+        // Poi i seriali già salvati nel DB (caricati all'apertura)
+        ...(realtimeScannerState.existingSerials || []).map(s => ({...s, fromSession: false}))
+    ];
+
+    // Mostra gli ultimi 30 (più spazio per vedere anche quelli esistenti)
+    const recent = allSerials.slice(0, 30);
 
     log.innerHTML = recent.map(item => `
-        <div class="serial-log-item">
+        <div class="serial-log-item ${item.fromSession ? 'session-serial' : 'existing-serial'}">
             <span class="serial-num">${item.serial_number}</span>
             <span class="serial-sku">${item.sku}</span>
+            <button class="delete-serial-btn"
+                    onclick="deleteScannedSerial('${item.serial_number}', '${item.order_number}', '${item.sku}', ${item.fromSession})"
+                    title="Elimina seriale">
+                &times;
+            </button>
         </div>
     `).join('');
+}
+
+async function deleteScannedSerial(serialNumber, orderNumber, sku, fromSession) {
+    if (!confirm(`Eliminare il seriale ${serialNumber}?`)) {
+        return;
+    }
+
+    try {
+        // Elimina dal database
+        const response = await window.modernAuth.authenticatedFetch(`/serials/delete-realtime-serial?serial_number=${encodeURIComponent(serialNumber)}&order_number=${encodeURIComponent(orderNumber)}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+            alert(`Errore: ${result.error}`);
+            return;
+        }
+
+        // Aggiorna lo stato locale
+        if (fromSession) {
+            // Rimuovi dall'array della sessione
+            const index = realtimeScannerState.scannedSerials.findIndex(
+                s => s.serial_number === serialNumber && s.order_number === orderNumber
+            );
+            if (index > -1) {
+                realtimeScannerState.scannedSerials.splice(index, 1);
+            }
+            realtimeScannerState.scannedSerialsSet.delete(serialNumber);
+        } else {
+            // Rimuovi dall'array dei seriali esistenti
+            const index = (realtimeScannerState.existingSerials || []).findIndex(
+                s => s.serial_number === serialNumber && s.order_number === orderNumber
+            );
+            if (index > -1) {
+                realtimeScannerState.existingSerials.splice(index, 1);
+            }
+        }
+
+        // Decrementa il contatore del prodotto
+        const key = `${orderNumber}_${sku}`;
+        if (realtimeScannerState.productsProgress[key]) {
+            realtimeScannerState.productsProgress[key].scanned =
+                Math.max(0, realtimeScannerState.productsProgress[key].scanned - 1);
+        }
+
+        // Re-render
+        renderScannerState();
+        showScanFeedback(`Seriale ${serialNumber} eliminato`, 'success');
+
+    } catch (error) {
+        console.error('Errore eliminazione seriale:', error);
+        alert('Errore durante l\'eliminazione del seriale');
+    }
 }
 
 function renderErrorsLog() {
@@ -2004,7 +2155,7 @@ function renderErrorsLog() {
 
     log.innerHTML = recent.map(item => `
         <div class="error-log-item">
-            <div class="error-serial">${item.serial_number}</div>
+            <div class="error-serial">${item.sku || item.ean_code}</div>
             <div class="error-msg">${item.error}</div>
         </div>
     `).join('');
@@ -2026,7 +2177,7 @@ async function commitScannedSerials() {
     }
 
     try {
-        const response = await fetch('/serials/commit-realtime-serials', {
+        const response = await window.modernAuth.authenticatedFetch('/serials/commit-realtime-serials', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             credentials: 'include',
@@ -2058,6 +2209,7 @@ function clearScannedSerials() {
     realtimeScannerState.scannedSerials = [];
     realtimeScannerState.scannedSerialsSet.clear();
     realtimeScannerState.errors = [];
+    realtimeScannerState.isProcessing = false;  // Reset lock
 
     for (const key in realtimeScannerState.productsProgress) {
         realtimeScannerState.productsProgress[key].scanned = 0;
@@ -2067,6 +2219,7 @@ function clearScannedSerials() {
 }
 
 function closeRealtimeScanner() {
+    realtimeScannerState.isProcessing = false;  // Reset lock
     document.getElementById('realtime-scanner-overlay').style.display = 'none';
 }
 
@@ -2079,10 +2232,29 @@ function showScanFeedback(message, type) {
     feedback.className = `scan-feedback ${type}`;
     feedback.textContent = message;
 
+    // Flash visivo bordo schermata
+    flashScannerBorder(type);
+
     setTimeout(() => {
         feedback.className = 'scan-feedback';
         feedback.textContent = '';
     }, 3000);
+}
+
+function flashScannerBorder(type) {
+    const content = document.querySelector('#realtime-scanner-overlay .scanner-content');
+    if (!content) return;
+
+    const flashClass = type === 'success' ? 'flash-success' : 'flash-error';
+
+    // Rimuovi classi flash precedenti e forza reflow per riavviare animazione
+    content.classList.remove('flash-success', 'flash-error');
+    void content.offsetWidth;
+
+    content.classList.add(flashClass);
+    setTimeout(() => {
+        content.classList.remove(flashClass);
+    }, 800);
 }
 
 function playSuccessBeep() {

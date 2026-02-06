@@ -11,10 +11,12 @@ from apscheduler.triggers.cron import CronTrigger
 import atexit
 
 from wms_app.database import database
+from wms_app.database.database import SessionLocal
 from wms_app.models import products, inventory, orders, reservations, serials, ddt, settings, logs, auth, arrivals
 from wms_app.models.inventory import Location, Inventory
 from wms_app.models.orders import Order, OrderLine, OutgoingStock
 from wms_app.models.serials import ProductSerial
+from wms_app.models.auth import Permission, Role
 
 
 
@@ -29,6 +31,74 @@ settings.Base.metadata.create_all(bind=database.engine)
 logs.Base.metadata.create_all(bind=database.engine)
 auth.Base.metadata.create_all(bind=database.engine)
 arrivals.Base.metadata.create_all(bind=database.engine)
+
+
+def ensure_granular_permissions():
+    """Crea permessi granulari per la sezione seriali se non esistono già"""
+    db = SessionLocal()
+    try:
+        new_perms = [
+            ("serials_view_details", "Visualizzare dettagli seriali ordine", "serials", "view_details"),
+            ("serials_validate", "Validare seriali ordine", "serials", "view_validate"),
+            ("serials_export", "Esportare seriali (PDF/CSV/Excel)", "serials", "view_export"),
+            ("serials_delete", "Eliminare seriali ordine", "serials", "view_delete"),
+            ("serials_upload", "Caricare file seriali", "serials", "view_upload"),
+            ("serials_scan", "Scansione seriali real-time", "serials", "view_scan"),
+        ]
+
+        created = []
+        for name, desc, section, action in new_perms:
+            existing = db.query(Permission).filter_by(name=name).first()
+            if not existing:
+                perm = Permission(name=name, description=desc, section=section, action=action)
+                db.add(perm)
+                created.append(name)
+        db.commit()
+
+        if created:
+            print(f"✅ Creati {len(created)} nuovi permessi granulari: {', '.join(created)}")
+
+            # Assegna ai ruoli di sistema
+            admin_role = db.query(Role).filter_by(name="admin").first()
+            operatore_role = db.query(Role).filter_by(name="operatore").first()
+            cliente_role = db.query(Role).filter_by(name="cliente").first()
+
+            all_new_perms = db.query(Permission).filter(
+                Permission.name.in_([p[0] for p in new_perms])
+            ).all()
+
+            perm_map = {p.name: p for p in all_new_perms}
+
+            # Admin: tutti i nuovi permessi
+            if admin_role:
+                for perm in all_new_perms:
+                    if perm not in admin_role.permissions:
+                        admin_role.permissions.append(perm)
+
+            # Operatore: tutti tranne serials_delete
+            if operatore_role:
+                for perm in all_new_perms:
+                    if perm.name != "serials_delete" and perm not in operatore_role.permissions:
+                        operatore_role.permissions.append(perm)
+
+            # Cliente: solo view_details e export
+            if cliente_role:
+                for perm_name in ["serials_view_details", "serials_export"]:
+                    perm = perm_map.get(perm_name)
+                    if perm and perm not in cliente_role.permissions:
+                        cliente_role.permissions.append(perm)
+
+            db.commit()
+            print("✅ Permessi granulari assegnati ai ruoli di sistema")
+
+    except Exception as e:
+        print(f"⚠️ Errore nel seeding permessi granulari: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+ensure_granular_permissions()
 
 app = FastAPI(title="WMS EPM")
 

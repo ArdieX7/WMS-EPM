@@ -674,11 +674,17 @@
             async function loadPickupLocations(orderNumber) {
                 const pickupSection = document.getElementById('pickup-locations-section');
                 const pickupBody = document.getElementById('pickup-locations-body');
-                
+
                 try {
                     // Mostra loading nella sezione
                     pickupSection.style.display = 'block';
                     pickupBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 1rem;">🔄 Caricamento posizioni prelievo...</td></tr>';
+
+                    // Imposta i pulsanti di export con il numero ordine corretto
+                    const excelBtn = document.getElementById('export-pickup-excel-btn');
+                    const pdfBtn = document.getElementById('export-pickup-pdf-btn');
+                    if (excelBtn) excelBtn.onclick = () => exportPickupLocationsExcel(orderNumber);
+                    if (pdfBtn) pdfBtn.onclick = () => exportPickupLocationsPdf(orderNumber);
                     
                     const response = await window.modernAuth.authenticatedFetch(`/orders/${orderNumber}/pickup-locations`);
                     if (!response.ok) {
@@ -1239,31 +1245,33 @@
                     
                     if (result.success) {
                         console.log('✅ Parsing Excel completato:', result);
-                        
-                        if (excelFileUpload) {
-                            excelFileUpload.setStatus('success', `✅ Import completato: ${result.orders_created} ordini creati, ${result.orders_updated} ordini aggiornati`);
+
+                        // Chiudi l'overlay di import
+                        closeOverlay('import-orders-overlay');
+
+                        // Costruisci messaggio dettagliato con numeri ordine
+                        let createdHtml = '';
+                        let updatedHtml = '';
+                        let skippedHtml = '';
+
+                        if (result.orders_created_list && result.orders_created_list.length > 0) {
+                            createdHtml = `<div style="margin: 10px 0;"><strong>Ordini creati:</strong> ${result.orders_created_list.join(', ')}</div>`;
                         }
-                        
-                        // Mostra risultato diretto
-                        if (importExcelResult) {
-                            importExcelResult.style.color = 'green';
-                            importExcelResult.innerHTML = `
-                            <div class="result-success">
-                                <h4>✅ Import Excel Completato!</h4>
-                                <p><strong>File:</strong> ${result.file_name}</p>
-                                <p><strong>Ordini creati:</strong> ${result.orders_created || 0}</p>
-                                <p><strong>Ordini aggiornati:</strong> ${result.orders_updated || 0}</p>
-                                <p><strong>Righe elaborate:</strong> ${result.summary?.total_lines || 0}</p>
-                                ${result.summary?.errors > 0 ? `<p style="color: orange;"><strong>Avvisi:</strong> ${result.summary.errors} righe con problemi (saltate)</p>` : ''}
-                            </div>
-                        `;
+
+                        if (result.orders_updated_list && result.orders_updated_list.length > 0) {
+                            updatedHtml = `<div style="margin: 10px 0;"><strong>Ordini aggiornati:</strong> ${result.orders_updated_list.join(', ')}</div>`;
                         }
-                        
+
+                        if (result.orders_skipped_list && result.orders_skipped_list.length > 0) {
+                            skippedHtml = `<div style="margin: 10px 0; color: #6c757d;"><strong>Ordini già presenti (nessuna modifica):</strong> ${result.orders_skipped_list.join(', ')}</div>`;
+                        }
+
+                        // Mostra overlay di successo al centro dello schermo
+                        showImportSuccessOverlay(createdHtml, updatedHtml, skippedHtml);
+
                         // Ricarica la lista ordini
-                        setTimeout(() => {
-                            fetchOrders();
-                        }, 1000);
-                        
+                        fetchOrders();
+
                     } else {
                         console.error('❌ Errore parsing Excel:', result);
                         if (excelFileUpload) {
@@ -1674,6 +1682,55 @@
                                 ">✅ Conferma Prelievo</button>
                             </form>
                         </div>
+
+                        <!-- Sezione Posizioni di Prelievo per ordini aperti -->
+                        <div id="open-order-pickup-locations-section" style="
+                            margin-top: 30px;
+                            padding: 25px;
+                            background: #FFFFFF;
+                            border-radius: 12px;
+                            border: 2px solid #00516E;
+                            display: none;
+                        ">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <h3 style="margin: 0; color: #00516E; font-size: 20px;">
+                                    📍 Posizioni di Prelievo Effettuate
+                                </h3>
+                                <div style="display: flex; gap: 8px;">
+                                    <button onclick="exportPickupLocationsExcel('${Object.keys(validationData.order_summaries)[0]}')"
+                                            style="background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+                                        📊 Excel
+                                    </button>
+                                    <button onclick="exportPickupLocationsPdf('${Object.keys(validationData.order_summaries)[0]}')"
+                                            style="background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+                                        📄 PDF
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="overflow-x: auto;">
+                                <table style="
+                                    width: 100%;
+                                    border-collapse: collapse;
+                                    background: white;
+                                    border-radius: 8px;
+                                    overflow: hidden;
+                                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                                ">
+                                    <thead>
+                                        <tr style="background: #f8f9fa;">
+                                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600;">SKU</th>
+                                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600;">Ubicazione</th>
+                                            <th style="padding: 12px; text-align: center; border-bottom: 2px solid #dee2e6; font-weight: 600;">Qtà Prelevata</th>
+                                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600;">Data/Ora</th>
+                                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; font-weight: 600;">Operatore</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="open-order-pickup-locations-body">
+                                        <tr><td colspan="5" style="text-align: center; padding: 1rem;">🔄 Caricamento posizioni prelievo...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     `;
                 }
 
@@ -1763,7 +1820,132 @@
                                 startRealTimePicking(orderData, validationData);
                             });
                         }
+
+                        // Carica le posizioni di prelievo per l'ordine aperto
+                        const orderData = Object.values(validationData.order_summaries)[0];
+                        if (orderData) {
+                            const orderNumber = Object.keys(validationData.order_summaries)[0];
+                            loadOpenOrderPickupLocations(orderNumber);
+                        }
                     }, 100);
+                }
+            }
+
+            // Funzione per caricare le posizioni di prelievo per ordini aperti
+            async function loadOpenOrderPickupLocations(orderNumber) {
+                const pickupSection = document.getElementById('open-order-pickup-locations-section');
+                const pickupBody = document.getElementById('open-order-pickup-locations-body');
+
+                if (!pickupSection || !pickupBody) {
+                    console.log('Sezione posizioni prelievo non trovata');
+                    return;
+                }
+
+                try {
+                    const response = await window.modernAuth.authenticatedFetch(`/orders/${orderNumber}/pickup-locations`);
+                    if (!response.ok) {
+                        throw new Error(`Errore ${response.status}: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+
+                    // Popola la tabella con i dati delle posizioni
+                    if (data.pickup_locations && data.pickup_locations.length > 0) {
+                        pickupSection.style.display = 'block';
+                        pickupBody.innerHTML = '';
+
+                        data.pickup_locations.forEach(pickup => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">${pickup.product_sku}</td>
+                                <td style="padding: 12px; border-bottom: 1px solid #dee2e6;"><strong>${pickup.location_from || 'N/D'}</strong></td>
+                                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #dee2e6; font-weight: bold; color: #0066CC;">${pickup.quantity_picked}</td>
+                                <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-size: 0.9rem;">${pickup.timestamp}</td>
+                                <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-size: 0.9rem;">${pickup.operator}</td>
+                            `;
+                            pickupBody.appendChild(row);
+                        });
+
+                        // Aggiungi riga riepilogativa
+                        const totalOperations = data.total_operations;
+                        const totalRow = document.createElement('tr');
+                        totalRow.style.backgroundColor = '#f8f9fa';
+                        totalRow.style.borderTop = '2px solid #0066CC';
+                        totalRow.style.fontWeight = 'bold';
+                        totalRow.innerHTML = `
+                            <td colspan="2" style="padding: 12px; font-weight: bold; color: #0066CC;">TOTALE OPERAZIONI</td>
+                            <td colspan="3" style="padding: 12px; text-align: center; font-weight: bold; color: #0066CC;">${totalOperations}</td>
+                        `;
+                        pickupBody.appendChild(totalRow);
+                    } else {
+                        // Nessuna posizione trovata - nascondi la sezione
+                        pickupSection.style.display = 'none';
+                    }
+
+                } catch (error) {
+                    console.error('Errore nel caricamento posizioni prelievo:', error);
+                    pickupSection.style.display = 'none';
+                }
+            }
+
+            // Funzioni per export posizioni di prelievo
+            window.exportPickupLocationsExcel = async function(orderNumber) {
+                try {
+                    const response = await window.modernAuth.authenticatedFetch(`/orders/${orderNumber}/pickup-locations/export-excel`);
+                    if (!response.ok) {
+                        throw new Error(`Errore ${response.status}: ${response.statusText}`);
+                    }
+
+                    const blob = await response.blob();
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `prelievi_ordine_${orderNumber}.xlsx`;
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename=(.+)/);
+                        if (match) filename = match[1];
+                    }
+
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+
+                } catch (error) {
+                    console.error('Errore export Excel:', error);
+                    alert('Errore durante l\'export Excel: ' + error.message);
+                }
+            }
+
+            window.exportPickupLocationsPdf = async function(orderNumber) {
+                try {
+                    const response = await window.modernAuth.authenticatedFetch(`/orders/${orderNumber}/pickup-locations/export-pdf`);
+                    if (!response.ok) {
+                        throw new Error(`Errore ${response.status}: ${response.statusText}`);
+                    }
+
+                    const blob = await response.blob();
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `prelievi_ordine_${orderNumber}.pdf`;
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename=(.+)/);
+                        if (match) filename = match[1];
+                    }
+
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+
+                } catch (error) {
+                    console.error('Errore export PDF:', error);
+                    alert('Errore durante l\'export PDF: ' + error.message);
                 }
             }
 
@@ -4153,9 +4335,28 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    alert(`✅ ${result.message}`);
+                    console.log('Import Excel success:', result);  // DEBUG
+
+                    // Chiudi prima l'overlay di import
                     closeExcelRecap();
-                    
+
+                    // Costruisci messaggio dettagliato con numeri ordine
+                    let createdHtml = '';
+                    let updatedHtml = '';
+
+                    if (result.orders_created_list && result.orders_created_list.length > 0) {
+                        createdHtml = `<div style="margin: 10px 0;"><strong>Ordini creati:</strong> ${result.orders_created_list.join(', ')}</div>`;
+                    }
+
+                    if (result.orders_updated_list && result.orders_updated_list.length > 0) {
+                        updatedHtml = `<div style="margin: 10px 0;"><strong>Ordini aggiornati:</strong> ${result.orders_updated_list.join(', ')}</div>`;
+                    }
+
+                    console.log('Showing overlay with:', createdHtml, updatedHtml);  // DEBUG
+
+                    // Mostra overlay di successo al centro dello schermo
+                    showImportSuccessOverlay(createdHtml, updatedHtml);
+
                     // Ricarica la lista ordini
                     await fetchOrders();
                 } else {
@@ -4170,8 +4371,70 @@
             }
         }
 
+        // === OVERLAY SUCCESSO IMPORT EXCEL ===
+
+        function showImportSuccessOverlay(createdHtml, updatedHtml, skippedHtml = '') {
+            // Rimuovi overlay esistente se presente
+            const existing = document.getElementById('import-success-overlay');
+            if (existing) existing.remove();
+
+            const overlay = document.createElement('div');
+            overlay.id = 'import-success-overlay';
+            overlay.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.6); z-index: 10001;
+                display: flex; justify-content: center; align-items: center;
+                animation: fadeIn 0.3s ease;
+            `;
+
+            overlay.innerHTML = `
+                <div style="
+                    background: white;
+                    padding: 30px 40px;
+                    border-radius: 12px;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                    text-align: center;
+                    max-width: 500px;
+                    animation: scaleIn 0.3s ease;
+                ">
+                    <div style="font-size: 60px; margin-bottom: 15px;">✅</div>
+                    <h2 style="margin: 0 0 20px 0; color: #28a745; font-size: 24px;">Import Completato!</h2>
+                    ${createdHtml}
+                    ${updatedHtml}
+                    ${skippedHtml}
+                    <button onclick="document.getElementById('import-success-overlay').remove()" style="
+                        margin-top: 20px;
+                        padding: 12px 40px;
+                        background: #28a745;
+                        color: white;
+                        border: none;
+                        border-radius: 6px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: background 0.2s;
+                    " onmouseover="this.style.background='#218838'" onmouseout="this.style.background='#28a745'">
+                        OK
+                    </button>
+                </div>
+                <style>
+                    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                    @keyframes scaleIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+                </style>
+            `;
+
+            // Chiudi cliccando fuori dal box
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) {
+                    overlay.remove();
+                }
+            });
+
+            document.body.appendChild(overlay);
+        }
+
         // === MODIFICA NOME CLIENTE ===
-        
+
         // Funzione per aprire il popup di modifica cliente
         async function editCustomerName(orderNumber, currentCustomerName, orderId) {
             const overlay = document.createElement('div');
@@ -4460,15 +4723,24 @@
         // Aggiorna il contatore all'avvio
         updateOutgoingStockCounter();
 
-        // Precompila date export al caricamento pagina
-        initializeExportDates();
-
         // --- FUNZIONI EXPORT ORDINI ---
+
+        // Apri overlay export ordini
+        window.openExportOrdersOverlay = function() {
+            document.getElementById('export-orders-overlay').style.display = 'flex';
+            // Inizializza date ogni volta che si apre l'overlay
+            initializeExportDates();
+        }
+
+        // Chiudi overlay export ordini
+        window.closeExportOrdersOverlay = function() {
+            document.getElementById('export-orders-overlay').style.display = 'none';
+        }
 
         function initializeExportDates() {
             const today = new Date();
             const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-            
+
             // Formatta le date in formato YYYY-MM-DD evitando problemi fuso orario
             const formatDate = (date) => {
                 const year = date.getFullYear();
@@ -4476,20 +4748,34 @@
                 const day = String(date.getDate()).padStart(2, '0');
                 return `${year}-${month}-${day}`;
             };
-            
-            // Precompila i campi
+
+            // Precompila i campi sommario ordini
             const fromDateField = document.getElementById('export-from-date');
             const toDateField = document.getElementById('export-to-date');
-            
+
             if (fromDateField) {
                 fromDateField.value = formatDate(firstDayOfMonth);
             }
-            
+
             if (toDateField) {
                 toDateField.value = formatDate(today);
             }
+
+            // Precompila i campi prodotti per ordine
+            const productsFromDateField = document.getElementById('export-products-from-date');
+            const productsToDateField = document.getElementById('export-products-to-date');
+
+            if (productsFromDateField) {
+                productsFromDateField.value = formatDate(firstDayOfMonth);
+            }
+
+            if (productsToDateField) {
+                productsToDateField.value = formatDate(today);
+            }
+
+            console.log('📅 Date export inizializzate: Da', formatDate(firstDayOfMonth), 'A', formatDate(today));
         }
-        
+
         // Export Excel
         window.exportOrdersExcel = async function() {
             try {
@@ -4739,39 +5025,6 @@
                 setTimeout(() => errorMsg.remove(), 5000);
             }
         };
-
-        // Inizializza date di default per export prodotti
-        function initializeProductsExportDates() {
-            const today = new Date();
-            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-            
-            // Funzione helper per formattare date
-            const formatDate = (date) => {
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            };
-            
-            // Precompila i campi export prodotti
-            const productsFromDateField = document.getElementById('export-products-from-date');
-            const productsToDateField = document.getElementById('export-products-to-date');
-            
-            if (productsFromDateField) {
-                productsFromDateField.value = formatDate(firstDayOfMonth);
-            }
-            
-            if (productsToDateField) {
-                productsToDateField.value = formatDate(today);
-            }
-        }
-
-        // Inizializza le date quando il documento è pronto
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initializeProductsExportDates);
-        } else {
-            initializeProductsExportDates();
-        }
 
         // ============== FUNZIONI MODIFICA DATA ARCHIVIAZIONE ==============
 

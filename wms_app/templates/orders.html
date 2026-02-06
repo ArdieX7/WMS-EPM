@@ -35,82 +35,79 @@
 
     <h1>Gestione Ordini</h1>
 
-    <!-- Layout container per gestione e export -->
-    <div style="display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: 2rem;">
-        
-        <!-- Sezione Gestione Ordini -->
-        <div style="flex: 1; min-width: 300px;">
-            <h2 style="color: #0066CC; margin-bottom: 1rem; font-size: 1.3rem;">📋 Gestione Ordini</h2>
-            <div class="action-buttons" data-permission="orders_management_section">
-                <button class="action-btn mobile-hide" onclick="openOverlay('import-orders-overlay')">📁 Import Ordini</button>
-                <button class="action-btn mobile-hide" onclick="openOverlay('create-order-overlay')">➕ Crea Nuovo Ordine</button>
-                <button class="action-btn" onclick="openOverlay('picking-file-overlay')">📋 Prelievo da File</button>
-            </div>
+    <!-- Sezione Gestione Ordini -->
+    <div style="margin-bottom: 1.5rem;">
+        <div class="action-buttons" data-permission="orders_management_section">
+            <button class="action-btn mobile-hide" onclick="openOverlay('import-orders-overlay')">📁 Import Ordini</button>
+            <button class="action-btn mobile-hide" onclick="openOverlay('create-order-overlay')">➕ Crea Nuovo Ordine</button>
+            <button class="action-btn mobile-hide" onclick="openExportOrdersOverlay()">📤 Esporta Dati</button>
+            <button class="action-btn" onclick="openOverlay('picking-file-overlay')">📋 Prelievo da File</button>
         </div>
-        
-        <!-- Nuova Sezione Export Prodotti per Ordine -->
-    <div class="mobile-hide" style="display: flex; justify-content: center; margin-bottom: 2rem;">
-        <div style="min-width: 300px; max-width: 600px;">
-            <h2 style="color: #0066CC; text-align: left; margin-bottom: 1rem; font-size: 1.3rem;">📦 Export Prodotti per Ordine Usciti</h2>
-            <div class="export-section" style="background: #e8f4f8; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #0066CC; text-align: center;">
-                <div style="display: flex; gap: 0.75rem; align-items: end; flex-wrap: wrap; justify-content: center; margin-bottom: 1rem;">
-                    <div style="min-width: 140px;">
-                        <label for="export-products-from-date" style="display: block; text-align: left; margin-bottom: 0.5rem; font-weight: 600; color: #495057; font-size: 0.9rem;">📅 Da:</label>
-                        <input type="date" id="export-products-from-date" style="width: 140px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9rem;">
-                    </div>
-                    <div style="min-width: 140px;">
-                        <label for="export-products-to-date" style="display: block; text-align: left; margin-bottom: 0.5rem; font-weight: 600; color: #495057; font-size: 0.9rem;">📅 A:</label>
-                        <input type="date" id="export-products-to-date" style="width: 140px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9rem;">
-                    </div>
-                    <div class="export-buttons" style="display: flex; gap: 0.5rem;">
-                        <button class="action-btn secondary" onclick="exportProductsExcel()" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; min-width: auto; white-space: nowrap;">
-                            📊 Excel
-                        </button>
-                        <button class="action-btn secondary" onclick="exportProductsPdf()" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; min-width: auto; white-space: nowrap;">
-                            📄 PDF
-                        </button>
-                    </div>
-                </div>
-                <div style="text-align: left; font-size: 0.85rem; color: #6c757d; line-height: 1.4;">
-                    <strong>Una riga per ogni prodotto-ordine con:</strong><br>
-                    N° Ordine, Cliente, Data, SKU, Descrizione, Qtà Richiesta, Qtà Prelevata, Stato<br>
-                    <strong>Nota:</strong> Include solo ordini con prodotti prelevati/completati
-                </div>
-            </div>
-        </div>
-    </div>
-        <!-- Sezione Export Ordini -->
-        <div class="mobile-hide" style="min-width: 300px; text-align: right;">
-            <h2 style="color: #0066CC; text-align: left; margin-bottom: 1rem; font-size: 1.3rem;">📈 Export Dati Ordini</h2>
-            <div class="export-section" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #0066CC; text-align: right; display: inline-block; min-width: 400px;">
-                <div style="display: flex; gap: 0.75rem; align-items: end; flex-wrap: wrap; justify-content: flex-end;">
-                    <div style="min-width: 140px;">
-                        <label for="export-from-date" style="display: block; text-align: left; margin-bottom: 0.5rem; font-weight: 600; color: #495057; font-size: 0.9rem;">📅 Da:</label>
-                        <input type="date" id="export-from-date" style="width: 140px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9rem;">
-                    </div>
-                    <div style="min-width: 140px;">
-                        <label for="export-to-date" style="display: block; text-align: left; margin-bottom: 0.5rem; font-weight: 600; color: #495057; font-size: 0.9rem;">📅 A:</label>
-                        <input type="date" id="export-to-date" style="width: 140px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9rem;">
-                    </div>
-                    <div class="export-buttons" style="display: flex; gap: 0.5rem;">
-                        <button class="action-btn secondary" onclick="exportOrdersExcel()" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; min-width: auto; white-space: nowrap;">
-                            📊 Excel
-                        </button>
-                        <button class="action-btn secondary" onclick="exportOrdersPdf()" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; min-width: auto; white-space: nowrap;">
-                            📄 PDF
-                        </button>
-                    </div>
-                </div>
-                <div style="margin-top: 0.75rem; text-align: left; font-size: 0.85rem; color: #6c757d; line-height: 1.4;">
-                    Include: N° Ordine, Cliente, Data, Stato, Qtà Totale, DDT, Data Evasione<br>
-                    <strong>Nota:</strong> Include sia ordini attivi che archiviati
-                </div>
-            </div>
-        </div>
-        
     </div>
 
-    
+    <!-- Overlay Export Ordini -->
+    <div id="export-orders-overlay" class="overlay mobile-hide" style="display: none;">
+        <div class="overlay-content" style="max-width: 720px; padding: 1.5rem;">
+            <div class="overlay-header">
+                <h3>📤 Esporta Dati Ordini</h3>
+                <button class="overlay-close" onclick="closeExportOrdersOverlay()">&times;</button>
+            </div>
+
+            <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; padding: 1.5rem 0.5rem;">
+                <!-- Export Prodotti per Ordine -->
+                <div style="flex: 1; min-width: 280px;">
+                    <h4 style="color: #0066CC; margin-bottom: 1rem; font-size: 1.1rem;">📦 Export Prodotti per Ordine</h4>
+                    <div style="background: #e8f4f8; padding: 1.25rem; border-radius: 8px; border-left: 4px solid #0066CC;">
+                        <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+                            <div>
+                                <label style="display: block; margin-bottom: 0.3rem; font-weight: 600; color: #495057; font-size: 0.85rem;">📅 Da:</label>
+                                <input type="date" id="export-products-from-date" style="width: 130px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.85rem;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.3rem; font-weight: 600; color: #495057; font-size: 0.85rem;">📅 A:</label>
+                                <input type="date" id="export-products-to-date" style="width: 130px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.85rem;">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                            <button class="action-btn" onclick="exportProductsExcel()" style="flex: 1; padding: 0.6rem;">
+                                📊 Excel
+                            </button>
+                            <button class="action-btn secondary" onclick="exportProductsPdf()" style="flex: 1; padding: 0.6rem;">
+                                📄 PDF
+                            </button>
+                        </div>
+                        <p style="font-size: 0.8rem; color: #6c757d; margin: 0;">Una riga per ogni prodotto-ordine</p>
+                    </div>
+                </div>
+
+                <!-- Export Dati Ordini (Sommario) -->
+                <div style="flex: 1; min-width: 280px;">
+                    <h4 style="color: #0066CC; margin-bottom: 1rem; font-size: 1.1rem;">📈 Export Dati Ordini</h4>
+                    <div style="background: #f8f9fa; padding: 1.25rem; border-radius: 8px; border-left: 4px solid #0066CC;">
+                        <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+                            <div>
+                                <label style="display: block; margin-bottom: 0.3rem; font-weight: 600; color: #495057; font-size: 0.85rem;">📅 Da:</label>
+                                <input type="date" id="export-from-date" style="width: 130px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.85rem;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.3rem; font-weight: 600; color: #495057; font-size: 0.85rem;">📅 A:</label>
+                                <input type="date" id="export-to-date" style="width: 130px; padding: 0.4rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.85rem;">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                            <button class="action-btn" onclick="exportOrdersExcel()" style="flex: 1; padding: 0.6rem;">
+                                📊 Excel
+                            </button>
+                            <button class="action-btn secondary" onclick="exportOrdersPdf()" style="flex: 1; padding: 0.6rem;">
+                                📄 PDF
+                            </button>
+                        </div>
+                        <p style="font-size: 0.8rem; color: #6c757d; margin: 0;">Una riga per documento (attivi + archiviati)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Overlay Import Ordini Unificato -->
     <div id="import-orders-overlay" class="overlay mobile-hide">
@@ -664,8 +661,20 @@
                 
                 <!-- Nuova sezione: Dettagli Posizioni di Prelievo -->
                 <div class="form-group" id="pickup-locations-section" style="display: none;">
-                    <label><strong>📍 Posizioni di Prelievo</strong></label>
-                    <table class="recap-table mobile-order-details-table" style="margin-top: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <label style="margin: 0;"><strong>📍 Posizioni di Prelievo</strong></label>
+                        <div style="display: flex; gap: 8px;">
+                            <button id="export-pickup-excel-btn" onclick=""
+                                    style="background: #28a745; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; display: flex; align-items: center; gap: 4px;">
+                                📊 Excel
+                            </button>
+                            <button id="export-pickup-pdf-btn" onclick=""
+                                    style="background: #dc3545; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; display: flex; align-items: center; gap: 4px;">
+                                📄 PDF
+                            </button>
+                        </div>
+                    </div>
+                    <table class="recap-table mobile-order-details-table" style="margin-top: 0;">
                         <thead>
                             <tr>
                                 <th class="mobile-sku-col" style="width: 120px;">SKU Prodotto</th>

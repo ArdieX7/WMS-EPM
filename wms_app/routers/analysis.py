@@ -540,87 +540,112 @@ async def export_product_locations_pdf(sku: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Errore nella generazione PDF: {str(e)}")
 
 @router.get("/products-by-row/{fila}", response_model=List[analysis_schemas.ProductInRowItem])
-def get_products_by_row(fila: int, db: Session = Depends(get_db)):
+def get_products_by_row(fila: int, include_empty: bool = False, db: Session = Depends(get_db)):
     """Restituisce tutti i prodotti e le loro ubicazioni per una data fila."""
-    # Filtra le ubicazioni che iniziano ESATTAMENTE con il numero della fila seguito da una lettera
-    # Formato ubicazioni: {FILA}{LETTERA}{RESTO} (es. 2A1P1, 21A1P1)
-    # Uso LIKE con controllo che il carattere dopo il numero sia una lettera
-    
-    products_query = db.query(
-        Inventory.location_name,
-        Inventory.product_sku,
-        Product.description,
-        Inventory.quantity
-    ).join(Product, Inventory.product_sku == Product.sku)
 
-    # Pattern per matchare esattamente la fila: inizia con il numero + almeno una lettera
-    fila_pattern = f"{fila}A%"
-    
-    # Query che filtra ubicazioni che iniziano con {fila}A, {fila}B, {fila}C, etc.
-    # ma NON {fila}1, {fila}2, etc. (che sarebbero altre file)
-    from sqlalchemy import or_
-    
     letter_patterns = [f"{fila}{letter}%" for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
-    
-    filtered_products = products_query.filter(
-        or_(*[Inventory.location_name.like(pattern) for pattern in letter_patterns])
-    ).filter(Inventory.quantity > 0)
-    
-    products_in_row = filtered_products.order_by(Inventory.location_name, Inventory.product_sku).all()
 
-    if not products_in_row:
-        raise HTTPException(status_code=404, detail=f"Nessun prodotto trovato nella fila {fila} o fila inesistente.")
+    if include_empty:
+        # Query tutte le locazioni della fila, con left join su inventory
+        from sqlalchemy.orm import outerjoin, aliased
 
-    return [analysis_schemas.ProductInRowItem(
-        location_name=item.location_name,
-        product_sku=item.product_sku,
-        product_description=item.description,
-        quantity=item.quantity
-    ) for item in products_in_row]
+        # Prendi tutte le locazioni della fila
+        all_locations = db.query(Location.name).filter(
+            or_(*[Location.name.like(pattern) for pattern in letter_patterns])
+        ).order_by(Location.name).all()
+
+        if not all_locations:
+            raise HTTPException(status_code=404, detail=f"Nessuna locazione trovata nella fila {fila}.")
+
+        # Prendi le locazioni occupate con i loro prodotti
+        occupied = db.query(
+            Inventory.location_name,
+            Inventory.product_sku,
+            Product.description,
+            Inventory.quantity
+        ).join(Product, Inventory.product_sku == Product.sku).filter(
+            or_(*[Inventory.location_name.like(pattern) for pattern in letter_patterns]),
+            Inventory.quantity > 0
+        ).all()
+
+        # Mappa locazione -> lista prodotti
+        occupied_map = {}
+        for item in occupied:
+            if item.location_name not in occupied_map:
+                occupied_map[item.location_name] = []
+            occupied_map[item.location_name].append(item)
+
+        # Costruisci risultato con tutte le locazioni
+        result = []
+        for (loc_name,) in all_locations:
+            if loc_name in occupied_map:
+                for item in occupied_map[loc_name]:
+                    result.append(analysis_schemas.ProductInRowItem(
+                        location_name=item.location_name,
+                        product_sku=item.product_sku,
+                        product_description=item.description,
+                        quantity=item.quantity
+                    ))
+            else:
+                result.append(analysis_schemas.ProductInRowItem(
+                    location_name=loc_name,
+                    product_sku=None,
+                    product_description=None,
+                    quantity=None
+                ))
+
+        return result
+    else:
+        # Query originale: solo locazioni occupate
+        products_query = db.query(
+            Inventory.location_name,
+            Inventory.product_sku,
+            Product.description,
+            Inventory.quantity
+        ).join(Product, Inventory.product_sku == Product.sku)
+
+        filtered_products = products_query.filter(
+            or_(*[Inventory.location_name.like(pattern) for pattern in letter_patterns])
+        ).filter(Inventory.quantity > 0)
+
+        products_in_row = filtered_products.order_by(Inventory.location_name, Inventory.product_sku).all()
+
+        if not products_in_row:
+            raise HTTPException(status_code=404, detail=f"Nessun prodotto trovato nella fila {fila} o fila inesistente.")
+
+        return [analysis_schemas.ProductInRowItem(
+            location_name=item.location_name,
+            product_sku=item.product_sku,
+            product_description=item.description,
+            quantity=item.quantity
+        ) for item in products_in_row]
 
 @router.get("/export-products-by-row/{fila}")
-async def export_products_by_row_csv(fila: int, db: Session = Depends(get_db)):
+async def export_products_by_row_csv(fila: int, include_empty: bool = False, db: Session = Depends(get_db)):
     """Esporta i prodotti di una fila in formato CSV."""
-    products_data = get_products_by_row(fila, db) # Riusiamo la logica dell'endpoint precedente
-    
+    products_data = get_products_by_row(fila, include_empty, db)
+
     output = io.StringIO()
-    output.write("ubicazione,sku,quantita\n") # Intestazione del CSV
+    output.write("ubicazione,sku,quantita\n")
     for item in products_data:
-        output.write(f"{item.location_name},{item.product_sku},{item.quantity}\n")
-    
+        output.write(f"{item.location_name},{item.product_sku or ''},{item.quantity if item.quantity is not None else ''}\n")
+
     output.seek(0)
-    
+
+    suffix = "_completa" if include_empty else ""
     return StreamingResponse(
         output,
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=prodotti_fila_{fila}.csv"}
+        headers={"Content-Disposition": f"attachment; filename=prodotti_fila_{fila}{suffix}.csv"}
     )
 
 @router.get("/export-products-by-row-pdf/{fila}")
-async def export_products_by_row_pdf(fila: int, db: Session = Depends(get_db)):
+async def export_products_by_row_pdf(fila: int, include_empty: bool = False, db: Session = Depends(get_db)):
     """Esporta i prodotti di una fila in formato PDF."""
-    # Query diretta per evitare problemi di caching
-    
-    products_query = db.query(
-        Inventory.location_name,
-        Inventory.product_sku,
-        Product.description,
-        Inventory.quantity
-    ).join(Product, Inventory.product_sku == Product.sku)
+    # Usa la stessa logica del data endpoint
+    items = get_products_by_row(fila, include_empty, db)
 
-    letter_patterns = [f"{fila}{letter}%" for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
-    
-    filtered_products = products_query.filter(
-        or_(*[Inventory.location_name.like(pattern) for pattern in letter_patterns])
-    ).filter(Inventory.quantity > 0)
-    
-    products_in_row = filtered_products.order_by(Inventory.location_name, Inventory.product_sku).all()
-
-    if not products_in_row:
-        raise HTTPException(status_code=404, detail=f"Nessun prodotto trovato nella fila {fila} o fila inesistente.")
-
-    # Converti in formato necessario per il PDF (senza descrizione)
-    products_data = [{"location_name": item.location_name, "product_sku": item.product_sku, "quantity": item.quantity} for item in products_in_row]
+    products_data = [{"location_name": item.location_name, "product_sku": item.product_sku or "", "quantity": item.quantity} for item in items]
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
@@ -628,7 +653,8 @@ async def export_products_by_row_pdf(fila: int, db: Session = Depends(get_db)):
     story = []
 
     # Titolo
-    story.append(Paragraph(f"Report Prodotti - Fila: {fila}", styles['h1']))
+    title_suffix = " (tutte le locazioni)" if include_empty else ""
+    story.append(Paragraph(f"Report Prodotti - Fila: {fila}{title_suffix}", styles['h1']))
     story.append(Spacer(1, 0.2 * inch))
 
     # Calcola righe per pagina: circa 30 righe per tabella in layout 2-colonne
@@ -639,7 +665,8 @@ async def export_products_by_row_pdf(fila: int, db: Session = Depends(get_db)):
     if len(products_data) <= max_rows_per_table:
         data = [["Ubicazione", "SKU", "Qty", "Note"]]
         for item in products_data:
-            data.append([item["location_name"], item["product_sku"], str(item["quantity"]), ""])
+            qty_str = str(item["quantity"]) if item["quantity"] is not None else ""
+            data.append([item["location_name"], item["product_sku"], qty_str, ""])
 
         table = Table(data, colWidths=[0.8*inch, 2*inch, 0.4*inch, 1.4*inch])
         table.setStyle([
@@ -675,7 +702,8 @@ async def export_products_by_row_pdf(fila: int, db: Session = Depends(get_db)):
             # Prima tabella (sinistra)
             data1 = [["Ubicazione", "SKU", "Qty", "Note"]]
             for item in left_products:
-                data1.append([item["location_name"], item["product_sku"], str(item["quantity"]), ""])
+                qty_str = str(item["quantity"]) if item["quantity"] is not None else ""
+                data1.append([item["location_name"], item["product_sku"], qty_str, ""])
 
             table1 = Table(data1, colWidths=[0.6*inch, 1.5*inch, 0.3*inch, 1.2*inch])
             table1.setStyle([
@@ -694,7 +722,8 @@ async def export_products_by_row_pdf(fila: int, db: Session = Depends(get_db)):
             # Seconda tabella (destra)
             data2 = [["Ubicazione", "SKU", "Qty", "Note"]]
             for item in right_products:
-                data2.append([item["location_name"], item["product_sku"], str(item["quantity"]), ""])
+                qty_str = str(item["quantity"]) if item["quantity"] is not None else ""
+                data2.append([item["location_name"], item["product_sku"], qty_str, ""])
 
             table2 = Table(data2, colWidths=[0.6*inch, 1.5*inch, 0.3*inch, 1.2*inch])
             table2.setStyle([
@@ -728,7 +757,7 @@ async def export_products_by_row_pdf(fila: int, db: Session = Depends(get_db)):
     return StreamingResponse(
         io.BytesIO(buffer.getvalue()),
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=prodotti_fila_{fila}.pdf"}
+        headers={"Content-Disposition": f"attachment; filename=prodotti_fila_{fila}{'_completa' if include_empty else ''}.pdf"}
     )
 
 @router.get("/pallet-summary", response_model=analysis_schemas.PalletSummary)
