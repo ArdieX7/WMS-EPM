@@ -1698,11 +1698,14 @@ async function openOrderSelectionModal() {
         }
 
         const list = document.getElementById('open-orders-list');
-        list.innerHTML = data.orders.map(order => `
+        list.innerHTML = data.orders.map(order => {
+            // Codifica il JSON per evitare problemi con caratteri speciali (apostrofi, virgolette, etc.)
+            const encodedOrder = encodeURIComponent(JSON.stringify(order));
+            return `
             <label class="order-checkbox">
                 <input type="checkbox"
                        value="${order.order_number}"
-                       data-order='${JSON.stringify(order)}'>
+                       data-order="${encodedOrder}">
                 <div class="order-details">
                     <div class="order-num">#${order.order_number}</div>
                     <div class="order-customer">${order.customer_name}</div>
@@ -1712,7 +1715,8 @@ async function openOrderSelectionModal() {
                     </div>
                 </div>
             </label>
-        `).join('');
+        `;
+        }).join('');
 
         document.getElementById('order-selection-modal').style.display = 'flex';
 
@@ -1749,7 +1753,7 @@ async function startRealtimeScanner() {
     };
 
     checkboxes.forEach(cb => {
-        const orderData = JSON.parse(cb.dataset.order);
+        const orderData = JSON.parse(decodeURIComponent(cb.dataset.order));
         realtimeScannerState.selectedOrders.push(orderData.order_number);
         realtimeScannerState.ordersData[orderData.order_number] = orderData;
 
