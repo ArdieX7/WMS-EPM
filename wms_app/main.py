@@ -44,6 +44,7 @@ def ensure_granular_permissions():
             ("serials_delete", "Eliminare seriali ordine", "serials", "view_delete"),
             ("serials_upload", "Caricare file seriali", "serials", "view_upload"),
             ("serials_scan", "Scansione seriali real-time", "serials", "view_scan"),
+            ("orders_picking_scan", "Prelievo Real-Time con scanner", "orders", "picking_scan"),
         ]
 
         created = []
@@ -80,6 +81,14 @@ def ensure_granular_permissions():
                 for perm in all_new_perms:
                     if perm.name != "serials_delete" and perm not in operatore_role.permissions:
                         operatore_role.permissions.append(perm)
+
+            # Forza assegnazione orders_picking_scan anche ad admin e operatore (sicurezza)
+            picking_perm = perm_map.get("orders_picking_scan")
+            if picking_perm:
+                if admin_role and picking_perm not in admin_role.permissions:
+                    admin_role.permissions.append(picking_perm)
+                if operatore_role and picking_perm not in operatore_role.permissions:
+                    operatore_role.permissions.append(picking_perm)
 
             # Cliente: solo view_details e export
             if cliente_role:
