@@ -1523,7 +1523,7 @@
         }
         
         .mobile-content .outgoing-stock-indicator::before {
-            content: '🔄' !important;
+            /* content: '🔄' !important; */
             position: absolute !important;
             left: 0 !important;
             top: 50% !important;

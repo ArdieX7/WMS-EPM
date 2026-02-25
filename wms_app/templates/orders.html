@@ -902,7 +902,7 @@
          PRELIEVI REAL-TIME: Overlay Scanner Full-Screen
          ==================================================== -->
     <div id="picking-realtime-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8f9fa; z-index: 9999; overflow-y: auto;">
-        <div style="max-width: 700px; margin: 0 auto; padding: 16px; padding-bottom: 100px;">
+        <div id="prt-body" style="max-width: 700px; margin: 0 auto; padding: 16px; padding-bottom: 100px;">
 
             <!-- Header -->
             <div style="display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #00516E, #0097E0); color: white; padding: 14px 18px; border-radius: 10px; margin-bottom: 16px;">
@@ -911,12 +911,6 @@
                     <div style="font-size: 0.85rem; opacity: 0.85;" id="prt-header-customer"></div>
                 </div>
                 <button onclick="closePickingRealtimeOverlay()" style="background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 1rem;">✕ Chiudi</button>
-            </div>
-
-            <!-- Piano Picking -->
-            <div style="background: white; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-                <h3 style="margin: 0 0 12px 0; color: #00516E; font-size: 1rem;">📋 Piano di Prelievo</h3>
-                <div id="prt-picking-plan"></div>
             </div>
 
             <!-- Scanner -->
@@ -980,6 +974,12 @@
                 </div>
             </div>
 
+            <!-- Piano Picking -->
+            <div style="background: white; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                <h3 style="margin: 0 0 12px 0; color: #00516E; font-size: 1rem;">📋 Piano di Prelievo</h3>
+                <div id="prt-picking-plan"></div>
+            </div>
+
             <!-- Log Prelievi Sessione -->
             <div style="background: white; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
                 <h3 style="margin: 0 0 10px 0; color: #28a745; font-size: 1rem;">✅ Prelievi Sessione (<span id="prt-picks-count">0</span>)</h3>
@@ -1000,6 +1000,30 @@
                 ✅ EVADI ORDINE — Tutti i prelievi completati
             </button>
         </div>
+
+        <!-- Backdrop bottom sheet ubicazioni -->
+        <div id="prt-sheet-backdrop" onclick="closeProductLocationsSheet()" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); z-index: 10001;"></div>
+
+        <!-- Bottom sheet: ubicazioni prodotto -->
+        <div id="prt-locations-sheet" style="display: none; position: fixed; bottom: 0; left: 0; width: 100%; z-index: 10002; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 24px rgba(0,0,0,0.25); max-height: 72vh; overflow-y: auto;">
+            <!-- Drag handle -->
+            <div style="display: flex; justify-content: center; padding: 10px 0 2px;">
+                <div style="width: 40px; height: 4px; background: #dee2e6; border-radius: 2px;"></div>
+            </div>
+            <div style="padding: 0 16px 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                    <div>
+                        <div style="font-weight: bold; font-size: 1rem; color: #00516E;" id="prt-sheet-sku"></div>
+                        <div style="font-size: 0.82rem; color: #666; margin-top: 1px;" id="prt-sheet-name"></div>
+                    </div>
+                    <button onclick="closeProductLocationsSheet()" style="background: #f1f3f4; border: none; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; font-size: 1rem; flex-shrink: 0; margin-left: 12px;">✕</button>
+                </div>
+                <div style="font-size: 0.85rem; color: #FF5913; font-weight: bold; margin-bottom: 14px;" id="prt-sheet-remaining"></div>
+                <div id="prt-sheet-locations">
+                    <div style="text-align: center; color: #888; padding: 24px;">Caricamento...</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     {% include 'partials/footer.html' %}
@@ -1012,7 +1036,7 @@
         });
     </script>
     <script src="/static/js/enhanced-upload.js"></script>
-    <script src="/static/js/orders.js?v=20260225prt"></script>
+    <script src="/static/js/orders.js?v=20260225prt4"></script>
     <script src="/static/js/navbar.js"></script>
     <script src="/static/js/mobile-navbar.js"></script>
 </body>

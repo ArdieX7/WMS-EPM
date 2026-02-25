@@ -5167,6 +5167,35 @@
 // PRELIEVI REAL-TIME
 // ============================================================
 
+// --- Persistenza sessione picking in localStorage ---
+const PICKING_RT_STORAGE_PREFIX = 'wms_prt_session_';
+
+function savePickingRtSession() {
+    if (!pickingRtState.orderId) return;
+    const key = PICKING_RT_STORAGE_PREFIX + pickingRtState.orderId;
+    const data = {
+        orderId: pickingRtState.orderId,
+        orderNumber: pickingRtState.orderNumber,
+        customerName: pickingRtState.customerName,
+        sessionId: pickingRtState.sessionId,
+        picksInSession: pickingRtState.picksInSession,
+        savedAt: new Date().toISOString()
+    };
+    try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
+}
+
+function loadPickingRtSession(orderId) {
+    const key = PICKING_RT_STORAGE_PREFIX + orderId;
+    try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+    } catch(e) { return null; }
+}
+
+function clearPickingRtSession(orderId) {
+    try { localStorage.removeItem(PICKING_RT_STORAGE_PREFIX + (orderId || pickingRtState.orderId)); } catch(e) {}
+}
+
 let pickingRtState = {
     orderId: null,
     orderNumber: null,
@@ -5284,11 +5313,21 @@ async function startPickingRealtimeSession() {
         pickingRtState.customerName = data.customer_name;
         pickingRtState.sessionId = data.session_id;
         pickingRtState.pickingPlan = data.picking_plan;
-        pickingRtState.picksInSession = [];
         pickingRtState.errors = [];
         pickingRtState.scanStep = 'LOCATION';
         pickingRtState.currentLocation = null;
         pickingRtState.isProcessing = false;
+
+        // Ripristina log sessione precedente da localStorage (se disponibile)
+        const savedSession = loadPickingRtSession(data.order_id);
+        if (savedSession && savedSession.picksInSession && savedSession.picksInSession.length > 0) {
+            pickingRtState.picksInSession = savedSession.picksInSession;
+            pickingRtState._sessionRecovered = true;
+            pickingRtState._recoveredCount = savedSession.picksInSession.length;
+        } else {
+            pickingRtState.picksInSession = [];
+            pickingRtState._sessionRecovered = false;
+        }
 
         renderPickingRtUI();
         setupPickingRtInputHandlers();
@@ -5302,6 +5341,22 @@ async function startPickingRealtimeSession() {
 function renderPickingRtUI() {
     document.getElementById('prt-header-order').textContent = `📱 Ordine #${pickingRtState.orderNumber}`;
     document.getElementById('prt-header-customer').textContent = pickingRtState.customerName;
+
+    // Banner di recupero sessione
+    const existingBanner = document.getElementById('prt-recovery-banner');
+    if (existingBanner) existingBanner.remove();
+    if (pickingRtState._sessionRecovered) {
+        const banner = document.createElement('div');
+        banner.id = 'prt-recovery-banner';
+        banner.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:8px 14px;margin-bottom:12px;font-size:0.85rem;color:#856404;display:flex;align-items:center;gap:8px;';
+        banner.innerHTML = `<span>📂</span><span>Sessione precedente ripristinata: <strong>${pickingRtState._recoveredCount} prelievi</strong> già confermati recuperati.</span>`;
+        const body = document.getElementById('prt-body');
+        // Inserisci dopo il primo figlio (l'header)
+        if (body && body.children.length > 0) {
+            body.insertBefore(banner, body.children[1]);
+        }
+    }
+
     renderPickingRtPlan();
     renderPickingRtPicksLog();
     renderPickingRtErrors();
@@ -5323,15 +5378,21 @@ function renderPickingRtPlan() {
         const pct = line.requested_quantity > 0 ? Math.round((totalPicked / line.requested_quantity) * 100) : 0;
         const done = remaining <= 0;
         const locationHints = line.suggested_locations.map(l => `${l.location_name} (${l.to_pick} pz)`).join(', ') || '—';
+        const locBtn = !done
+            ? `<button onclick="showProductLocations('${line.product_sku.replace(/'/g,"\\'")}','${(line.product_name||'').replace(/'/g,"\\'")}' )" title="Vedi tutte le ubicazioni" style="background:none;border:1px solid #0097E0;color:#0097E0;border-radius:6px;padding:2px 8px;font-size:0.78rem;cursor:pointer;white-space:nowrap;flex-shrink:0;">📍 Ubicazioni</button>`
+            : '';
 
         return `
         <div style="border-bottom: 1px solid #f0f0f0; padding: 8px 0; ${done ? 'opacity: 0.6;' : ''}">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <div style="min-width:0;">
                     <span style="font-weight: bold; color: #00516E;">${line.product_sku}</span>
                     ${line.product_name ? `<span style="font-size:0.8rem;color:#666;"> — ${line.product_name}</span>` : ''}
                 </div>
-                <span style="font-weight: bold; color: ${done ? '#28a745' : '#FF5913'};">${done ? '✅' : ''} ${totalPicked}/${line.requested_quantity}</span>
+                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                    ${locBtn}
+                    <span style="font-weight: bold; color: ${done ? '#28a745' : '#FF5913'}; white-space:nowrap;">${done ? '✅' : ''} ${totalPicked}/${line.requested_quantity}</span>
+                </div>
             </div>
             <div style="background: #f1f1f1; border-radius: 4px; height: 5px; margin: 4px 0;">
                 <div style="background: ${done ? '#28a745' : '#0097E0'}; height: 100%; width: ${pct}%; border-radius: 4px;"></div>
@@ -5616,6 +5677,9 @@ async function confirmPickingRtPick() {
                 planLine.remaining = data.new_remaining;
             }
 
+            // Salva sessione in localStorage per recupero dopo disconnessione
+            savePickingRtSession();
+
             playPickingRtBeep('success');
             feedback.style.color = '#28a745';
             feedback.textContent = `✅ Prelevati ${qty} pz — ${data.progress}`;
@@ -5666,6 +5730,8 @@ async function undoPickingRtPick(idx) {
                 planLine.picked_quantity = data.new_picked_quantity;
                 planLine.remaining = data.new_remaining;
             }
+            // Aggiorna localStorage dopo annullamento
+            savePickingRtSession();
             renderPickingRtPlan();
             renderPickingRtPicksLog();
             checkPickingRtOrderComplete();
@@ -5689,6 +5755,8 @@ async function fulfillPickingRtOrder() {
     try {
         const res = await window.modernAuth.authenticatedFetch(`/orders/${pickingRtState.orderId}/fulfill`, { method: 'POST' });
         if (res.ok) {
+            // Ordine evaso: cancella la sessione salvata
+            clearPickingRtSession(pickingRtState.orderId);
             alert(`✅ Ordine #${pickingRtState.orderNumber} evaso con successo!`);
             closePickingRealtimeOverlay();
             location.reload();
@@ -5701,7 +5769,53 @@ async function fulfillPickingRtOrder() {
     }
 }
 
+// --- Bottom sheet: ubicazioni prodotto ---
+
+async function showProductLocations(sku, productName) {
+    const sheet = document.getElementById('prt-locations-sheet');
+    const backdrop = document.getElementById('prt-sheet-backdrop');
+    sheet.style.display = 'block';
+    backdrop.style.display = 'block';
+    document.getElementById('prt-sheet-sku').textContent = `📦 ${sku}`;
+    document.getElementById('prt-sheet-name').textContent = productName || '';
+    document.getElementById('prt-sheet-remaining').textContent = '';
+    document.getElementById('prt-sheet-locations').innerHTML = '<div style="text-align:center;color:#888;padding:24px;">Caricamento...</div>';
+
+    try {
+        const res = await window.modernAuth.authenticatedFetch(
+            `/orders/${pickingRtState.orderId}/product-locations/${encodeURIComponent(sku)}`
+        );
+        const data = await res.json();
+
+        document.getElementById('prt-sheet-remaining').textContent =
+            `Da prelevare: ${data.remaining_to_pick} pz`;
+
+        if (!data.locations || data.locations.length === 0) {
+            document.getElementById('prt-sheet-locations').innerHTML =
+                '<div style="color:#dc3545;padding:16px;text-align:center;">Nessuna giacenza disponibile</div>';
+            return;
+        }
+
+        document.getElementById('prt-sheet-locations').innerHTML = data.locations.map(loc => `
+            <div style="padding:12px 14px;margin-bottom:8px;border-radius:10px;border:2px solid ${loc.is_suggested ? '#0097E0' : '#e9ecef'};background:${loc.is_suggested ? '#f0f8ff' : '#fafafa'};">
+                <div style="font-size:1.15rem;font-weight:bold;color:#00516E;">${loc.location_name}${loc.is_suggested ? ' <span style="font-size:0.7rem;background:#0097E0;color:white;border-radius:4px;padding:1px 5px;vertical-align:middle;">Suggerita</span>' : ''}</div>
+                <div style="font-size:0.88rem;color:#555;margin-top:2px;">Disponibili: <strong>${loc.available_quantity} pz</strong></div>
+            </div>
+        `).join('');
+    } catch(e) {
+        document.getElementById('prt-sheet-locations').innerHTML =
+            '<div style="color:#dc3545;padding:16px;text-align:center;">Errore di rete</div>';
+    }
+}
+
+
+function closeProductLocationsSheet() {
+    document.getElementById('prt-locations-sheet').style.display = 'none';
+    document.getElementById('prt-sheet-backdrop').style.display = 'none';
+}
+
 function closePickingRealtimeOverlay() {
+    closeProductLocationsSheet();
     document.getElementById('picking-realtime-overlay').style.display = 'none';
     pickingRtState = {
         orderId: null, orderNumber: null, customerName: null, sessionId: null,
@@ -5745,3 +5859,5 @@ window.pickingRtQtyChange = pickingRtQtyChange;
 window.confirmPickingRtPick = confirmPickingRtPick;
 window.undoPickingRtPick = undoPickingRtPick;
 window.fulfillPickingRtOrder = fulfillPickingRtOrder;
+window.showProductLocations = showProductLocations;
+window.closeProductLocationsSheet = closeProductLocationsSheet;

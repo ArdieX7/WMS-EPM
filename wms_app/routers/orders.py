@@ -4372,6 +4372,61 @@ def export_pickup_locations_pdf(
 # PRELIEVI REAL-TIME
 # ============================================================
 
+@router.get("/{order_id}/product-locations/{product_sku}")
+def get_product_locations_for_picking(
+    order_id: int,
+    product_sku: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("orders_picking_scan"))
+):
+    """Tutte le ubicazioni con stock disponibile per un prodotto specifico dell'ordine."""
+    from wms_app.models.reservations import InventoryReservation
+
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordine non trovato")
+
+    order_line = db.query(models.OrderLine).filter(
+        models.OrderLine.order_id == order_id,
+        models.OrderLine.product_sku == product_sku
+    ).first()
+    if not order_line:
+        raise HTTPException(status_code=404, detail="Prodotto non trovato nell'ordine")
+
+    remaining = order_line.requested_quantity - order_line.picked_quantity
+
+    # Tutte le ubicazioni con stock per questo SKU, ordinate per quantità desc
+    inventories = db.query(models.Inventory).filter(
+        models.Inventory.product_sku == product_sku,
+        models.Inventory.quantity > 0
+    ).order_by(models.Inventory.quantity.desc()).all()
+
+    # Ubicazioni suggerite (prenotazioni attive per questo ordine/sku)
+    suggested = db.query(InventoryReservation).filter(
+        InventoryReservation.order_id == str(order.order_number),
+        InventoryReservation.product_sku == product_sku,
+        InventoryReservation.status == 'active'
+    ).all()
+    suggested_location_names = {r.location_name for r in suggested}
+
+    locations = []
+    for inv in inventories:
+        locations.append({
+            "location_name": inv.location_name,
+            "available_quantity": inv.quantity,
+            "is_suggested": inv.location_name in suggested_location_names
+        })
+
+    product = db.query(models.Product).filter(models.Product.sku == product_sku).first()
+
+    return {
+        "product_sku": product_sku,
+        "product_name": product.description if product else product_sku,
+        "remaining_to_pick": remaining,
+        "locations": locations
+    }
+
+
 @router.post("/{order_id}/activate-picking-session")
 def activate_picking_session(
     order_id: int,
