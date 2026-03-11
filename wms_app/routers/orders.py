@@ -1311,6 +1311,51 @@ async def export_products_pdf(
 
 # --- API Endpoints con parametri di percorso (devono essere definiti dopo le rotte generiche) ---
 
+@router.get("/open-for-picking")
+def get_open_orders_for_picking(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("orders_picking_scan"))
+):
+    """Lista ordini aperti con progress picking per il modal di selezione."""
+    orders = db.query(models.Order).filter(
+        models.Order.is_completed == False,
+        models.Order.is_cancelled == False,
+        models.Order.is_archived == False
+    ).options(
+        joinedload(models.Order.lines).joinedload(models.OrderLine.product)
+    ).order_by(models.Order.id.desc()).all()
+
+    result = []
+    for order in orders:
+        lines_data = []
+        total_items = 0
+        total_picked = 0
+        for line in order.lines:
+            remaining = line.requested_quantity - line.picked_quantity
+            lines_data.append({
+                "order_line_id": line.id,
+                "product_sku": line.product_sku,
+                "product_name": line.product.description if line.product else None,
+                "requested_quantity": line.requested_quantity,
+                "picked_quantity": line.picked_quantity,
+                "remaining": remaining
+            })
+            total_items += line.requested_quantity
+            total_picked += line.picked_quantity
+
+        result.append({
+            "order_id": order.id,
+            "order_number": order.order_number,
+            "customer_name": order.customer_name,
+            "lines": lines_data,
+            "total_items": total_items,
+            "total_picked": total_picked,
+            "is_fully_picked": total_picked >= total_items and total_items > 0
+        })
+
+    return {"orders": result}
+
+
 @router.get("/{order_id}", response_model=schemas.Order)
 def get_order(order_id: int, db: Session = Depends(get_db)):
     order = db.query(models.Order).options(joinedload(models.Order.lines)).filter(models.Order.id == order_id).first()
@@ -4323,3 +4368,552 @@ def export_pickup_locations_pdf(
         raise HTTPException(status_code=500, detail=f"Errore export PDF: {str(e)}")
 
 
+# ============================================================
+# PRELIEVI REAL-TIME
+# ============================================================
+
+@router.get("/{order_id}/product-locations/{product_sku}")
+def get_product_locations_for_picking(
+    order_id: int,
+    product_sku: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("orders_picking_scan"))
+):
+    """Tutte le ubicazioni con stock disponibile per un prodotto specifico dell'ordine."""
+    from wms_app.models.reservations import InventoryReservation
+
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordine non trovato")
+
+    order_line = db.query(models.OrderLine).filter(
+        models.OrderLine.order_id == order_id,
+        models.OrderLine.product_sku == product_sku
+    ).first()
+    if not order_line:
+        raise HTTPException(status_code=404, detail="Prodotto non trovato nell'ordine")
+
+    remaining = order_line.requested_quantity - order_line.picked_quantity
+
+    # Tutte le ubicazioni con stock per questo SKU, ordinate per quantità desc
+    inventories = db.query(models.Inventory).filter(
+        models.Inventory.product_sku == product_sku,
+        models.Inventory.quantity > 0
+    ).order_by(models.Inventory.quantity.desc()).all()
+
+    # Ubicazioni suggerite (prenotazioni attive per questo ordine/sku)
+    suggested = db.query(InventoryReservation).filter(
+        InventoryReservation.order_id == str(order.order_number),
+        InventoryReservation.product_sku == product_sku,
+        InventoryReservation.status == 'active'
+    ).all()
+    suggested_location_names = {r.location_name for r in suggested}
+
+    locations = []
+    for inv in inventories:
+        locations.append({
+            "location_name": inv.location_name,
+            "available_quantity": inv.quantity,
+            "is_suggested": inv.location_name in suggested_location_names
+        })
+
+    product = db.query(models.Product).filter(models.Product.sku == product_sku).first()
+
+    return {
+        "product_sku": product_sku,
+        "product_name": product.description if product else product_sku,
+        "remaining_to_pick": remaining,
+        "locations": locations
+    }
+
+
+@router.post("/{order_id}/activate-picking-session")
+def activate_picking_session(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("orders_picking_scan"))
+):
+    """Attiva le prenotazioni per l'ordine (evitando duplicati) e restituisce il piano di picking."""
+    import uuid
+    from wms_app.services.reservation_service import ReservationService
+
+    order = db.query(models.Order).options(
+        joinedload(models.Order.lines).joinedload(models.OrderLine.product)
+    ).filter(models.Order.id == order_id).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordine non trovato")
+    if order.is_completed:
+        raise HTTPException(status_code=400, detail="Ordine già completato")
+    if order.is_cancelled:
+        raise HTTPException(status_code=400, detail="Ordine annullato")
+
+    reservation_service = ReservationService(db)
+    reservation_service.cleanup_expired_reservations()
+
+    # Prepara prodotti con quantità rimanente
+    products_needed = []
+    for line in order.lines:
+        remaining = line.requested_quantity - line.picked_quantity
+        if remaining > 0:
+            products_needed.append({
+                'sku': line.product_sku,
+                'quantity': remaining,
+                'line_id': line.id
+            })
+
+    # Alloca ubicazioni (il servizio evita già i duplicati)
+    allocation_map = {}
+    if products_needed:
+        try:
+            allocations = reservation_service.allocate_picking_locations(
+                order_id=str(order.order_number),
+                products_needed=products_needed
+            )
+            allocation_map = {a['sku']: a for a in allocations}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Errore allocazione picking: {str(e)}")
+
+    # Costruisce il piano di picking
+    picking_plan = []
+    for line in order.lines:
+        remaining = line.requested_quantity - line.picked_quantity
+        ean_codes = [e.ean for e in db.query(models.EanCode).filter(
+            models.EanCode.product_sku == line.product_sku
+        ).all()]
+
+        suggested_locations = []
+        status = "completed" if remaining <= 0 else "out_of_stock"
+
+        if remaining > 0:
+            allocation = allocation_map.get(line.product_sku)
+            if allocation:
+                for loc in allocation.get('allocations', []):
+                    suggested_locations.append({
+                        "location_name": loc['location_name'],
+                        "available_quantity": loc['quantity'],
+                        "reservation_id": loc.get('reservation_id'),
+                        "to_pick": loc['quantity']
+                    })
+                if allocation['fully_allocated']:
+                    status = "full_stock"
+                elif suggested_locations:
+                    status = "partial_stock"
+
+        picking_plan.append({
+            "order_line_id": line.id,
+            "product_sku": line.product_sku,
+            "product_name": line.product.description if line.product else None,
+            "ean_codes": ean_codes,
+            "requested_quantity": line.requested_quantity,
+            "picked_quantity": line.picked_quantity,
+            "remaining": remaining,
+            "suggested_locations": suggested_locations,
+            "status": status
+        })
+
+    session_id = str(uuid.uuid4())
+
+    return {
+        "session_id": session_id,
+        "order_id": order.id,
+        "order_number": order.order_number,
+        "customer_name": order.customer_name,
+        "picking_plan": picking_plan
+    }
+
+
+@router.post("/{order_id}/validate-scan-location")
+def validate_scan_location_picking(
+    order_id: int,
+    request: schemas.ValidateScanLocationRequest,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("orders_picking_scan"))
+):
+    """Valida che un'ubicazione scansionata abbia stock per almeno un prodotto dell'ordine."""
+    order = db.query(models.Order).options(
+        joinedload(models.Order.lines).joinedload(models.OrderLine.product)
+    ).filter(models.Order.id == order_id).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordine non trovato")
+
+    # Verifica esistenza ubicazione
+    location = db.query(models.Location).filter(
+        models.Location.name == request.location_name
+    ).first()
+
+    if not location:
+        return {
+            "valid": False,
+            "location_name": request.location_name,
+            "products_available": [],
+            "error": f"Ubicazione '{request.location_name}' non trovata",
+            "status": "location_not_found"
+        }
+
+    # Cerca prodotti dell'ordine con stock in questa ubicazione
+    products_available = []
+    for line in order.lines:
+        remaining = line.requested_quantity - line.picked_quantity
+        if remaining <= 0:
+            continue
+
+        inventory = db.query(models.Inventory).filter(
+            models.Inventory.location_name == request.location_name,
+            models.Inventory.product_sku == line.product_sku,
+            models.Inventory.quantity > 0
+        ).first()
+
+        if inventory:
+            ean_codes = [e.ean for e in db.query(models.EanCode).filter(
+                models.EanCode.product_sku == line.product_sku
+            ).all()]
+            products_available.append({
+                "product_sku": line.product_sku,
+                "product_name": line.product.description if line.product else None,
+                "order_line_id": line.id,
+                "available_quantity": inventory.quantity,
+                "needed": remaining,
+                "ean_codes": ean_codes
+            })
+
+    if not products_available:
+        return {
+            "valid": False,
+            "location_name": request.location_name,
+            "products_available": [],
+            "error": f"Nessun prodotto dell'ordine trovato in '{request.location_name}'",
+            "status": "no_stock_for_order"
+        }
+
+    return {
+        "valid": True,
+        "location_name": request.location_name,
+        "products_available": products_available,
+        "error": None,
+        "status": "ok"
+    }
+
+
+@router.post("/{order_id}/validate-scan-ean")
+def validate_scan_ean_picking(
+    order_id: int,
+    request: schemas.ValidateScanEanRequest,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("orders_picking_scan"))
+):
+    """Valida EAN nella location corrente. Accetta qualsiasi location con stock (picking libero)."""
+    order = db.query(models.Order).options(
+        joinedload(models.Order.lines).joinedload(models.OrderLine.product)
+    ).filter(models.Order.id == order_id).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordine non trovato")
+
+    # Risolvi EAN -> SKU
+    product_sku = None
+    product = db.query(models.Product).filter(models.Product.sku == request.ean_code).first()
+    if product:
+        product_sku = product.sku
+    else:
+        ean = db.query(models.EanCode).filter(models.EanCode.ean == request.ean_code).first()
+        if ean:
+            product_sku = ean.product_sku
+
+    if not product_sku:
+        return {
+            "valid": False,
+            "error": f"Codice '{request.ean_code}' non trovato nel database",
+            "status": "ean_not_found"
+        }
+
+    # Trova la riga ordine
+    order_line = next((l for l in order.lines if l.product_sku == product_sku), None)
+
+    if not order_line:
+        return {
+            "valid": False,
+            "product_sku": product_sku,
+            "error": f"Prodotto '{product_sku}' non presente in questo ordine",
+            "status": "sku_not_in_order"
+        }
+
+    remaining = order_line.requested_quantity - order_line.picked_quantity
+    if remaining <= 0:
+        return {
+            "valid": False,
+            "product_sku": product_sku,
+            "error": f"Prodotto '{product_sku}' già completamente prelevato",
+            "status": "no_remaining"
+        }
+
+    # Verifica stock nella location (picking libero: qualsiasi location con stock va bene)
+    inventory = db.query(models.Inventory).filter(
+        models.Inventory.location_name == request.location_name,
+        models.Inventory.product_sku == product_sku,
+        models.Inventory.quantity > 0
+    ).first()
+
+    if not inventory:
+        return {
+            "valid": False,
+            "product_sku": product_sku,
+            "error": f"Nessuno stock di '{product_sku}' in '{request.location_name}'",
+            "status": "no_stock_at_location"
+        }
+
+    product_name = order_line.product.description if order_line.product else product_sku
+    max_pickable = min(remaining, inventory.quantity)
+
+    return {
+        "valid": True,
+        "product_sku": product_sku,
+        "product_name": product_name,
+        "order_line_id": order_line.id,
+        "available_at_location": inventory.quantity,
+        "remaining_to_pick": remaining,
+        "max_pickable": max_pickable,
+        "error": None,
+        "status": "ok"
+    }
+
+
+@router.post("/{order_id}/realtime-commit-pick")
+def realtime_commit_pick(
+    order_id: int,
+    request: schemas.RealtimeCommitPickRequest,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("orders_picking_scan"))
+):
+    """Core endpoint: salva un prelievo real-time con auto-save immediato."""
+    from wms_app.services.reservation_service import ReservationService
+    from wms_app.models.reservations import InventoryReservation
+
+    order = db.query(models.Order).options(
+        joinedload(models.Order.lines)
+    ).filter(models.Order.id == order_id).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordine non trovato")
+    if order.is_completed:
+        raise HTTPException(status_code=400, detail="Ordine già completato")
+
+    order_line = db.query(models.OrderLine).filter(
+        models.OrderLine.id == request.order_line_id,
+        models.OrderLine.order_id == order_id
+    ).first()
+
+    if not order_line:
+        raise HTTPException(status_code=404, detail="Riga ordine non trovata")
+
+    remaining = order_line.requested_quantity - order_line.picked_quantity
+    if request.quantity > remaining:
+        return {
+            "success": False,
+            "error": f"Quantità richiesta ({request.quantity}) supera il rimanente ({remaining})",
+            "status": "quantity_exceeded"
+        }
+
+    inventory = db.query(models.Inventory).filter(
+        models.Inventory.product_sku == request.product_sku,
+        models.Inventory.location_name == request.location_name
+    ).first()
+
+    if not inventory or inventory.quantity < request.quantity:
+        available = inventory.quantity if inventory else 0
+        return {
+            "success": False,
+            "error": f"Stock insufficiente in '{request.location_name}' per '{request.product_sku}': disponibili {available}, richiesti {request.quantity}",
+            "status": "insufficient_stock"
+        }
+
+    try:
+        # Aggiorna inventario
+        inventory.quantity -= request.quantity
+
+        # Aggiorna riga ordine
+        order_line.picked_quantity += request.quantity
+
+        # Aggiorna OutgoingStock
+        outgoing = db.query(models.OutgoingStock).filter(
+            models.OutgoingStock.order_line_id == request.order_line_id,
+            models.OutgoingStock.product_sku == request.product_sku
+        ).first()
+
+        if outgoing:
+            outgoing.quantity += request.quantity
+        else:
+            db.add(models.OutgoingStock(
+                order_line_id=request.order_line_id,
+                product_sku=request.product_sku,
+                quantity=request.quantity
+            ))
+
+        # Gestione prenotazioni
+        reservation_service = ReservationService(db)
+        new_remaining = order_line.requested_quantity - order_line.picked_quantity
+
+        if request.reservation_id:
+            reservation_service.complete_reservation(request.reservation_id, request.quantity)
+        else:
+            active_reservation = db.query(InventoryReservation).filter(
+                and_(
+                    InventoryReservation.order_id == str(order.order_number),
+                    InventoryReservation.product_sku == request.product_sku,
+                    InventoryReservation.location_name == request.location_name,
+                    InventoryReservation.status == 'active'
+                )
+            ).first()
+            if active_reservation:
+                reservation_service.complete_reservation(active_reservation.id, request.quantity)
+
+        # Se il prodotto è completato, cancella le prenotazioni rimanenti
+        if new_remaining == 0:
+            remaining_reservations = db.query(InventoryReservation).filter(
+                and_(
+                    InventoryReservation.order_id == str(order.order_number),
+                    InventoryReservation.product_sku == request.product_sku,
+                    InventoryReservation.status == 'active'
+                )
+            ).all()
+            for res in remaining_reservations:
+                res.status = 'cancelled'
+
+        # Log operazione
+        logger = LoggingService(db)
+        logger.log_operation(
+            operation_type=OperationType.PRELIEVO_TEMPO_REALE,
+            operation_category=OperationCategory.PICKING,
+            status=OperationStatus.SUCCESS,
+            product_sku=request.product_sku,
+            location_from=request.location_name,
+            quantity=request.quantity,
+            user_id="realtime_picker",
+            details={
+                'order_number': order.order_number,
+                'customer_name': order.customer_name,
+                'order_line_id': request.order_line_id,
+                'session_id': request.session_id,
+                'operation_description': f"Prelievo real-time: {request.product_sku} ({request.quantity} pz) da {request.location_name} per ordine {order.order_number}",
+                'picking_type': 'prelievo_tempo_reale'
+            },
+            api_endpoint=f"/orders/{order_id}/realtime-commit-pick"
+        )
+
+        # Verifica se l'ordine è completamente prelevato
+        db.flush()
+        order_fully_picked = all(
+            line.picked_quantity >= line.requested_quantity
+            for line in order.lines
+        )
+
+        db.commit()
+
+        return {
+            "success": True,
+            "product_sku": request.product_sku,
+            "location_name": request.location_name,
+            "quantity_picked": request.quantity,
+            "new_picked_quantity": order_line.picked_quantity,
+            "new_remaining": new_remaining,
+            "product_completed": new_remaining == 0,
+            "order_fully_picked": order_fully_picked,
+            "progress": f"{order_line.picked_quantity}/{order_line.requested_quantity}"
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore durante il prelievo: {str(e)}")
+
+
+@router.post("/{order_id}/realtime-undo-pick")
+def realtime_undo_pick(
+    order_id: int,
+    request: schemas.RealtimeUndoPickRequest,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_permission("orders_picking_scan"))
+):
+    """Annulla un singolo prelievo real-time ripristinando inventario e picked_quantity."""
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordine non trovato")
+
+    order_line = db.query(models.OrderLine).filter(
+        models.OrderLine.id == request.order_line_id,
+        models.OrderLine.order_id == order_id
+    ).first()
+
+    if not order_line:
+        raise HTTPException(status_code=404, detail="Riga ordine non trovata")
+
+    if order_line.picked_quantity < request.quantity:
+        return {
+            "success": False,
+            "error": f"Non si può annullare {request.quantity} pz: prelevati {order_line.picked_quantity}",
+            "status": "invalid_quantity"
+        }
+
+    try:
+        # Ripristina inventario
+        inventory = db.query(models.Inventory).filter(
+            models.Inventory.product_sku == request.product_sku,
+            models.Inventory.location_name == request.location_name
+        ).first()
+
+        if inventory:
+            inventory.quantity += request.quantity
+        else:
+            db.add(models.Inventory(
+                location_name=request.location_name,
+                product_sku=request.product_sku,
+                quantity=request.quantity
+            ))
+
+        # Riduci picked_quantity
+        order_line.picked_quantity -= request.quantity
+
+        # Aggiorna OutgoingStock
+        outgoing = db.query(models.OutgoingStock).filter(
+            models.OutgoingStock.order_line_id == request.order_line_id,
+            models.OutgoingStock.product_sku == request.product_sku
+        ).first()
+
+        if outgoing:
+            if outgoing.quantity <= request.quantity:
+                db.delete(outgoing)
+            else:
+                outgoing.quantity -= request.quantity
+
+        new_remaining = order_line.requested_quantity - order_line.picked_quantity
+
+        # Log operazione
+        logger = LoggingService(db)
+        logger.log_operation(
+            operation_type=OperationType.PRELIEVO_TEMPO_REALE,
+            operation_category=OperationCategory.PICKING,
+            status=OperationStatus.CANCELLED,
+            product_sku=request.product_sku,
+            location_from=request.location_name,
+            quantity=request.quantity,
+            user_id="realtime_picker",
+            details={
+                'order_number': order.order_number,
+                'operation_description': f"ANNULLATO prelievo real-time: {request.product_sku} ({request.quantity} pz) da {request.location_name} per ordine {order.order_number}",
+                'picking_type': 'undo_prelievo_tempo_reale'
+            },
+            api_endpoint=f"/orders/{order_id}/realtime-undo-pick"
+        )
+
+        db.commit()
+
+        return {
+            "success": True,
+            "quantity_restored": request.quantity,
+            "new_picked_quantity": order_line.picked_quantity,
+            "new_remaining": new_remaining
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore durante l'annullamento: {str(e)}")

@@ -309,7 +309,7 @@
                                     <button class="edit-order-button" data-order-id="${order.id}" style="background-color: #17a2b8; margin-left: 5px;" title="Modifica ordine">
                                         ✏️ Modifica
                                     </button>
-                                    <button class="cancel-order-button" data-order-id="${order.id}" style="background-color: #dc3545; margin-left: 5px;">
+                                    <button class="cancel-order-button" data-order-id="${order.id}" style="background-color: #f0f0f0; margin-left: 5px;">
                                         ❌
                                     </button>
                                 `;
@@ -5162,3 +5162,707 @@
         window.showEditArchivedDateOverlay = showEditArchivedDateOverlay;
         window.closeEditArchivedDateOverlay = closeEditArchivedDateOverlay;
         window.confirmUpdateArchivedDate = confirmUpdateArchivedDate;
+
+// ============================================================
+// PRELIEVI REAL-TIME
+// ============================================================
+
+// --- Persistenza sessione picking in localStorage ---
+const PICKING_RT_STORAGE_PREFIX = 'wms_prt_session_';
+
+function savePickingRtSession() {
+    if (!pickingRtState.orderId) return;
+    const key = PICKING_RT_STORAGE_PREFIX + pickingRtState.orderId;
+    const data = {
+        orderId: pickingRtState.orderId,
+        orderNumber: pickingRtState.orderNumber,
+        customerName: pickingRtState.customerName,
+        sessionId: pickingRtState.sessionId,
+        picksInSession: pickingRtState.picksInSession,
+        savedAt: new Date().toISOString()
+    };
+    try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
+}
+
+function loadPickingRtSession(orderId) {
+    const key = PICKING_RT_STORAGE_PREFIX + orderId;
+    try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+    } catch(e) { return null; }
+}
+
+function clearPickingRtSession(orderId) {
+    try { localStorage.removeItem(PICKING_RT_STORAGE_PREFIX + (orderId || pickingRtState.orderId)); } catch(e) {}
+}
+
+let pickingRtState = {
+    orderId: null,
+    orderNumber: null,
+    customerName: null,
+    sessionId: null,
+    pickingPlan: [],          // [{order_line_id, product_sku, product_name, ean_codes, requested_quantity, picked_quantity, remaining, suggested_locations, status}]
+    scanStep: 'LOCATION',     // 'LOCATION' | 'EAN' | 'CONFIRM'
+    currentLocation: null,
+    currentSku: null,
+    currentEan: null,
+    currentOrderLineId: null,
+    currentMaxPickable: 0,
+    currentReservationId: null,
+    picksInSession: [],       // [{order_line_id, product_sku, product_name, location_name, quantity, timestamp}]
+    errors: [],
+    isProcessing: false,
+    allOrders: []
+};
+
+// --- Modal selezione ordine ---
+
+async function openPickingRealtimeOrderSelection() {
+    const modal = document.getElementById('picking-realtime-order-modal');
+    const list = document.getElementById('picking-rt-orders-list');
+    const btn = document.getElementById('picking-rt-start-btn');
+    const label = document.getElementById('picking-rt-selected-label');
+
+    list.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">Caricamento ordini...</div>';
+    btn.disabled = true;
+    label.textContent = 'Nessun ordine selezionato';
+    modal.style.display = 'flex';
+
+    try {
+        const res = await window.modernAuth.authenticatedFetch('/orders/open-for-picking');
+        if (!res.ok) throw new Error(`Errore ${res.status}: ${(await res.json()).detail || 'server error'}`);
+        const data = await res.json();
+        pickingRtState.allOrders = data.orders || [];
+        renderPickingRtOrderList(pickingRtState.allOrders);
+    } catch (e) {
+        list.innerHTML = `<div style="color: #dc3545; padding: 12px;">Errore: ${e.message}</div>`;
+    }
+}
+
+function renderPickingRtOrderList(orders) {
+    const list = document.getElementById('picking-rt-orders-list');
+    if (!orders.length) {
+        list.innerHTML = '<div style="color: #888; padding: 16px; text-align: center;">Nessun ordine aperto trovato.</div>';
+        return;
+    }
+    list.innerHTML = orders.map(o => {
+        const pct = o.total_items > 0 ? Math.round((o.total_picked / o.total_items) * 100) : 0;
+        const badgeColor = o.is_fully_picked ? '#28a745' : (o.total_picked > 0 ? '#FF5913' : '#0097E0');
+        const badge = o.is_fully_picked ? '✅ Completo' : (o.total_picked > 0 ? `🔄 ${pct}%` : '🆕 Nuovo');
+        return `
+        <label style="display: block; border: 2px solid #dee2e6; border-radius: 8px; padding: 12px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s;"
+               onmouseover="this.style.borderColor='#0097E0'" onmouseout="this.style.borderColor=document.getElementById('prt-radio-${o.order_id}').checked?'#0097E0':'#dee2e6'">
+            <input type="radio" name="prt-order-radio" id="prt-radio-${o.order_id}"
+                   value="${o.order_id}" data-order-number="${o.order_number}" data-customer="${o.customer_name}"
+                   onchange="onPickingRtOrderSelect(this)"
+                   style="margin-right: 10px;">
+            <strong>#${o.order_number}</strong> — ${o.customer_name}
+            <span style="float: right; background: ${badgeColor}; color: white; border-radius: 12px; padding: 2px 10px; font-size: 0.8rem;">${badge}</span>
+            <div style="margin-top: 6px; background: #f1f1f1; border-radius: 4px; height: 6px;">
+                <div style="background: ${badgeColor}; height: 100%; width: ${pct}%; border-radius: 4px;"></div>
+            </div>
+            <div style="font-size: 0.8rem; color: #666; margin-top: 4px;">${o.total_picked}/${o.total_items} pezzi • ${o.lines.length} prodotti</div>
+        </label>`;
+    }).join('');
+}
+
+function filterPickingRtOrders(query) {
+    const q = query.toLowerCase();
+    const filtered = pickingRtState.allOrders.filter(o =>
+        o.order_number.toLowerCase().includes(q) || o.customer_name.toLowerCase().includes(q)
+    );
+    renderPickingRtOrderList(filtered);
+}
+
+function onPickingRtOrderSelect(radio) {
+    const btn = document.getElementById('picking-rt-start-btn');
+    const label = document.getElementById('picking-rt-selected-label');
+    btn.disabled = false;
+    label.textContent = `Selezionato: #${radio.dataset.orderNumber} — ${radio.dataset.customer}`;
+    // Aggiorna bordi
+    document.querySelectorAll('input[name="prt-order-radio"]').forEach(r => {
+        r.closest('label').style.borderColor = r.checked ? '#0097E0' : '#dee2e6';
+    });
+}
+
+function closePickingRealtimeOrderModal() {
+    document.getElementById('picking-realtime-order-modal').style.display = 'none';
+}
+
+async function startPickingRealtimeSession() {
+    const selected = document.querySelector('input[name="prt-order-radio"]:checked');
+    if (!selected) return;
+
+    const orderId = parseInt(selected.value);
+    closePickingRealtimeOrderModal();
+
+    // Mostra overlay con spinner
+    const overlay = document.getElementById('picking-realtime-overlay');
+    overlay.style.display = 'block';
+    document.getElementById('prt-header-order').textContent = 'Attivazione sessione...';
+    document.getElementById('prt-header-customer').textContent = '';
+    document.getElementById('prt-picking-plan').innerHTML = '<div style="text-align:center;padding:20px;color:#888;">Preparazione piano picking...</div>';
+
+    try {
+        const res = await window.modernAuth.authenticatedFetch(`/orders/${orderId}/activate-picking-session`, { method: 'POST' });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Errore server');
+        const data = await res.json();
+
+        pickingRtState.orderId = data.order_id;
+        pickingRtState.orderNumber = data.order_number;
+        pickingRtState.customerName = data.customer_name;
+        pickingRtState.sessionId = data.session_id;
+        pickingRtState.pickingPlan = data.picking_plan;
+        pickingRtState.errors = [];
+        pickingRtState.scanStep = 'LOCATION';
+        pickingRtState.currentLocation = null;
+        pickingRtState.isProcessing = false;
+
+        // Ripristina log sessione precedente da localStorage (se disponibile)
+        const savedSession = loadPickingRtSession(data.order_id);
+        if (savedSession && savedSession.picksInSession && savedSession.picksInSession.length > 0) {
+            pickingRtState.picksInSession = savedSession.picksInSession;
+            pickingRtState._sessionRecovered = true;
+            pickingRtState._recoveredCount = savedSession.picksInSession.length;
+        } else {
+            pickingRtState.picksInSession = [];
+            pickingRtState._sessionRecovered = false;
+        }
+
+        renderPickingRtUI();
+        setupPickingRtInputHandlers();
+    } catch (e) {
+        document.getElementById('prt-picking-plan').innerHTML = `<div style="color:#dc3545;padding:12px;">Errore: ${e.message}</div>`;
+    }
+}
+
+// --- Rendering UI ---
+
+function renderPickingRtUI() {
+    document.getElementById('prt-header-order').textContent = `📱 Ordine #${pickingRtState.orderNumber}`;
+    document.getElementById('prt-header-customer').textContent = pickingRtState.customerName;
+
+    // Banner di recupero sessione
+    const existingBanner = document.getElementById('prt-recovery-banner');
+    if (existingBanner) existingBanner.remove();
+    if (pickingRtState._sessionRecovered) {
+        const banner = document.createElement('div');
+        banner.id = 'prt-recovery-banner';
+        banner.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:8px 14px;margin-bottom:12px;font-size:0.85rem;color:#856404;display:flex;align-items:center;gap:8px;';
+        banner.innerHTML = `<span>📂</span><span>Sessione precedente ripristinata: <strong>${pickingRtState._recoveredCount} prelievi</strong> già confermati recuperati.</span>`;
+        const body = document.getElementById('prt-body');
+        // Inserisci dopo il primo figlio (l'header)
+        if (body && body.children.length > 0) {
+            body.insertBefore(banner, body.children[1]);
+        }
+    }
+
+    renderPickingRtPlan();
+    renderPickingRtPicksLog();
+    renderPickingRtErrors();
+    showPickingRtStep('LOCATION');
+    checkPickingRtOrderComplete();
+}
+
+function renderPickingRtPlan() {
+    const container = document.getElementById('prt-picking-plan');
+
+    const rows = pickingRtState.pickingPlan.map(line => {
+        const totalPicked = line.picked_quantity; // aggiornato dal server dopo ogni confirm
+        const remaining = line.requested_quantity - totalPicked;
+        const pct = line.requested_quantity > 0 ? Math.round((totalPicked / line.requested_quantity) * 100) : 0;
+        const done = remaining <= 0;
+        const locationHints = line.suggested_locations.map(l => `${l.location_name} (${l.to_pick} pz)`).join(', ') || '—';
+        const locBtn = !done
+            ? `<button onclick="showProductLocations('${line.product_sku.replace(/'/g,"\\'")}','${(line.product_name||'').replace(/'/g,"\\'")}' )" title="Vedi tutte le ubicazioni" style="background:none;border:1px solid #0097E0;color:#0097E0;border-radius:6px;padding:2px 8px;font-size:0.78rem;cursor:pointer;white-space:nowrap;flex-shrink:0;">📍 Ubicazioni</button>`
+            : '';
+
+        return `
+        <div style="border-bottom: 1px solid #f0f0f0; padding: 8px 0; ${done ? 'opacity: 0.6;' : ''}">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <div style="min-width:0;">
+                    <span style="font-weight: bold; color: #00516E;">${line.product_sku}</span>
+                    ${line.product_name ? `<span style="font-size:0.8rem;color:#666;"> — ${line.product_name}</span>` : ''}
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                    ${locBtn}
+                    <span style="font-weight: bold; color: ${done ? '#28a745' : '#FF5913'}; white-space:nowrap;">${done ? '✅' : ''} ${totalPicked}/${line.requested_quantity}</span>
+                </div>
+            </div>
+            <div style="background: #f1f1f1; border-radius: 4px; height: 5px; margin: 4px 0;">
+                <div style="background: ${done ? '#28a745' : '#0097E0'}; height: 100%; width: ${pct}%; border-radius: 4px;"></div>
+            </div>
+            <div style="font-size: 0.78rem; color: #888;">📍 ${locationHints}</div>
+        </div>`;
+    }).join('');
+
+    container.innerHTML = rows || '<div style="color:#888;">Nessun prodotto</div>';
+}
+
+function renderPickingRtPicksLog() {
+    const container = document.getElementById('prt-picks-log');
+    document.getElementById('prt-picks-count').textContent = pickingRtState.picksInSession.length;
+    if (!pickingRtState.picksInSession.length) {
+        container.innerHTML = '<div style="color:#888;font-size:0.85rem;padding:8px;">Nessun prelievo ancora</div>';
+        return;
+    }
+    container.innerHTML = [...pickingRtState.picksInSession].reverse().map((p, idx) => {
+        const realIdx = pickingRtState.picksInSession.length - 1 - idx;
+        return `
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.9rem;">
+            <div>
+                <strong>${p.product_sku}</strong> — ${p.location_name} — <strong>${p.quantity} pz</strong>
+                <span style="color:#888;font-size:0.78rem;"> ${p.timestamp}</span>
+            </div>
+            <button onclick="undoPickingRtPick(${realIdx})" style="background:#dc3545;color:white;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:0.8rem;">Annulla</button>
+        </div>`;
+    }).join('');
+}
+
+function renderPickingRtErrors() {
+    const section = document.getElementById('prt-errors-section');
+    const container = document.getElementById('prt-errors-log');
+    document.getElementById('prt-errors-count').textContent = pickingRtState.errors.length;
+    section.style.display = pickingRtState.errors.length ? 'block' : 'none';
+    container.innerHTML = pickingRtState.errors.map(e =>
+        `<div style="padding:5px 0;border-bottom:1px solid #f0f0f0;color:#dc3545;font-size:0.85rem;">⚠️ ${e.error} <span style="color:#888;">${e.timestamp}</span></div>`
+    ).join('');
+}
+
+// --- Step management ---
+
+function showPickingRtStep(step) {
+    pickingRtState.scanStep = step;
+    document.getElementById('prt-step-location').style.display = step === 'LOCATION' ? 'block' : 'none';
+    document.getElementById('prt-step-ean').style.display = step === 'EAN' ? 'block' : 'none';
+    document.getElementById('prt-step-confirm').style.display = step === 'CONFIRM' ? 'block' : 'none';
+
+    if (step === 'LOCATION') {
+        const input = document.getElementById('prt-location-input');
+        input.value = '';
+        input.readOnly = true;
+        document.getElementById('prt-location-feedback').textContent = '';
+        setTimeout(() => input.focus(), 100);
+    } else if (step === 'EAN') {
+        const input = document.getElementById('prt-ean-input');
+        input.value = '';
+        input.readOnly = true;
+        document.getElementById('prt-ean-feedback').textContent = '';
+        setTimeout(() => input.focus(), 100);
+    } else if (step === 'CONFIRM') {
+        const input = document.getElementById('prt-confirm-scan-input');
+        input.value = '';
+        input.readOnly = true;
+        document.getElementById('prt-confirm-feedback').textContent = '';
+        setTimeout(() => input.focus(), 100);
+    }
+}
+
+function backToLocationStep() {
+    pickingRtState.currentLocation = null;
+    pickingRtState.currentSku = null;
+    pickingRtState.currentEan = null;
+    showPickingRtStep('LOCATION');
+}
+
+function backToEanStep() {
+    pickingRtState.currentSku = null;
+    pickingRtState.currentEan = null;
+    document.getElementById('prt-qty-input').value = 1;
+    showPickingRtStep('EAN');
+}
+
+// --- Input handlers ---
+
+function setupPickingRtInputHandlers() {
+    setupPickingRtInput('prt-location-input', handlePickingRtLocationScan);
+    setupPickingRtInput('prt-ean-input', handlePickingRtEanScan);
+    setupPickingRtInput('prt-confirm-scan-input', handlePickingRtConfirmScan);
+}
+
+function setupPickingRtInput(inputId, handler) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    input.addEventListener('keydown', function(e) {
+        if (this.readOnly && e.key !== 'Tab') this.readOnly = false;
+    });
+
+    input.addEventListener('keypress', async function(e) {
+        if (e.key === 'Enter') {
+            const val = this.value.trim();
+            this.value = '';
+            this.readOnly = true;
+            if (!val) return;
+            if (pickingRtState.isProcessing) return;
+            pickingRtState.isProcessing = true;
+            try {
+                await handler(val);
+            } finally {
+                pickingRtState.isProcessing = false;
+                setTimeout(() => { this.readOnly = false; this.focus(); }, 50);
+            }
+        }
+    });
+}
+
+// --- Scan handlers ---
+
+async function handlePickingRtLocationScan(locationCode) {
+    const feedback = document.getElementById('prt-location-feedback');
+    feedback.style.color = '#888';
+    feedback.textContent = '⏳ Verifica ubicazione...';
+
+    try {
+        const res = await window.modernAuth.authenticatedFetch(`/orders/${pickingRtState.orderId}/validate-scan-location`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ location_name: locationCode, session_id: pickingRtState.sessionId })
+        });
+        const data = await res.json();
+
+        if (data.valid) {
+            pickingRtState.currentLocation = data.location_name;
+            feedback.style.color = '#28a745';
+            feedback.textContent = `✅ ${data.location_name} — ${data.products_available.length} prodotto/i disponibile/i`;
+
+            // Mostra hint prodotti disponibili
+            const hint = data.products_available.map(p =>
+                `${p.product_sku}${p.product_name ? ' (' + p.product_name + ')' : ''}: ${p.available_quantity} pz`
+            ).join(' | ');
+
+            document.getElementById('prt-current-location-label').textContent = data.location_name;
+            document.getElementById('prt-location-products-hint').textContent = hint;
+
+            playPickingRtBeep('success');
+            setTimeout(() => showPickingRtStep('EAN'), 400);
+        } else {
+            feedback.style.color = '#dc3545';
+            feedback.textContent = `❌ ${data.error || 'Ubicazione non valida'}`;
+            playPickingRtBeep('error');
+            pickingRtState.errors.push({ error: `Ubicazione: ${data.error}`, timestamp: nowHHMM() });
+            renderPickingRtErrors();
+        }
+    } catch (e) {
+        feedback.style.color = '#dc3545';
+        feedback.textContent = '❌ Errore di rete';
+    }
+}
+
+async function handlePickingRtEanScan(eanCode) {
+    const feedback = document.getElementById('prt-ean-feedback');
+    feedback.style.color = '#888';
+    feedback.textContent = '⏳ Verifica prodotto...';
+
+    try {
+        const res = await window.modernAuth.authenticatedFetch(`/orders/${pickingRtState.orderId}/validate-scan-ean`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ean_code: eanCode,
+                location_name: pickingRtState.currentLocation,
+                session_id: pickingRtState.sessionId
+            })
+        });
+        const data = await res.json();
+
+        if (data.valid) {
+            pickingRtState.currentSku = data.product_sku;
+            pickingRtState.currentEan = eanCode;
+            pickingRtState.currentOrderLineId = data.order_line_id;
+            pickingRtState.currentMaxPickable = data.max_pickable;
+
+            // Trova reservation_id se presente nel piano
+            const planLine = pickingRtState.pickingPlan.find(l => l.product_sku === data.product_sku);
+            const suggestedLoc = planLine?.suggested_locations?.find(l => l.location_name === pickingRtState.currentLocation);
+            pickingRtState.currentReservationId = suggestedLoc?.reservation_id || null;
+
+            // Popola step CONFIRM
+            document.getElementById('prt-confirm-location').textContent = pickingRtState.currentLocation;
+            document.getElementById('prt-confirm-product').textContent = `${data.product_sku}${data.product_name ? ' — ' + data.product_name : ''}`;
+            document.getElementById('prt-confirm-remaining').textContent = `Da prelevare: ${data.remaining_to_pick} pz | Disponibili qui: ${data.available_at_location} pz`;
+            document.getElementById('prt-qty-input').value = 1;
+            document.getElementById('prt-qty-hint').textContent = `max: ${data.max_pickable}`;
+
+            feedback.style.color = '#28a745';
+            feedback.textContent = `✅ ${data.product_sku} — max ${data.max_pickable} pz`;
+            playPickingRtBeep('success');
+            setTimeout(() => showPickingRtStep('CONFIRM'), 300);
+        } else {
+            feedback.style.color = '#dc3545';
+            feedback.textContent = `❌ ${data.error || 'Prodotto non valido'}`;
+            playPickingRtBeep('error');
+            if (data.status !== 'no_remaining') {
+                pickingRtState.errors.push({ error: `EAN ${eanCode}: ${data.error}`, timestamp: nowHHMM() });
+                renderPickingRtErrors();
+            }
+        }
+    } catch (e) {
+        feedback.style.color = '#dc3545';
+        feedback.textContent = '❌ Errore di rete';
+    }
+}
+
+async function handlePickingRtConfirmScan(eanCode) {
+    // Scan EAN aggiuntiva nello step CONFIRM: incrementa contatore di 1
+    if (eanCode !== pickingRtState.currentEan) {
+        // EAN diverso: avvisa
+        document.getElementById('prt-confirm-feedback').style.color = '#dc3545';
+        document.getElementById('prt-confirm-feedback').textContent = '⚠️ EAN diverso — conferma o cambia EAN';
+        return;
+    }
+    const qtyInput = document.getElementById('prt-qty-input');
+    const current = parseInt(qtyInput.value) || 1;
+    const newVal = Math.min(current + 1, pickingRtState.currentMaxPickable);
+    qtyInput.value = newVal;
+    document.getElementById('prt-confirm-feedback').style.color = '#0097E0';
+    document.getElementById('prt-confirm-feedback').textContent = `+1 → quantità: ${newVal}`;
+}
+
+function pickingRtQtyChange(delta) {
+    const input = document.getElementById('prt-qty-input');
+    const val = parseInt(input.value) || 1;
+    const newVal = Math.max(1, Math.min(val + delta, pickingRtState.currentMaxPickable));
+    input.value = newVal;
+}
+
+async function confirmPickingRtPick() {
+    const qty = parseInt(document.getElementById('prt-qty-input').value) || 1;
+    const feedback = document.getElementById('prt-confirm-feedback');
+    const drainedLocation = (qty >= pickingRtState.currentMaxPickable);
+
+    if (qty < 1 || qty > pickingRtState.currentMaxPickable) {
+        feedback.style.color = '#dc3545';
+        feedback.textContent = `❌ Quantità non valida (max: ${pickingRtState.currentMaxPickable})`;
+        return;
+    }
+
+    feedback.style.color = '#888';
+    feedback.textContent = '⏳ Salvataggio...';
+
+    try {
+        const res = await window.modernAuth.authenticatedFetch(`/orders/${pickingRtState.orderId}/realtime-commit-pick`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                order_line_id: pickingRtState.currentOrderLineId,
+                product_sku: pickingRtState.currentSku,
+                location_name: pickingRtState.currentLocation,
+                quantity: qty,
+                session_id: pickingRtState.sessionId,
+                reservation_id: pickingRtState.currentReservationId
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            // Aggiungi alla sessione
+            pickingRtState.picksInSession.push({
+                order_line_id: pickingRtState.currentOrderLineId,
+                product_sku: pickingRtState.currentSku,
+                product_name: document.getElementById('prt-confirm-product').textContent,
+                location_name: pickingRtState.currentLocation,
+                quantity: qty,
+                timestamp: nowHHMM()
+            });
+
+            // Aggiorna il piano locale
+            const planLine = pickingRtState.pickingPlan.find(l => l.order_line_id === pickingRtState.currentOrderLineId);
+            if (planLine) {
+                planLine.picked_quantity = data.new_picked_quantity;
+                planLine.remaining = data.new_remaining;
+            }
+
+            // Salva sessione in localStorage per recupero dopo disconnessione
+            savePickingRtSession();
+
+            playPickingRtBeep('success');
+            feedback.style.color = '#28a745';
+            feedback.textContent = `✅ Prelevati ${qty} pz — ${data.progress}`;
+
+            renderPickingRtPlan();
+            renderPickingRtPicksLog();
+            checkPickingRtOrderComplete();
+
+            pickingRtState.currentSku = null;
+            pickingRtState.currentEan = null;
+
+            if (data.order_fully_picked) {
+                // Ordine completo: non navigare, il tasto EVADI apparirà
+            } else if (drainedLocation) {
+                // Locazione svuotata: resetta e torna a scansionare un'altra ubicazione
+                pickingRtState.currentLocation = null;
+                setTimeout(() => showPickingRtStep('LOCATION'), 600);
+            } else {
+                // C'è ancora stock qui: resta su EAN
+                setTimeout(() => showPickingRtStep('EAN'), 600);
+            }
+        } else {
+            feedback.style.color = '#dc3545';
+            feedback.textContent = `❌ ${data.error || 'Errore durante il prelievo'}`;
+            playPickingRtBeep('error');
+            pickingRtState.errors.push({ error: data.error, timestamp: nowHHMM() });
+            renderPickingRtErrors();
+        }
+    } catch (e) {
+        feedback.style.color = '#dc3545';
+        feedback.textContent = '❌ Errore di rete';
+    }
+}
+
+async function undoPickingRtPick(idx) {
+    const pick = pickingRtState.picksInSession[idx];
+    if (!pick) return;
+    if (!confirm(`Annullare il prelievo di ${pick.quantity} pz di ${pick.product_sku} da ${pick.location_name}?`)) return;
+
+    try {
+        const res = await window.modernAuth.authenticatedFetch(`/orders/${pickingRtState.orderId}/realtime-undo-pick`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                order_line_id: pick.order_line_id,
+                location_name: pick.location_name,
+                product_sku: pick.product_sku,
+                quantity: pick.quantity
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            pickingRtState.picksInSession.splice(idx, 1);
+            const planLine = pickingRtState.pickingPlan.find(l => l.order_line_id === pick.order_line_id);
+            if (planLine) {
+                planLine.picked_quantity = data.new_picked_quantity;
+                planLine.remaining = data.new_remaining;
+            }
+            // Aggiorna localStorage dopo annullamento
+            savePickingRtSession();
+            renderPickingRtPlan();
+            renderPickingRtPicksLog();
+            checkPickingRtOrderComplete();
+        } else {
+            alert(`❌ ${data.error || 'Errore durante l\'annullamento'}`);
+        }
+    } catch (e) {
+        alert('❌ Errore di rete durante l\'annullamento');
+    }
+}
+
+function checkPickingRtOrderComplete() {
+    const allDone = pickingRtState.pickingPlan.every(l => l.remaining <= 0);
+    const btn = document.getElementById('prt-fulfill-btn');
+    if (btn) btn.style.display = allDone ? 'inline-block' : 'none';
+}
+
+async function fulfillPickingRtOrder() {
+    if (!confirm(`Evadere l'ordine #${pickingRtState.orderNumber}? Tutti i prelievi sono stati completati.`)) return;
+
+    try {
+        const res = await window.modernAuth.authenticatedFetch(`/orders/${pickingRtState.orderId}/fulfill`, { method: 'POST' });
+        if (res.ok) {
+            // Ordine evaso: cancella la sessione salvata
+            clearPickingRtSession(pickingRtState.orderId);
+            alert(`✅ Ordine #${pickingRtState.orderNumber} evaso con successo!`);
+            closePickingRealtimeOverlay();
+            location.reload();
+        } else {
+            const err = await res.json();
+            alert(`❌ Errore evasione: ${err.detail || 'Errore sconosciuto'}`);
+        }
+    } catch (e) {
+        alert('❌ Errore di rete durante l\'evasione');
+    }
+}
+
+// --- Bottom sheet: ubicazioni prodotto ---
+
+async function showProductLocations(sku, productName) {
+    const sheet = document.getElementById('prt-locations-sheet');
+    const backdrop = document.getElementById('prt-sheet-backdrop');
+    sheet.style.display = 'block';
+    backdrop.style.display = 'block';
+    document.getElementById('prt-sheet-sku').textContent = `📦 ${sku}`;
+    document.getElementById('prt-sheet-name').textContent = productName || '';
+    document.getElementById('prt-sheet-remaining').textContent = '';
+    document.getElementById('prt-sheet-locations').innerHTML = '<div style="text-align:center;color:#888;padding:24px;">Caricamento...</div>';
+
+    try {
+        const res = await window.modernAuth.authenticatedFetch(
+            `/orders/${pickingRtState.orderId}/product-locations/${encodeURIComponent(sku)}`
+        );
+        const data = await res.json();
+
+        document.getElementById('prt-sheet-remaining').textContent =
+            `Da prelevare: ${data.remaining_to_pick} pz`;
+
+        if (!data.locations || data.locations.length === 0) {
+            document.getElementById('prt-sheet-locations').innerHTML =
+                '<div style="color:#dc3545;padding:16px;text-align:center;">Nessuna giacenza disponibile</div>';
+            return;
+        }
+
+        document.getElementById('prt-sheet-locations').innerHTML = data.locations.map(loc => `
+            <div style="padding:12px 14px;margin-bottom:8px;border-radius:10px;border:2px solid ${loc.is_suggested ? '#0097E0' : '#e9ecef'};background:${loc.is_suggested ? '#f0f8ff' : '#fafafa'};">
+                <div style="font-size:1.15rem;font-weight:bold;color:#00516E;">${loc.location_name}${loc.is_suggested ? ' <span style="font-size:0.7rem;background:#0097E0;color:white;border-radius:4px;padding:1px 5px;vertical-align:middle;">Suggerita</span>' : ''}</div>
+                <div style="font-size:0.88rem;color:#555;margin-top:2px;">Disponibili: <strong>${loc.available_quantity} pz</strong></div>
+            </div>
+        `).join('');
+    } catch(e) {
+        document.getElementById('prt-sheet-locations').innerHTML =
+            '<div style="color:#dc3545;padding:16px;text-align:center;">Errore di rete</div>';
+    }
+}
+
+
+function closeProductLocationsSheet() {
+    document.getElementById('prt-locations-sheet').style.display = 'none';
+    document.getElementById('prt-sheet-backdrop').style.display = 'none';
+}
+
+function closePickingRealtimeOverlay() {
+    closeProductLocationsSheet();
+    document.getElementById('picking-realtime-overlay').style.display = 'none';
+    pickingRtState = {
+        orderId: null, orderNumber: null, customerName: null, sessionId: null,
+        pickingPlan: [], scanStep: 'LOCATION', currentLocation: null,
+        currentSku: null, currentEan: null, currentOrderLineId: null,
+        currentMaxPickable: 0, currentReservationId: null,
+        picksInSession: [], errors: [], isProcessing: false, allOrders: []
+    };
+}
+
+function nowHHMM() {
+    const d = new Date();
+    return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+}
+
+function playPickingRtBeep(type) {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = type === 'success' ? 880 : 300;
+        gain.gain.value = 0.3;
+        osc.start();
+        osc.stop(ctx.currentTime + (type === 'success' ? 0.12 : 0.25));
+    } catch(e) {}
+}
+
+// Esponi funzioni picking realtime globalmente
+window.openPickingRealtimeOrderSelection = openPickingRealtimeOrderSelection;
+window.closePickingRealtimeOrderModal = closePickingRealtimeOrderModal;
+window.filterPickingRtOrders = filterPickingRtOrders;
+window.onPickingRtOrderSelect = onPickingRtOrderSelect;
+window.startPickingRealtimeSession = startPickingRealtimeSession;
+window.closePickingRealtimeOverlay = closePickingRealtimeOverlay;
+window.backToLocationStep = backToLocationStep;
+window.backToEanStep = backToEanStep;
+window.pickingRtQtyChange = pickingRtQtyChange;
+window.confirmPickingRtPick = confirmPickingRtPick;
+window.undoPickingRtPick = undoPickingRtPick;
+window.fulfillPickingRtOrder = fulfillPickingRtOrder;
+window.showProductLocations = showProductLocations;
+window.closeProductLocationsSheet = closeProductLocationsSheet;

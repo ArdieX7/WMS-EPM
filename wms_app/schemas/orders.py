@@ -129,3 +129,142 @@ class OrderEditResponse(BaseModel):
     message: str
     warnings: List[OrderEditWarning] = []
     order: "Order"  # Forward reference
+
+
+# --- Schemi per Prelievi Real-Time ---
+
+class PickingOpenOrderLine(BaseModel):
+    order_line_id: int
+    product_sku: str
+    product_name: Optional[str] = None
+    requested_quantity: int
+    picked_quantity: int
+    remaining: int
+
+class PickingOpenOrder(BaseModel):
+    order_id: int
+    order_number: str
+    customer_name: str
+    lines: List[PickingOpenOrderLine]
+    total_items: int
+    total_picked: int
+    is_fully_picked: bool
+
+class PickingOpenOrdersResponse(BaseModel):
+    orders: List[PickingOpenOrder]
+
+class PickingPlanLocation(BaseModel):
+    location_name: str
+    available_quantity: int
+    reservation_id: Optional[int] = None
+    to_pick: int
+
+class PickingPlanLine(BaseModel):
+    order_line_id: int
+    product_sku: str
+    product_name: Optional[str] = None
+    ean_codes: List[str] = []
+    requested_quantity: int
+    picked_quantity: int
+    remaining: int
+    suggested_locations: List[PickingPlanLocation] = []
+    status: str  # full_stock, partial_stock, out_of_stock, completed
+
+class ActivatePickingSessionResponse(BaseModel):
+    session_id: str
+    order_id: int
+    order_number: str
+    customer_name: str
+    picking_plan: List[PickingPlanLine]
+
+class ValidateScanLocationRequest(BaseModel):
+    location_name: str
+    session_id: str
+
+    @validator('location_name')
+    def location_name_to_uppercase(cls, v):
+        return v.upper() if v else v
+
+class ProductAtLocation(BaseModel):
+    product_sku: str
+    product_name: Optional[str] = None
+    order_line_id: int
+    available_quantity: int
+    needed: int
+    ean_codes: List[str] = []
+
+class ValidateScanLocationResponse(BaseModel):
+    valid: bool
+    location_name: str
+    products_available: List[ProductAtLocation] = []
+    error: Optional[str] = None
+    status: Optional[str] = None
+
+class ValidateScanEanRequest(BaseModel):
+    ean_code: str
+    location_name: str
+    session_id: str
+
+    @validator('location_name')
+    def location_name_to_uppercase(cls, v):
+        return v.upper() if v else v
+
+class ValidateScanEanResponse(BaseModel):
+    valid: bool
+    product_sku: Optional[str] = None
+    product_name: Optional[str] = None
+    order_line_id: Optional[int] = None
+    available_at_location: Optional[int] = None
+    remaining_to_pick: Optional[int] = None
+    max_pickable: Optional[int] = None
+    error: Optional[str] = None
+    status: Optional[str] = None
+
+class RealtimeCommitPickRequest(BaseModel):
+    order_line_id: int
+    product_sku: str
+    location_name: str
+    quantity: int
+    session_id: str
+    reservation_id: Optional[int] = None
+
+    @validator('location_name')
+    def location_name_to_uppercase(cls, v):
+        return v.upper() if v else v
+
+    @validator('quantity')
+    def quantity_must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError('La quantità deve essere positiva')
+        return v
+
+class RealtimeCommitPickResponse(BaseModel):
+    success: bool
+    product_sku: Optional[str] = None
+    location_name: Optional[str] = None
+    quantity_picked: Optional[int] = None
+    new_picked_quantity: Optional[int] = None
+    new_remaining: Optional[int] = None
+    product_completed: Optional[bool] = None
+    order_fully_picked: Optional[bool] = None
+    progress: Optional[str] = None
+    error: Optional[str] = None
+    status: Optional[str] = None
+
+class RealtimeUndoPickRequest(BaseModel):
+    order_line_id: int
+    location_name: str
+    product_sku: str
+    quantity: int
+
+    @validator('location_name')
+    def location_name_to_uppercase(cls, v):
+        return v.upper() if v else v
+
+class RealtimeUndoPickResponse(BaseModel):
+    success: bool
+    quantity_restored: Optional[int] = None
+    new_picked_quantity: Optional[int] = None
+    new_remaining: Optional[int] = None
+    error: Optional[str] = None
+    status: Optional[str] = None

@@ -42,6 +42,7 @@
             <button class="action-btn mobile-hide" onclick="openOverlay('create-order-overlay')">➕ Crea Nuovo Ordine</button>
             <button class="action-btn mobile-hide" onclick="openExportOrdersOverlay()">📤 Esporta Dati</button>
             <button class="action-btn" onclick="openOverlay('picking-file-overlay')">📋 Prelievo da File</button>
+            <button class="action-btn" onclick="openPickingRealtimeOrderSelection()" data-permission="orders_picking_scan" style="background: linear-gradient(135deg, #FF5913, #e04d10);">📱 Prelievi Real-Time</button>
         </div>
     </div>
 
@@ -871,8 +872,162 @@
     <!-- Libreria ZXing per confronto -->
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     
+    <!-- ====================================================
+         PRELIEVI REAL-TIME: Modal Selezione Ordine
+         ==================================================== -->
+    <div id="picking-realtime-order-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3>📱 Prelievi Real-Time — Seleziona Ordine</h3>
+                <span class="close" onclick="closePickingRealtimeOrderModal()">✕</span>
+            </div>
+            <div class="modal-body">
+                <input type="text"
+                       id="picking-rt-search"
+                       placeholder="🔍 Cerca ordine o cliente..."
+                       oninput="filterPickingRtOrders(this.value)"
+                       style="width: 100%; margin-bottom: 12px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+                <div id="picking-rt-orders-list" style="max-height: 380px; overflow-y: auto;"></div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <span id="picking-rt-selected-label" style="color: #666; font-size: 0.9rem;">Nessun ordine selezionato</span>
+                <button class="btn btn-primary btn-lg" id="picking-rt-start-btn" onclick="startPickingRealtimeSession()" disabled>
+                    🚀 Inizia Prelievo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================
+         PRELIEVI REAL-TIME: Overlay Scanner Full-Screen
+         ==================================================== -->
+    <div id="picking-realtime-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8f9fa; z-index: 9999; overflow-y: auto;">
+        <div id="prt-body" style="max-width: 700px; margin: 0 auto; padding: 16px; padding-bottom: 100px;">
+
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #00516E, #0097E0); color: white; padding: 14px 18px; border-radius: 10px; margin-bottom: 16px;">
+                <div>
+                    <div style="font-size: 1.1rem; font-weight: bold;" id="prt-header-order">Prelievi Real-Time</div>
+                    <div style="font-size: 0.85rem; opacity: 0.85;" id="prt-header-customer"></div>
+                </div>
+                <button onclick="closePickingRealtimeOverlay()" style="background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 1rem;">✕ Chiudi</button>
+            </div>
+
+            <!-- Scanner -->
+            <div style="background: white; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);" id="prt-scanner-section">
+
+                <!-- Step LOCATION -->
+                <div id="prt-step-location">
+                    <div style="text-align: center; color: #00516E; font-weight: bold; font-size: 1rem; margin-bottom: 12px;">📍 STEP 1 — SCANSIONA UBICAZIONE</div>
+                    <input type="text" id="prt-location-input"
+                           placeholder="Spara il barcode dell'ubicazione..."
+                           autocomplete="off" inputmode="none" readonly
+                           style="width: 100%; padding: 14px; font-size: 1.1rem; border: 2px solid #0097E0; border-radius: 8px; text-align: center; box-sizing: border-box; background: #f0f8ff;">
+                    <div id="prt-location-feedback" style="min-height: 28px; text-align: center; font-weight: bold; margin-top: 8px; font-size: 0.95rem;"></div>
+                </div>
+
+                <!-- Step EAN (nascosto inizialmente) -->
+                <div id="prt-step-ean" style="display: none;">
+                    <div style="background: #e8f4f8; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; border-left: 4px solid #0097E0;">
+                        <div style="font-size: 0.85rem; color: #666;">📍 Ubicazione attiva:</div>
+                        <div style="font-size: 1.2rem; font-weight: bold; color: #00516E;" id="prt-current-location-label">—</div>
+                        <div style="font-size: 0.85rem; color: #555; margin-top: 4px;" id="prt-location-products-hint"></div>
+                    </div>
+                    <div style="text-align: center; color: #FF5913; font-weight: bold; font-size: 1rem; margin-bottom: 12px;">🏷️ STEP 2 — SCANSIONA EAN PRODOTTO</div>
+                    <input type="text" id="prt-ean-input"
+                           placeholder="Spara il barcode del prodotto..."
+                           autocomplete="off" inputmode="none" readonly
+                           style="width: 100%; padding: 14px; font-size: 1.1rem; border: 2px solid #FF5913; border-radius: 8px; text-align: center; box-sizing: border-box; background: #fff8f5;">
+                    <div id="prt-ean-feedback" style="min-height: 28px; text-align: center; font-weight: bold; margin-top: 8px; font-size: 0.95rem;"></div>
+                    <button onclick="backToLocationStep()" style="margin-top: 10px; background: none; border: none; color: #0097E0; cursor: pointer; font-size: 0.9rem; text-decoration: underline;">← Cambia ubicazione</button>
+                </div>
+
+                <!-- Step CONFIRM (nascosto inizialmente) -->
+                <div id="prt-step-confirm" style="display: none;">
+                    <div style="background: #f0fff4; border-radius: 8px; padding: 12px 16px; margin-bottom: 14px; border-left: 4px solid #28a745;">
+                        <div style="font-size: 0.85rem; color: #666;">📍 <span id="prt-confirm-location">—</span></div>
+                        <div style="font-size: 1.1rem; font-weight: bold; color: #00516E;" id="prt-confirm-product">—</div>
+                        <div style="font-size: 0.85rem; color: #555;" id="prt-confirm-remaining">—</div>
+                    </div>
+                    <div style="text-align: center; color: #28a745; font-weight: bold; font-size: 1rem; margin-bottom: 14px;">✅ STEP 3 — QUANTITÀ E CONFERMA</div>
+                    <!-- Contatore quantità -->
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 16px;">
+                        <button onclick="pickingRtQtyChange(-1)" style="width: 48px; height: 48px; font-size: 1.5rem; border-radius: 50%; border: 2px solid #ddd; background: white; cursor: pointer;">−</button>
+                        <div style="text-align: center;">
+                            <input type="number" id="prt-qty-input" value="1" min="1"
+                                   style="width: 80px; text-align: center; font-size: 1.8rem; font-weight: bold; border: 2px solid #28a745; border-radius: 8px; padding: 6px; color: #00516E;">
+                            <div style="font-size: 0.8rem; color: #888; margin-top: 2px;" id="prt-qty-hint">max: —</div>
+                        </div>
+                        <button onclick="pickingRtQtyChange(+1)" style="width: 48px; height: 48px; font-size: 1.5rem; border-radius: 50%; border: 2px solid #ddd; background: white; cursor: pointer;">+</button>
+                    </div>
+                    <!-- Pulsante Scan EAN aggiuntivo -->
+                    <div style="text-align: center; font-size: 0.85rem; color: #666; margin-bottom: 10px;">Scansiona di nuovo l'EAN per incrementare (+1)</div>
+                    <input type="text" id="prt-confirm-scan-input"
+                           placeholder="Scan EAN per +1 oppure conferma..."
+                           autocomplete="off" inputmode="none" readonly
+                           style="width: 100%; padding: 10px; font-size: 0.95rem; border: 1px dashed #28a745; border-radius: 8px; text-align: center; box-sizing: border-box; background: #f9fff9; margin-bottom: 12px;">
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="backToEanStep()" style="flex: 1; padding: 12px; background: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem;">← Nuova EAN</button>
+                        <button onclick="confirmPickingRtPick()" style="flex: 2; padding: 12px; background: linear-gradient(135deg, #28a745, #20963b); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: bold;">✓ CONFERMA PRELIEVO</button>
+                    </div>
+                    <div id="prt-confirm-feedback" style="min-height: 24px; text-align: center; font-weight: bold; margin-top: 8px; font-size: 0.9rem;"></div>
+                </div>
+            </div>
+
+            <!-- Piano Picking -->
+            <div style="background: white; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                <h3 style="margin: 0 0 12px 0; color: #00516E; font-size: 1rem;">📋 Piano di Prelievo</h3>
+                <div id="prt-picking-plan"></div>
+            </div>
+
+            <!-- Log Prelievi Sessione -->
+            <div style="background: white; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                <h3 style="margin: 0 0 10px 0; color: #28a745; font-size: 1rem;">✅ Prelievi Sessione (<span id="prt-picks-count">0</span>)</h3>
+                <div id="prt-picks-log" style="max-height: 200px; overflow-y: auto;"></div>
+            </div>
+
+            <!-- Log Errori -->
+            <div id="prt-errors-section" style="background: white; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: none;">
+                <h3 style="margin: 0 0 10px 0; color: #dc3545; font-size: 1rem;">⚠️ Segnalazioni (<span id="prt-errors-count">0</span>)</h3>
+                <div id="prt-errors-log" style="max-height: 150px; overflow-y: auto;"></div>
+            </div>
+        </div>
+
+        <!-- Footer fisso -->
+        <div style="position: fixed; bottom: 0; left: 0; width: 100%; background: white; border-top: 2px solid #dee2e6; padding: 12px 20px; text-align: center; z-index: 10000; box-shadow: 0 -4px 12px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.8rem; color: #28a745; margin-bottom: 6px;">💾 Salvataggio automatico attivo</div>
+            <button id="prt-fulfill-btn" onclick="fulfillPickingRtOrder()" style="display: none; background: linear-gradient(135deg, #00516E, #0097E0); color: white; border: none; border-radius: 8px; padding: 12px 32px; font-size: 1rem; font-weight: bold; cursor: pointer; width: 100%; max-width: 400px;">
+                ✅ EVADI ORDINE — Tutti i prelievi completati
+            </button>
+        </div>
+
+        <!-- Backdrop bottom sheet ubicazioni -->
+        <div id="prt-sheet-backdrop" onclick="closeProductLocationsSheet()" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); z-index: 10001;"></div>
+
+        <!-- Bottom sheet: ubicazioni prodotto -->
+        <div id="prt-locations-sheet" style="display: none; position: fixed; bottom: 0; left: 0; width: 100%; z-index: 10002; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 24px rgba(0,0,0,0.25); max-height: 72vh; overflow-y: auto;">
+            <!-- Drag handle -->
+            <div style="display: flex; justify-content: center; padding: 10px 0 2px;">
+                <div style="width: 40px; height: 4px; background: #dee2e6; border-radius: 2px;"></div>
+            </div>
+            <div style="padding: 0 16px 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                    <div>
+                        <div style="font-weight: bold; font-size: 1rem; color: #00516E;" id="prt-sheet-sku"></div>
+                        <div style="font-size: 0.82rem; color: #666; margin-top: 1px;" id="prt-sheet-name"></div>
+                    </div>
+                    <button onclick="closeProductLocationsSheet()" style="background: #f1f3f4; border: none; border-radius: 50%; width: 34px; height: 34px; cursor: pointer; font-size: 1rem; flex-shrink: 0; margin-left: 12px;">✕</button>
+                </div>
+                <div style="font-size: 0.85rem; color: #FF5913; font-weight: bold; margin-bottom: 14px;" id="prt-sheet-remaining"></div>
+                <div id="prt-sheet-locations">
+                    <div style="text-align: center; color: #888; padding: 24px;">Caricamento...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {% include 'partials/footer.html' %}
-    
+
     <!-- Scripts in ordine ottimizzato per caricamento rapido -->
     <script>
         // Protezione pagina con nuovo sistema
@@ -881,7 +1036,7 @@
         });
     </script>
     <script src="/static/js/enhanced-upload.js"></script>
-    <script src="/static/js/orders.js?v=2025082719direct"></script>
+    <script src="/static/js/orders.js?v=20260225prt5"></script>
     <script src="/static/js/navbar.js"></script>
     <script src="/static/js/mobile-navbar.js"></script>
 </body>
