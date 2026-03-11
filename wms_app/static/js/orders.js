@@ -309,7 +309,7 @@
                                     <button class="edit-order-button" data-order-id="${order.id}" style="background-color: #17a2b8; margin-left: 5px;" title="Modifica ordine">
                                         ✏️ Modifica
                                     </button>
-                                    <button class="cancel-order-button" data-order-id="${order.id}" style="background-color: #dc3545; margin-left: 5px;">
+                                    <button class="cancel-order-button" data-order-id="${order.id}" style="background-color: #f0f0f0; margin-left: 5px;">
                                         ❌
                                     </button>
                                 `;
@@ -5366,14 +5366,9 @@ function renderPickingRtUI() {
 
 function renderPickingRtPlan() {
     const container = document.getElementById('prt-picking-plan');
-    // Aggiorna il piano con la picked_quantity corrente della sessione
-    const sessionPickedBySku = {};
-    for (const pick of pickingRtState.picksInSession) {
-        sessionPickedBySku[pick.product_sku] = (sessionPickedBySku[pick.product_sku] || 0) + pick.quantity;
-    }
 
     const rows = pickingRtState.pickingPlan.map(line => {
-        const totalPicked = line.picked_quantity + (sessionPickedBySku[line.product_sku] || 0);
+        const totalPicked = line.picked_quantity; // aggiornato dal server dopo ogni confirm
         const remaining = line.requested_quantity - totalPicked;
         const pct = line.requested_quantity > 0 ? Math.round((totalPicked / line.requested_quantity) * 100) : 0;
         const done = remaining <= 0;
@@ -5634,6 +5629,7 @@ function pickingRtQtyChange(delta) {
 async function confirmPickingRtPick() {
     const qty = parseInt(document.getElementById('prt-qty-input').value) || 1;
     const feedback = document.getElementById('prt-confirm-feedback');
+    const drainedLocation = (qty >= pickingRtState.currentMaxPickable);
 
     if (qty < 1 || qty > pickingRtState.currentMaxPickable) {
         feedback.style.color = '#dc3545';
@@ -5688,10 +5684,19 @@ async function confirmPickingRtPick() {
             renderPickingRtPicksLog();
             checkPickingRtOrderComplete();
 
-            // Torna a step EAN nella stessa ubicazione
             pickingRtState.currentSku = null;
             pickingRtState.currentEan = null;
-            setTimeout(() => showPickingRtStep('EAN'), 600);
+
+            if (data.order_fully_picked) {
+                // Ordine completo: non navigare, il tasto EVADI apparirà
+            } else if (drainedLocation) {
+                // Locazione svuotata: resetta e torna a scansionare un'altra ubicazione
+                pickingRtState.currentLocation = null;
+                setTimeout(() => showPickingRtStep('LOCATION'), 600);
+            } else {
+                // C'è ancora stock qui: resta su EAN
+                setTimeout(() => showPickingRtStep('EAN'), 600);
+            }
         } else {
             feedback.style.color = '#dc3545';
             feedback.textContent = `❌ ${data.error || 'Errore durante il prelievo'}`;
