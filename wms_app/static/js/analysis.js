@@ -771,6 +771,25 @@ class OrdersChartsManager {
             previousMonthPieces.textContent = data.previous_month.name;
         }
 
+        // Update PLT data
+        const currentPltValue = document.getElementById('plt-current-month')?.querySelector('.kpi-value');
+        if (currentPltValue) {
+            currentPltValue.textContent = data.current_month.plt_total.toLocaleString();
+        }
+        const currentMonthPlt = document.getElementById('current-month-plt');
+        if (currentMonthPlt) {
+            currentMonthPlt.textContent = data.current_month.name;
+        }
+
+        const previousPltValue = document.getElementById('plt-previous-month')?.querySelector('.kpi-value');
+        if (previousPltValue) {
+            previousPltValue.textContent = data.previous_month.plt_total.toLocaleString();
+        }
+        const previousMonthPlt = document.getElementById('previous-month-plt');
+        if (previousMonthPlt) {
+            previousMonthPlt.textContent = data.previous_month.name;
+        }
+
         // Update chart titles
         const currentChartMonth = document.getElementById('current-chart-month');
         if (currentChartMonth) {

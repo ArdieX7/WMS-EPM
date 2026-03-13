@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse, HTMLResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case, or_, extract, and_
+from sqlalchemy import func, case, or_, extract, and_, Integer, cast
 from typing import List, Dict, Any
 import io
 from datetime import datetime, timedelta
@@ -99,7 +99,31 @@ def get_orders_statistics(db: Session = Depends(get_db), current_user = Depends(
         )
     )
     previous_month_pieces = previous_month_pieces_query.scalar() or 0
-    
+
+    # Get total PLT shipped for current month
+    current_month_plt = db.query(func.sum(cast(Order.plt_number, Integer))).filter(
+        and_(
+            extract('month', Order.archived_date) == current_month,
+            extract('year', Order.archived_date) == current_year,
+            Order.is_archived == 1,
+            Order.is_cancelled == 0,
+            Order.plt_number.isnot(None),
+            Order.plt_number != ''
+        )
+    ).scalar() or 0
+
+    # Get total PLT shipped for previous month
+    previous_month_plt = db.query(func.sum(cast(Order.plt_number, Integer))).filter(
+        and_(
+            extract('month', Order.archived_date) == previous_month,
+            extract('year', Order.archived_date) == previous_year,
+            Order.is_archived == 1,
+            Order.is_cancelled == 0,
+            Order.plt_number.isnot(None),
+            Order.plt_number != ''
+        )
+    ).scalar() or 0
+
     # Get top products for current month (for pie chart)
     current_month_products_query = db.query(
         OrderLine.product_sku,
@@ -153,12 +177,14 @@ def get_orders_statistics(db: Session = Depends(get_db), current_user = Depends(
             "name": month_names[current_month],
             "orders_count": current_month_orders,
             "pieces_total": current_month_pieces,
+            "plt_total": current_month_plt,
             "top_products": current_month_products
         },
         "previous_month": {
             "name": month_names[previous_month],
             "orders_count": previous_month_orders,
             "pieces_total": previous_month_pieces,
+            "plt_total": previous_month_plt,
             "top_products": previous_month_products
         }
     }

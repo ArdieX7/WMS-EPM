@@ -5211,12 +5211,33 @@
 
         let currentEditPltOrderId = null;
 
+        function showPltToast(message, isError = false) {
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed; bottom: 30px; right: 30px; z-index: 99999;
+                background: ${isError ? '#dc3545' : '#28a745'};
+                color: white; padding: 12px 20px; border-radius: 8px;
+                font-weight: 600; font-size: 0.95rem;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                opacity: 0; transition: opacity 0.2s ease;
+            `;
+            document.body.appendChild(toast);
+            requestAnimationFrame(() => { toast.style.opacity = '1'; });
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 200);
+            }, 2500);
+        }
+
         function showEditPltOverlay(orderId, orderNumber, currentPlt) {
             currentEditPltOrderId = orderId;
             document.getElementById('edit-plt-order-number').textContent = orderNumber;
             document.getElementById('edit-plt-current').textContent = currentPlt || '—';
-            document.getElementById('new-plt-input').value = currentPlt || '';
+            const input = document.getElementById('new-plt-input');
+            input.value = currentPlt || '';
             document.getElementById('edit-plt-overlay').style.display = 'flex';
+            setTimeout(() => input.focus(), 50);
         }
 
         function closeEditPltOverlay() {
@@ -5224,17 +5245,18 @@
             currentEditPltOrderId = null;
         }
 
+        document.getElementById('new-plt-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); confirmUpdatePlt(); }
+            if (e.key === 'Escape') { closeEditPltOverlay(); }
+        });
+
         async function confirmUpdatePlt() {
-            if (!currentEditPltOrderId) {
-                alert('Errore: nessun ordine selezionato');
-                return;
-            }
+            if (!currentEditPltOrderId) return;
 
             const newPlt = document.getElementById('new-plt-input').value.trim();
 
-            // Validazione client-side
             if (newPlt && (!/^\d+$/.test(newPlt) || parseInt(newPlt) < 1 || parseInt(newPlt) > 99)) {
-                alert('Il numero PLT deve essere un valore tra 1 e 99');
+                showPltToast('❌ PLT deve essere un numero tra 1 e 99', true);
                 return;
             }
 
@@ -5248,22 +5270,20 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    // Aggiorna la cella direttamente nel DOM senza ricaricare la tabella
                     const span = document.querySelector(`.plt-value[data-order-id="${currentEditPltOrderId}"]`);
                     if (span) span.textContent = result.plt_number || '—';
                     const btn = document.querySelector(`.edit-plt-button[data-order-id="${currentEditPltOrderId}"]`);
                     if (btn) btn.setAttribute('data-plt', result.plt_number || '');
 
                     closeEditPltOverlay();
-                    alert(`✅ PLT aggiornato per l'ordine #${result.order_number}`);
+                    showPltToast(`✅ PLT aggiornato — Ordine #${result.order_number}`);
                 } else {
-                    const errorMessage = result.detail || result.message || 'Errore sconosciuto';
-                    alert(`❌ ${errorMessage}`);
+                    showPltToast(`❌ ${result.detail || 'Errore sconosciuto'}`, true);
                 }
             } catch (error) {
                 console.error("Errore durante l'aggiornamento PLT:", error);
-                alert(`❌ Errore di rete durante l'aggiornamento PLT\n\nDettaglio: ${error.message || error}`);
                 closeEditPltOverlay();
+                showPltToast('❌ Errore di rete', true);
             }
         }
 
