@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_, or_, text
 from wms_app.routers.auth import require_permission
 from wms_app.middleware.auth_middleware import AuthMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -108,6 +108,20 @@ def ensure_granular_permissions():
 
 
 ensure_granular_permissions()
+
+
+def ensure_db_migrations():
+    """Aggiunge colonne mancanti al DB per retrocompatibilità con versioni precedenti."""
+    with database.engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE orders ADD COLUMN plt_number VARCHAR"))
+            conn.commit()
+            print("✅ Migration: aggiunta colonna plt_number alla tabella orders")
+        except Exception:
+            pass  # Colonna già esistente, nessun problema
+
+
+ensure_db_migrations()
 
 app = FastAPI(title="WMS EPM")
 

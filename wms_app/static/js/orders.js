@@ -949,18 +949,23 @@
                 try {
                     // Richiedi il numero DDT all'operatore
                     const ddtNumber = prompt("Inserisci il numero DDT per l'ordine evaso:");
-                    
+
                     // Se l'utente annulla il prompt, non procedere
                     if (ddtNumber === null) {
                         return;
                     }
-                    
+
                     // Valida che il numero DDT non sia vuoto
                     if (ddtNumber.trim() === '') {
                         alert("Il numero DDT non può essere vuoto.");
                         return;
                     }
-                    
+
+                    // Richiedi il numero di PLT
+                    const pltInput = prompt("Inserisci il numero di PLT (pallet) usciti con l'ordine (lascia vuoto se non applicabile):");
+                    if (pltInput === null) return; // annullato
+                    const pltNumber = pltInput.trim();
+
                     // Prima marca l'ordine come completato
                     const fulfillResponse = await fetch(`/orders/${orderId}/fulfill`, {
                         method: "POST",
@@ -974,21 +979,22 @@
                         return;
                     }
 
-                    // Poi archivia l'ordine con il numero DDT
+                    // Poi archivia l'ordine con DDT e PLT
                     const archiveResponse = await fetch(`/orders/${orderId}/archive`, {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
+                        headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             order_id: parseInt(orderId),
-                            ddt_number: ddtNumber.trim()
+                            ddt_number: ddtNumber.trim(),
+                            plt_number: pltNumber || null
                         })
                     });
-                    
+
                     if (archiveResponse.ok) {
-                        alert(`Ordine evaso e archiviato con successo! DDT: ${ddtNumber.trim()}`);
+                        const pltMsg = pltNumber ? ` — PLT: ${pltNumber}` : '';
+                        alert(`Ordine evaso e archiviato con successo! DDT: ${ddtNumber.trim()}${pltMsg}`);
                         fetchOrders();
+                        fetchArchivedOrders();
                     } else {
                         const error = await archiveResponse.json();
                         alert(`Errore nell'archiviazione: ${error.detail}`);
@@ -2057,12 +2063,18 @@
                 try {
                     // Per ordini già completati, potrebbe già avere un DDT o richiederne uno nuovo
                     let ddtNumber = prompt("Inserisci il numero DDT per l'ordine (lascia vuoto se già presente):");
-                    
+
                     // Se l'utente annulla il prompt, non procedere
                     if (ddtNumber === null) {
                         return;
                     }
-                    
+
+                    const pltInput = prompt("Inserisci il numero di PLT (pallet) usciti con l'ordine (lascia vuoto se non applicabile):");
+                    if (pltInput === null) {
+                        return;
+                    }
+                    const pltNumber = pltInput.trim();
+
                     // Permetti DDT vuoto per ordini già completati che potrebbero già avere un DDT
                     const response = await fetch(`/orders/${orderId}/archive`, {
                         method: "POST",
@@ -2071,7 +2083,8 @@
                         },
                         body: JSON.stringify({
                             order_id: parseInt(orderId),
-                            ddt_number: ddtNumber ? ddtNumber.trim() : null
+                            ddt_number: ddtNumber ? ddtNumber.trim() : null,
+                            plt_number: pltNumber || null
                         })
                     });
                     
@@ -2079,7 +2092,8 @@
                     
                     if (response.ok) {
                         alert(`Ordine archiviato con successo: ${result.message}`);
-                        fetchOrders(); // Ricarica la lista degli ordini
+                        fetchOrders();
+                        fetchArchivedOrders();
                     } else {
                         alert(`Errore nell'archiviazione: ${result.detail}`);
                     }
@@ -2194,6 +2208,19 @@
                                 </td>
                                 <td>${orderStatusText}</td>
                                 <td>${order.ddt_number || '-'}</td>
+                                <td style="text-align: center;">
+                                    <span class="plt-value" data-order-id="${order.id}">${order.plt_number || '—'}</span>
+                                    <button class="edit-plt-button"
+                                            data-order-id="${order.id}"
+                                            data-order-number="${order.order_number}"
+                                            data-plt="${order.plt_number || ''}"
+                                            style="background: none; border: none; cursor: pointer; margin-left: 5px; font-size: 1.1em; opacity: 0.6; transition: opacity 0.2s;"
+                                            onmouseover="this.style.opacity='1'"
+                                            onmouseout="this.style.opacity='0.6'"
+                                            title="Modifica N° PLT">
+                                        ✏️
+                                    </button>
+                                </td>
                                 <td style="text-align: center;">${formattedWeight}</td>
                                 <td>
                                     <button class="view-archived-order-button" data-order-id="${order.id}">
@@ -2245,8 +2272,19 @@
                                 showEditArchivedDateOverlay(orderId, orderNumber, currentDate);
                             });
                         });
+
+                        // Gestore per modifica PLT
+                        document.querySelectorAll(".edit-plt-button").forEach(button => {
+                            button.addEventListener("click", function(e) {
+                                e.stopPropagation();
+                                const orderId = this.getAttribute("data-order-id");
+                                const orderNumber = this.getAttribute("data-order-number");
+                                const currentPlt = this.getAttribute("data-plt");
+                                showEditPltOverlay(orderId, orderNumber, currentPlt);
+                            });
+                        });
                     } else {
-                        archivedOrdersTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #666;">Nessun ordine archiviato</td></tr>';
+                        archivedOrdersTableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #666;">Nessun ordine archiviato</td></tr>';
                     }
             }
 
@@ -2286,11 +2324,15 @@
                             aValue = a.total_weight || 0;
                             bValue = b.total_weight || 0;
                             break;
+                        case 'plt_number':
+                            aValue = parseInt(a.plt_number) || 0;
+                            bValue = parseInt(b.plt_number) || 0;
+                            break;
                         default:
                             return 0;
                     }
-                    
-                    if (column === 'order_date' || column === 'archived_at' || column === 'id' || column === 'total_weight') {
+
+                    if (column === 'order_date' || column === 'archived_at' || column === 'id' || column === 'total_weight' || column === 'plt_number') {
                         return direction === 'asc' ? aValue - bValue : bValue - aValue;
                     } else {
                         return direction === 'asc' ? 
@@ -5162,6 +5204,72 @@
         window.showEditArchivedDateOverlay = showEditArchivedDateOverlay;
         window.closeEditArchivedDateOverlay = closeEditArchivedDateOverlay;
         window.confirmUpdateArchivedDate = confirmUpdateArchivedDate;
+
+        // ============================================================
+        // EDIT PLT OVERLAY
+        // ============================================================
+
+        let currentEditPltOrderId = null;
+
+        function showEditPltOverlay(orderId, orderNumber, currentPlt) {
+            currentEditPltOrderId = orderId;
+            document.getElementById('edit-plt-order-number').textContent = orderNumber;
+            document.getElementById('edit-plt-current').textContent = currentPlt || '—';
+            document.getElementById('new-plt-input').value = currentPlt || '';
+            document.getElementById('edit-plt-overlay').style.display = 'flex';
+        }
+
+        function closeEditPltOverlay() {
+            document.getElementById('edit-plt-overlay').style.display = 'none';
+            currentEditPltOrderId = null;
+        }
+
+        async function confirmUpdatePlt() {
+            if (!currentEditPltOrderId) {
+                alert('Errore: nessun ordine selezionato');
+                return;
+            }
+
+            const newPlt = document.getElementById('new-plt-input').value.trim();
+
+            // Validazione client-side
+            if (newPlt && (!/^\d+$/.test(newPlt) || parseInt(newPlt) < 1 || parseInt(newPlt) > 99)) {
+                alert('Il numero PLT deve essere un valore tra 1 e 99');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/orders/${currentEditPltOrderId}/update-plt`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plt_number: newPlt || null })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Aggiorna la cella direttamente nel DOM senza ricaricare la tabella
+                    const span = document.querySelector(`.plt-value[data-order-id="${currentEditPltOrderId}"]`);
+                    if (span) span.textContent = result.plt_number || '—';
+                    const btn = document.querySelector(`.edit-plt-button[data-order-id="${currentEditPltOrderId}"]`);
+                    if (btn) btn.setAttribute('data-plt', result.plt_number || '');
+
+                    closeEditPltOverlay();
+                    alert(`✅ PLT aggiornato per l'ordine #${result.order_number}`);
+                } else {
+                    const errorMessage = result.detail || result.message || 'Errore sconosciuto';
+                    alert(`❌ ${errorMessage}`);
+                }
+            } catch (error) {
+                console.error("Errore durante l'aggiornamento PLT:", error);
+                alert(`❌ Errore di rete durante l'aggiornamento PLT\n\nDettaglio: ${error.message || error}`);
+                closeEditPltOverlay();
+            }
+        }
+
+        window.showEditPltOverlay = showEditPltOverlay;
+        window.closeEditPltOverlay = closeEditPltOverlay;
+        window.confirmUpdatePlt = confirmUpdatePlt;
 
 // ============================================================
 // PRELIEVI REAL-TIME
