@@ -436,6 +436,7 @@ def get_archived_orders(db: Session = Depends(get_db)):
                 "is_completed": bool(order.is_completed),
                 "is_cancelled": bool(order.is_cancelled),
                 "ddt_number": order.ddt_number,
+                "plt_number": order.plt_number,
                 "total_weight": total_weight,
                 "lines": [
                     {
