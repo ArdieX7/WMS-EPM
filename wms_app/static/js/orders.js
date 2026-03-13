@@ -5754,25 +5754,6 @@ function checkPickingRtOrderComplete() {
     if (btn) btn.style.display = allDone ? 'inline-block' : 'none';
 }
 
-async function fulfillPickingRtOrder() {
-    if (!confirm(`Evadere l'ordine #${pickingRtState.orderNumber}? Tutti i prelievi sono stati completati.`)) return;
-
-    try {
-        const res = await window.modernAuth.authenticatedFetch(`/orders/${pickingRtState.orderId}/fulfill`, { method: 'POST' });
-        if (res.ok) {
-            // Ordine evaso: cancella la sessione salvata
-            clearPickingRtSession(pickingRtState.orderId);
-            alert(`✅ Ordine #${pickingRtState.orderNumber} evaso con successo!`);
-            closePickingRealtimeOverlay();
-            location.reload();
-        } else {
-            const err = await res.json();
-            alert(`❌ Errore evasione: ${err.detail || 'Errore sconosciuto'}`);
-        }
-    } catch (e) {
-        alert('❌ Errore di rete durante l\'evasione');
-    }
-}
 
 // --- Bottom sheet: ubicazioni prodotto ---
 
@@ -5821,6 +5802,10 @@ function closeProductLocationsSheet() {
 
 function closePickingRealtimeOverlay() {
     closeProductLocationsSheet();
+    // Se l'ordine era completamente prelevato, pulisci il localStorage
+    const allDone = pickingRtState.pickingPlan.length > 0 &&
+        pickingRtState.pickingPlan.every(l => l.remaining <= 0);
+    if (allDone) clearPickingRtSession(pickingRtState.orderId);
     document.getElementById('picking-realtime-overlay').style.display = 'none';
     pickingRtState = {
         orderId: null, orderNumber: null, customerName: null, sessionId: null,
@@ -5863,6 +5848,5 @@ window.backToEanStep = backToEanStep;
 window.pickingRtQtyChange = pickingRtQtyChange;
 window.confirmPickingRtPick = confirmPickingRtPick;
 window.undoPickingRtPick = undoPickingRtPick;
-window.fulfillPickingRtOrder = fulfillPickingRtOrder;
 window.showProductLocations = showProductLocations;
 window.closeProductLocationsSheet = closeProductLocationsSheet;
