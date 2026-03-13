@@ -2207,7 +2207,19 @@
                                     </button>
                                 </td>
                                 <td>${orderStatusText}</td>
-                                <td>${order.ddt_number || '-'}</td>
+                                <td style="text-align: center;">
+                                    <span class="ddt-value" data-order-id="${order.id}">${order.ddt_number || '—'}</span>
+                                    <button class="edit-ddt-button"
+                                            data-order-id="${order.id}"
+                                            data-order-number="${order.order_number}"
+                                            data-ddt="${order.ddt_number || ''}"
+                                            style="background: none; border: none; cursor: pointer; margin-left: 5px; font-size: 1.1em; opacity: 0.6; transition: opacity 0.2s;"
+                                            onmouseover="this.style.opacity='1'"
+                                            onmouseout="this.style.opacity='0.6'"
+                                            title="Modifica N° DDT">
+                                        ✏️
+                                    </button>
+                                </td>
                                 <td style="text-align: center;">
                                     <span class="plt-value" data-order-id="${order.id}">${order.plt_number || '—'}</span>
                                     <button class="edit-plt-button"
@@ -2281,6 +2293,17 @@
                                 const orderNumber = this.getAttribute("data-order-number");
                                 const currentPlt = this.getAttribute("data-plt");
                                 showEditPltOverlay(orderId, orderNumber, currentPlt);
+                            });
+                        });
+
+                        // Gestore per modifica DDT
+                        document.querySelectorAll(".edit-ddt-button").forEach(button => {
+                            button.addEventListener("click", function(e) {
+                                e.stopPropagation();
+                                const orderId = this.getAttribute("data-order-id");
+                                const orderNumber = this.getAttribute("data-order-number");
+                                const currentDdt = this.getAttribute("data-ddt");
+                                showEditDdtOverlay(orderId, orderNumber, currentDdt);
                             });
                         });
                     } else {
@@ -5211,16 +5234,18 @@
 
         let currentEditPltOrderId = null;
 
-        function showPltToast(message, isError = false) {
+        function showOrderToast(message, isError = false) {
             const toast = document.createElement('div');
             toast.textContent = message;
             toast.style.cssText = `
-                position: fixed; bottom: 30px; right: 30px; z-index: 99999;
+                position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+                z-index: 99999;
                 background: ${isError ? '#dc3545' : '#28a745'};
-                color: white; padding: 12px 20px; border-radius: 8px;
+                color: white; padding: 12px 28px; border-radius: 8px;
                 font-weight: 600; font-size: 0.95rem;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                box-shadow: 0 4px 16px rgba(0,0,0,0.25);
                 opacity: 0; transition: opacity 0.2s ease;
+                white-space: nowrap;
             `;
             document.body.appendChild(toast);
             requestAnimationFrame(() => { toast.style.opacity = '1'; });
@@ -5256,7 +5281,7 @@
             const newPlt = document.getElementById('new-plt-input').value.trim();
 
             if (newPlt && (!/^\d+$/.test(newPlt) || parseInt(newPlt) < 1 || parseInt(newPlt) > 99)) {
-                showPltToast('❌ PLT deve essere un numero tra 1 e 99', true);
+                showOrderToast('❌ PLT deve essere un numero tra 1 e 99', true);
                 return;
             }
 
@@ -5276,20 +5301,82 @@
                     if (btn) btn.setAttribute('data-plt', result.plt_number || '');
 
                     closeEditPltOverlay();
-                    showPltToast(`✅ PLT aggiornato — Ordine #${result.order_number}`);
+                    showOrderToast(`✅ PLT aggiornato — Ordine #${result.order_number}`);
                 } else {
-                    showPltToast(`❌ ${result.detail || 'Errore sconosciuto'}`, true);
+                    showOrderToast(`❌ ${result.detail || 'Errore sconosciuto'}`, true);
                 }
             } catch (error) {
                 console.error("Errore durante l'aggiornamento PLT:", error);
                 closeEditPltOverlay();
-                showPltToast('❌ Errore di rete', true);
+                showOrderToast('❌ Errore di rete', true);
             }
         }
 
         window.showEditPltOverlay = showEditPltOverlay;
         window.closeEditPltOverlay = closeEditPltOverlay;
         window.confirmUpdatePlt = confirmUpdatePlt;
+
+        // ============================================================
+        // EDIT DDT OVERLAY
+        // ============================================================
+
+        let currentEditDdtOrderId = null;
+
+        function showEditDdtOverlay(orderId, orderNumber, currentDdt) {
+            currentEditDdtOrderId = orderId;
+            document.getElementById('edit-ddt-order-number').textContent = orderNumber;
+            document.getElementById('edit-ddt-current').textContent = currentDdt || '—';
+            const input = document.getElementById('new-ddt-input');
+            input.value = currentDdt || '';
+            document.getElementById('edit-ddt-overlay').style.display = 'flex';
+            setTimeout(() => input.focus(), 50);
+        }
+
+        function closeEditDdtOverlay() {
+            document.getElementById('edit-ddt-overlay').style.display = 'none';
+            currentEditDdtOrderId = null;
+        }
+
+        document.getElementById('new-ddt-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); confirmUpdateDdt(); }
+            if (e.key === 'Escape') { closeEditDdtOverlay(); }
+        });
+
+        async function confirmUpdateDdt() {
+            if (!currentEditDdtOrderId) return;
+
+            const newDdt = document.getElementById('new-ddt-input').value.trim();
+
+            try {
+                const response = await fetch(`/orders/${currentEditDdtOrderId}/update-ddt`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ddt_number: newDdt || null })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    const span = document.querySelector(`.ddt-value[data-order-id="${currentEditDdtOrderId}"]`);
+                    if (span) span.textContent = result.ddt_number || '—';
+                    const btn = document.querySelector(`.edit-ddt-button[data-order-id="${currentEditDdtOrderId}"]`);
+                    if (btn) btn.setAttribute('data-ddt', result.ddt_number || '');
+
+                    closeEditDdtOverlay();
+                    showOrderToast(`✅ DDT aggiornato — Ordine #${result.order_number}`);
+                } else {
+                    showOrderToast(`❌ ${result.detail || 'Errore sconosciuto'}`, true);
+                }
+            } catch (error) {
+                console.error("Errore durante l'aggiornamento DDT:", error);
+                closeEditDdtOverlay();
+                showOrderToast('❌ Errore di rete', true);
+            }
+        }
+
+        window.showEditDdtOverlay = showEditDdtOverlay;
+        window.closeEditDdtOverlay = closeEditDdtOverlay;
+        window.confirmUpdateDdt = confirmUpdateDdt;
 
 // ============================================================
 // PRELIEVI REAL-TIME

@@ -873,6 +873,30 @@
     <!-- Libreria ZXing per confronto -->
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     
+    <!-- Modal Modifica N° DDT -->
+    <div id="edit-ddt-overlay" class="overlay mobile-hide" style="display: none;">
+        <div class="overlay-content" style="max-width: 400px; width: 90%;">
+            <div class="overlay-header">
+                <h3>📄 Modifica N° DDT</h3>
+                <button class="overlay-close" onclick="closeEditDdtOverlay()">&times;</button>
+            </div>
+            <div class="overlay-body" style="padding: 1.5rem;">
+                <p style="margin-bottom: 0.5rem;">Ordine: <strong id="edit-ddt-order-number"></strong></p>
+                <p style="margin-bottom: 1rem;">DDT attuale: <strong id="edit-ddt-current"></strong></p>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="new-ddt-input" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Nuovo numero DDT:</label>
+                    <input type="text" id="new-ddt-input" placeholder="es. 12345"
+                           style="width: 100%; padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 1.2rem; text-align: center;">
+                    <div style="font-size: 0.8rem; color: #888; margin-top: 4px;">Lascia vuoto per rimuovere il valore</div>
+                </div>
+            </div>
+            <div class="overlay-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding: 1rem 1.5rem; border-top: 1px solid #dee2e6; background: #f8f9fa;">
+                <button class="btn-secondary" onclick="closeEditDdtOverlay()">Annulla</button>
+                <button class="btn-primary" onclick="confirmUpdateDdt()">Salva DDT</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Modifica N° PLT -->
     <div id="edit-plt-overlay" class="overlay mobile-hide" style="display: none;">
         <div class="overlay-content" style="max-width: 400px; width: 90%;">

@@ -78,6 +78,15 @@ class UpdatePltNumberRequest(BaseModel):
                 raise ValueError('PLT deve essere un numero da 1 a 99')
         return v or None
 
+class UpdateDdtNumberRequest(BaseModel):
+    ddt_number: Optional[str] = None
+
+    @validator('ddt_number')
+    def validate_ddt(cls, v):
+        if v is not None:
+            v = v.strip()
+        return v or None
+
 # Schema per la Modifica Data Archiviazione
 class UpdateArchivedDateRequest(BaseModel):
     new_archived_date: datetime
