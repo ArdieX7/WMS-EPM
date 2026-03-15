@@ -212,7 +212,7 @@ async def export_orders_excel(
         # Headers
         headers = [
             "N° Ordine", "Cliente", "Data Ordine", "Stato",
-            "Quantità Totale", "N° DDT", "N° PLT", "Evaso il"
+            "Quantità Totale", "N° DDT", "N° PLT", "Vettore", "Evaso il"
         ]
         
         # Styling headers
@@ -249,7 +249,8 @@ async def export_orders_excel(
             ws.cell(row=row, column=5, value=total_quantity)
             ws.cell(row=row, column=6, value=order.ddt_number or "")
             ws.cell(row=row, column=7, value=order.plt_number or "")
-            ws.cell(row=row, column=8, value=order.archived_date.strftime("%d/%m/%Y") if order.archived_date else "")
+            ws.cell(row=row, column=8, value=order.carrier_name or "")
+            ws.cell(row=row, column=9, value=order.archived_date.strftime("%d/%m/%Y") if order.archived_date else "")
         
         # Auto-dimensiona colonne
         for column in ws.columns:
@@ -343,7 +344,7 @@ async def export_orders_pdf(
         
         # Prepara dati tabella
         table_data = []
-        table_data.append(["N° Ordine", "Cliente", "Data", "Stato", "Qtà Tot", "DDT", "PLT", "Evaso il"])
+        table_data.append(["N° Ordine", "Cliente", "Data", "Stato", "Qtà Tot", "DDT", "PLT", "Vettore", "Evaso il"])
         
         for order in orders:
             # Calcola quantità totale
@@ -367,11 +368,12 @@ async def export_orders_pdf(
                 str(total_quantity),
                 order.ddt_number or "",
                 order.plt_number or "",
+                order.carrier_name or "",
                 order.archived_date.strftime("%d/%m/%Y") if order.archived_date else ""
             ])
-        
+
         # Crea tabella
-        table = Table(table_data, colWidths=[1.2*inch, 1.5*inch, 0.8*inch, 0.8*inch, 0.6*inch, 0.7*inch, 0.5*inch, 0.8*inch])
+        table = Table(table_data, colWidths=[1.0*inch, 1.2*inch, 0.7*inch, 0.7*inch, 0.5*inch, 0.6*inch, 0.4*inch, 0.8*inch, 0.7*inch])
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -1062,6 +1064,7 @@ async def export_products_excel(
                     'order_date': order.order_date,
                     'ddt_number': order.ddt_number,
                     'plt_number': order.plt_number,
+                    'carrier_name': order.carrier_name,
                     'is_completed': order.is_completed,
                     'is_cancelled': order.is_cancelled,
                     'is_archived': order.is_archived,
@@ -1086,6 +1089,7 @@ async def export_products_excel(
             "Data Ordine",
             "DDT",
             "PLT",
+            "Vettore",
             "SKU Prodotto",
             "Descrizione Prodotto",
             "Quantità Richiesta",
@@ -1127,6 +1131,7 @@ async def export_products_excel(
                 product_line['order_date'].strftime("%Y-%m-%d") if product_line['order_date'] else "",
                 product_line['ddt_number'] or "",
                 product_line['plt_number'] or "",
+                product_line['carrier_name'] or "",
                 product_line['product_sku'],
                 product_line['description'] or "",
                 product_line['requested_quantity'],
@@ -1212,6 +1217,7 @@ async def export_products_pdf(
                     'order_date': order.order_date,
                     'ddt_number': order.ddt_number,
                     'plt_number': order.plt_number,
+                    'carrier_name': order.carrier_name,
                     'is_completed': order.is_completed,
                     'is_cancelled': order.is_cancelled,
                     'is_archived': order.is_archived,
@@ -1251,7 +1257,7 @@ async def export_products_pdf(
         
         # Tabella con i dati
         table_data = [
-            ['N° Ordine', 'Cliente', 'Data', 'PLT', 'SKU', 'Descrizione', 'Richiesto', 'Prelevato', 'Stato']
+            ['N° Ordine', 'Cliente', 'Data', 'PLT', 'Vettore', 'SKU', 'Descrizione', 'Richiesto', 'Prelevato', 'Stato']
         ]
 
         # Aggiungi le righe dei prodotti
@@ -1270,6 +1276,7 @@ async def export_products_pdf(
                 product_line['customer_name'][:15] + "..." if len(product_line['customer_name']) > 18 else product_line['customer_name'],
                 product_line['order_date'].strftime("%d/%m/%y") if product_line['order_date'] else "",
                 product_line['plt_number'] or "",
+                product_line['carrier_name'] or "",
                 product_line['product_sku'][:12] + "..." if len(product_line['product_sku']) > 15 else product_line['product_sku'],
                 (product_line['description'][:20] + "..." if len(product_line['description'] or "") > 23 else product_line['description'] or ""),
                 str(product_line['requested_quantity']),
@@ -1279,7 +1286,7 @@ async def export_products_pdf(
             table_data.append(row)
 
         # Crea la tabella
-        table = Table(table_data, colWidths=[55, 75, 42, 28, 65, 90, 38, 38, 44])
+        table = Table(table_data, colWidths=[52, 70, 40, 26, 52, 60, 85, 36, 36, 42])
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),

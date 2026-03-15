@@ -124,6 +124,46 @@ def get_orders_statistics(db: Session = Depends(get_db), current_user = Depends(
         )
     ).scalar() or 0
 
+    # Get carriers breakdown for current month (orders per carrier, excluding unassigned)
+    current_month_carriers_query = db.query(
+        Order.carrier_name,
+        func.count(Order.id).label('order_count')
+    ).filter(
+        and_(
+            extract('month', Order.archived_date) == current_month,
+            extract('year', Order.archived_date) == current_year,
+            Order.is_archived == 1,
+            Order.is_cancelled == 0,
+            Order.carrier_name.isnot(None),
+            Order.carrier_name != ''
+        )
+    ).group_by(Order.carrier_name).order_by(func.count(Order.id).desc())
+
+    current_month_carriers = [
+        {"carrier": row.carrier_name, "count": int(row.order_count)}
+        for row in current_month_carriers_query.all()
+    ]
+
+    # Get carriers breakdown for previous month
+    previous_month_carriers_query = db.query(
+        Order.carrier_name,
+        func.count(Order.id).label('order_count')
+    ).filter(
+        and_(
+            extract('month', Order.archived_date) == previous_month,
+            extract('year', Order.archived_date) == previous_year,
+            Order.is_archived == 1,
+            Order.is_cancelled == 0,
+            Order.carrier_name.isnot(None),
+            Order.carrier_name != ''
+        )
+    ).group_by(Order.carrier_name).order_by(func.count(Order.id).desc())
+
+    previous_month_carriers = [
+        {"carrier": row.carrier_name, "count": int(row.order_count)}
+        for row in previous_month_carriers_query.all()
+    ]
+
     # Get top products for current month (for pie chart)
     current_month_products_query = db.query(
         OrderLine.product_sku,
@@ -178,14 +218,16 @@ def get_orders_statistics(db: Session = Depends(get_db), current_user = Depends(
             "orders_count": current_month_orders,
             "pieces_total": current_month_pieces,
             "plt_total": current_month_plt,
-            "top_products": current_month_products
+            "top_products": current_month_products,
+            "carriers": current_month_carriers
         },
         "previous_month": {
             "name": month_names[previous_month],
             "orders_count": previous_month_orders,
             "pieces_total": previous_month_pieces,
             "plt_total": previous_month_plt,
-            "top_products": previous_month_products
+            "top_products": previous_month_products,
+            "carriers": previous_month_carriers
         }
     }
 
