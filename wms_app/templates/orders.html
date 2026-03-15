@@ -423,6 +423,7 @@
                                     <th class="sortable" data-column="status">Stato <span class="sort-arrow"></span></th>
                                     <th class="sortable" data-column="ddt_number">DDT <span class="sort-arrow"></span></th>
                                     <th class="sortable" data-column="plt_number">PLT <span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-column="carrier_name">Vettore <span class="sort-arrow"></span></th>
                                     <th class="sortable" data-column="total_weight">Peso <span class="sort-arrow"></span></th>
                                     <th>Azioni</th>
                                 </tr>
@@ -873,6 +874,31 @@
     <!-- Libreria ZXing per confronto -->
     <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
     
+    <!-- Modal Modifica Vettore -->
+    <div id="edit-carrier-overlay" class="overlay mobile-hide" style="display: none;">
+        <div class="overlay-content" style="max-width: 400px; width: 90%;">
+            <div class="overlay-header">
+                <h3>🚚 Modifica Vettore</h3>
+                <button class="overlay-close" onclick="closeEditCarrierOverlay()">&times;</button>
+            </div>
+            <div class="overlay-body" style="padding: 1.5rem;">
+                <p style="margin-bottom: 0.5rem;">Ordine: <strong id="edit-carrier-order-number"></strong></p>
+                <p style="margin-bottom: 1rem;">Vettore attuale: <strong id="edit-carrier-current"></strong></p>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="carrier-select" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Seleziona vettore:</label>
+                    <select id="carrier-select" style="width: 100%; padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 1rem;">
+                        <option value="">— Nessun vettore —</option>
+                    </select>
+                    <div style="font-size: 0.8rem; color: #888; margin-top: 4px;">Seleziona "Nessun vettore" per rimuovere</div>
+                </div>
+            </div>
+            <div class="overlay-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding: 1rem 1.5rem; border-top: 1px solid #dee2e6; background: #f8f9fa;">
+                <button class="btn-secondary" onclick="closeEditCarrierOverlay()">Annulla</button>
+                <button class="btn-primary" onclick="confirmUpdateCarrier()">Salva</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Modifica N° DDT -->
     <div id="edit-ddt-overlay" class="overlay mobile-hide" style="display: none;">
         <div class="overlay-content" style="max-width: 400px; width: 90%;">

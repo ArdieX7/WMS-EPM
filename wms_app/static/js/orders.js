@@ -2233,6 +2233,19 @@
                                         ✏️
                                     </button>
                                 </td>
+                                <td style="text-align: center;">
+                                    <span class="carrier-value" data-order-id="${order.id}">${order.carrier_name || '—'}</span>
+                                    <button class="edit-carrier-button"
+                                            data-order-id="${order.id}"
+                                            data-order-number="${order.order_number}"
+                                            data-carrier="${order.carrier_name || ''}"
+                                            style="background: none; border: none; cursor: pointer; margin-left: 5px; font-size: 1.1em; opacity: 0.6; transition: opacity 0.2s;"
+                                            onmouseover="this.style.opacity='1'"
+                                            onmouseout="this.style.opacity='0.6'"
+                                            title="Modifica Vettore">
+                                        ✏️
+                                    </button>
+                                </td>
                                 <td style="text-align: center;">${formattedWeight}</td>
                                 <td>
                                     <button class="view-archived-order-button" data-order-id="${order.id}">
@@ -2296,6 +2309,17 @@
                             });
                         });
 
+                        // Gestore per modifica Vettore
+                        document.querySelectorAll(".edit-carrier-button").forEach(button => {
+                            button.addEventListener("click", function(e) {
+                                e.stopPropagation();
+                                const orderId = this.getAttribute("data-order-id");
+                                const orderNumber = this.getAttribute("data-order-number");
+                                const currentCarrier = this.getAttribute("data-carrier");
+                                showEditCarrierOverlay(orderId, orderNumber, currentCarrier);
+                            });
+                        });
+
                         // Gestore per modifica DDT
                         document.querySelectorAll(".edit-ddt-button").forEach(button => {
                             button.addEventListener("click", function(e) {
@@ -2307,7 +2331,7 @@
                             });
                         });
                     } else {
-                        archivedOrdersTableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #666;">Nessun ordine archiviato</td></tr>';
+                        archivedOrdersTableBody.innerHTML = '<tr><td colspan="11" style="text-align: center; color: #666;">Nessun ordine archiviato</td></tr>';
                     }
             }
 
@@ -2350,6 +2374,10 @@
                         case 'plt_number':
                             aValue = parseInt(a.plt_number) || 0;
                             bValue = parseInt(b.plt_number) || 0;
+                            break;
+                        case 'carrier_name':
+                            aValue = a.carrier_name || '';
+                            bValue = b.carrier_name || '';
                             break;
                         default:
                             return 0;
@@ -5377,6 +5405,80 @@
         window.showEditDdtOverlay = showEditDdtOverlay;
         window.closeEditDdtOverlay = closeEditDdtOverlay;
         window.confirmUpdateDdt = confirmUpdateDdt;
+
+        // ============================================================
+        // EDIT CARRIER (VETTORE) OVERLAY
+        // ============================================================
+
+        let currentEditCarrierOrderId = null;
+
+        async function fetchCarriersForSelect(currentCarrier) {
+            try {
+                const resp = await fetch('/carriers/');
+                const data = await resp.json();
+                const sel = document.getElementById('carrier-select');
+                sel.innerHTML = '<option value="">— Nessun vettore —</option>';
+                data.carriers.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.name;
+                    opt.textContent = c.name;
+                    if (c.name === currentCarrier) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            } catch (e) {
+                console.error('Errore caricamento vettori:', e);
+            }
+        }
+
+        async function showEditCarrierOverlay(orderId, orderNumber, currentCarrier) {
+            currentEditCarrierOrderId = orderId;
+            document.getElementById('edit-carrier-order-number').textContent = orderNumber;
+            document.getElementById('edit-carrier-current').textContent = currentCarrier || '—';
+            document.getElementById('edit-carrier-overlay').style.display = 'flex';
+            await fetchCarriersForSelect(currentCarrier);
+            document.getElementById('carrier-select').focus();
+        }
+
+        function closeEditCarrierOverlay() {
+            document.getElementById('edit-carrier-overlay').style.display = 'none';
+            currentEditCarrierOrderId = null;
+        }
+
+        async function confirmUpdateCarrier() {
+            if (!currentEditCarrierOrderId) return;
+
+            const carrierName = document.getElementById('carrier-select').value || null;
+
+            try {
+                const response = await fetch(`/orders/${currentEditCarrierOrderId}/update-carrier`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ carrier_name: carrierName })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    const span = document.querySelector(`.carrier-value[data-order-id="${currentEditCarrierOrderId}"]`);
+                    if (span) span.textContent = result.carrier_name || '—';
+                    const btn = document.querySelector(`.edit-carrier-button[data-order-id="${currentEditCarrierOrderId}"]`);
+                    if (btn) btn.setAttribute('data-carrier', result.carrier_name || '');
+
+                    closeEditCarrierOverlay();
+                    showOrderToast(`✅ Vettore aggiornato — Ordine #${result.order_number}`);
+                } else {
+                    showOrderToast(`❌ ${result.detail || 'Errore sconosciuto'}`, true);
+                }
+            } catch (error) {
+                console.error("Errore aggiornamento vettore:", error);
+                closeEditCarrierOverlay();
+                showOrderToast('❌ Errore di rete', true);
+            }
+        }
+
+        window.showEditCarrierOverlay = showEditCarrierOverlay;
+        window.closeEditCarrierOverlay = closeEditCarrierOverlay;
+        window.confirmUpdateCarrier = confirmUpdateCarrier;
 
 // ============================================================
 // PRELIEVI REAL-TIME

@@ -18,6 +18,7 @@ class Order(Base):
     cancelled_date = Column(DateTime, nullable=True)  # Data annullamento
     ddt_number = Column(String, nullable=True)  # Numero DDT dell'ordine evaso
     plt_number = Column(String, nullable=True)  # Numero pallet evasi
+    carrier_name = Column(String, nullable=True)  # Nome vettore assegnato all'ordine
 
     lines = relationship("OrderLine", back_populates="order")
 

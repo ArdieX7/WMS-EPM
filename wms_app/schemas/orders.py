@@ -78,6 +78,16 @@ class UpdatePltNumberRequest(BaseModel):
                 raise ValueError('PLT deve essere un numero da 1 a 99')
         return v or None
 
+class UpdateCarrierRequest(BaseModel):
+    carrier_name: Optional[str] = None
+
+    @validator('carrier_name')
+    def validate_carrier(cls, v):
+        if v is not None:
+            v = v.strip()
+        return v or None
+
+
 class UpdateDdtNumberRequest(BaseModel):
     ddt_number: Optional[str] = None
 

@@ -437,6 +437,7 @@ def get_archived_orders(db: Session = Depends(get_db)):
                 "is_cancelled": bool(order.is_cancelled),
                 "ddt_number": order.ddt_number,
                 "plt_number": order.plt_number,
+                "carrier_name": order.carrier_name,
                 "total_weight": total_weight,
                 "lines": [
                     {
@@ -2381,6 +2382,27 @@ def unarchive_order(order_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error unarchiving order: {str(e)}")
+
+@router.put("/{order_id}/update-carrier")
+def update_carrier_name(
+    order_id: int,
+    request: schemas.UpdateCarrierRequest,
+    db: Session = Depends(get_db)
+):
+    """Modifica il vettore di un ordine archiviato."""
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordine non trovato")
+    if not order.is_archived:
+        raise HTTPException(status_code=400, detail="Solo gli ordini archiviati possono avere il vettore modificato")
+    order.carrier_name = request.carrier_name
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore salvataggio vettore: {str(e)}")
+    return {"success": True, "carrier_name": order.carrier_name, "order_number": order.order_number}
+
 
 @router.put("/{order_id}/update-ddt")
 def update_ddt_number(

@@ -1321,35 +1321,40 @@ th {
 
     #archived-orders-table th:nth-child(7), /* DDT */
     #archived-orders-table td:nth-child(7) {
-        width: 10%;
+        width: 9%;
     }
 
     #archived-orders-table th:nth-child(8), /* PLT */
     #archived-orders-table td:nth-child(8) {
-        width: 6%;
+        width: 5%;
     }
 
-    #archived-orders-table th:nth-child(9), /* Peso */
+    #archived-orders-table th:nth-child(9), /* Vettore */
     #archived-orders-table td:nth-child(9) {
+        width: 9%;
+    }
+
+    #archived-orders-table th:nth-child(10), /* Peso */
+    #archived-orders-table td:nth-child(10) {
         width: 6%;
     }
 
-    #archived-orders-table th:nth-child(10), /* Azioni */
-    #archived-orders-table td:nth-child(10) {
+    #archived-orders-table th:nth-child(11), /* Azioni */
+    #archived-orders-table td:nth-child(11) {
         width: 20%;
     }
 }
 
 /* Miglioramenti per i pulsanti delle azioni */
 #orders-table td:nth-child(9),
-#archived-orders-table td:nth-child(10) {
+#archived-orders-table td:nth-child(11) {
     white-space: nowrap;
     overflow: hidden;
     padding: 0.5rem !important;
 }
 
 #orders-table td:nth-child(9) button,
-#archived-orders-table td:nth-child(10) button {
+#archived-orders-table td:nth-child(11) button {
     font-size: 0.8rem;
     padding: 0.4rem 0.8rem;
     margin: 0.1rem;
