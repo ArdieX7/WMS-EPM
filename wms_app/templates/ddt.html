@@ -226,6 +226,29 @@
             </div>
         </div>
 
+        <!-- Sezione Anagrafica Vettori -->
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection('carriers-section')">
+                <span><i class="fas fa-truck"></i> Anagrafica Vettori</span>
+                <i class="fas fa-chevron-down" id="carriers-section-icon"></i>
+            </div>
+            <div class="section-content collapsible-content" id="carriers-section-content">
+                <!-- Form aggiunta vettore -->
+                <div style="display: flex; gap: 10px; margin-bottom: 1.5rem; align-items: center;">
+                    <input type="text" id="new-carrier-name" placeholder="Nome vettore (es. Bartolini, GLS...)"
+                           style="flex: 1; padding: 0.5rem 0.75rem; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.95rem;"
+                           onkeydown="if(event.key==='Enter') addCarrier()">
+                    <button onclick="addCarrier()" class="btn btn-primary" style="white-space: nowrap;">
+                        <i class="fas fa-plus"></i> Aggiungi
+                    </button>
+                </div>
+                <!-- Lista vettori -->
+                <div id="carriers-list">
+                    <p style="color:#888; text-align:center;">Caricamento...</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Sezione DDT Esistenti -->
         <div class="section-card">
             <div class="section-header" onclick="toggleSection('existing-section')">
@@ -751,6 +774,96 @@
         // Auto-maiuscolo per provincia
         document.getElementById('customerProvince').addEventListener('input', function(e) {
             e.target.value = e.target.value.toUpperCase();
+        });
+
+        // ============================================================
+        // ANAGRAFICA VETTORI
+        // ============================================================
+
+        async function loadCarriers() {
+            try {
+                const resp = await fetch('/carriers/');
+                const data = await resp.json();
+                const container = document.getElementById('carriers-list');
+                if (!data.carriers || data.carriers.length === 0) {
+                    container.innerHTML = '<p style="color:#888; text-align:center; padding: 1rem;">Nessun vettore presente. Aggiungi il primo vettore.</p>';
+                    return;
+                }
+                container.innerHTML = `
+                    <table style="width:100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background:#f8f9fa; border-bottom: 2px solid #dee2e6;">
+                                <th style="padding:0.6rem 0.75rem; text-align:left;">Nome Vettore</th>
+                                <th style="padding:0.6rem 0.75rem; text-align:center; width:80px;">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.carriers.map(c => `
+                                <tr style="border-bottom: 1px solid #dee2e6;">
+                                    <td style="padding:0.6rem 0.75rem;">${c.name}</td>
+                                    <td style="padding:0.6rem 0.75rem; text-align:center;">
+                                        <button onclick="deleteCarrier(${c.id}, '${c.name.replace(/'/g, "\\'")}')"
+                                                style="background:none; border:none; cursor:pointer; color:#dc3545; font-size:1.1em;"
+                                                title="Elimina vettore">🗑️</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (e) {
+                console.error('Errore caricamento vettori:', e);
+            }
+        }
+
+        async function addCarrier() {
+            const input = document.getElementById('new-carrier-name');
+            const name = input.value.trim();
+            if (!name) {
+                alert('Inserisci il nome del vettore');
+                return;
+            }
+            try {
+                const resp = await fetch('/carriers/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                const result = await resp.json();
+                if (resp.ok) {
+                    input.value = '';
+                    loadCarriers();
+                } else {
+                    alert(result.detail || 'Errore durante l\'aggiunta del vettore');
+                }
+            } catch (e) {
+                alert('Errore di rete');
+            }
+        }
+
+        async function deleteCarrier(id, name) {
+            if (!confirm(`Eliminare il vettore "${name}"?`)) return;
+            try {
+                const resp = await fetch(`/carriers/${id}`, { method: 'DELETE' });
+                const result = await resp.json();
+                if (resp.ok) {
+                    loadCarriers();
+                } else {
+                    alert(result.detail || 'Errore durante l\'eliminazione');
+                }
+            } catch (e) {
+                alert('Errore di rete');
+            }
+        }
+
+        // Carica vettori quando la sezione viene aperta (dopo toggleSection che aggiunge la classe 'show')
+        document.querySelector('[onclick="toggleSection(\'carriers-section\')"]').addEventListener('click', function() {
+            setTimeout(() => {
+                const content = document.getElementById('carriers-section-content');
+                if (content.classList.contains('show')) {
+                    loadCarriers();
+                }
+            }, 0);
         });
     </script>
     {% include 'partials/footer.html' %}

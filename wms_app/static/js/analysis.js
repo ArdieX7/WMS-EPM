@@ -308,10 +308,17 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // Export button per giacenza totale
+    // Export buttons per giacenza totale
     document.getElementById("export-total-stock-csv").addEventListener("click", function() {
-        // Avvia il download del CSV con tutta la giacenza
         window.location.href = '/analysis/export-total-stock-csv';
+    });
+
+    document.getElementById("export-total-stock-xlsx").addEventListener("click", function() {
+        window.location.href = '/analysis/export-total-stock-xlsx';
+    });
+
+    document.getElementById("export-total-stock-pdf").addEventListener("click", function() {
+        window.location.href = '/analysis/export-total-stock-pdf';
     });
     
     // Export buttons per prodotti a TERRA
@@ -660,39 +667,18 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // Check if orders section is visible and adjust layout
+    // Initialize orders charts manager if section is present (charts load lazily on first open)
     function checkOrdersSectionVisibility() {
-        const rightColumn = document.querySelector('.statistics-right-column');
-        const mainGrid = document.querySelector('.statistics-main-grid');
-        
-        if (rightColumn && mainGrid) {
-            // Check if right column is visible (not hidden by permissions)
-            const ordersSection = rightColumn.querySelector('.orders-statistics-section');
-            if (ordersSection && window.getComputedStyle(ordersSection).display !== 'none') {
-                mainGrid.classList.add('has-orders-section');
-                console.log('✅ Orders section visible, added has-orders-section class');
-                
-                // Initialize Orders Charts Manager only if Chart.js is available
-                if (typeof Chart !== 'undefined') {
-                    console.log('✅ Chart.js loaded, initializing orders charts...');
-                    const ordersChartsManager = new OrdersChartsManager();
-                    ordersChartsManager.initialize();
-                } else {
-                    console.error('❌ Chart.js not loaded');
-                    // Try again after a short delay
-                    setTimeout(() => {
-                        if (typeof Chart !== 'undefined') {
-                            console.log('✅ Chart.js loaded on retry, initializing orders charts...');
-                            const ordersChartsManager = new OrdersChartsManager();
-                            ordersChartsManager.initialize();
-                        } else {
-                            console.error('❌ Chart.js still not loaded after retry');
-                        }
-                    }, 1000);
-                }
+        const ordersSection = document.querySelector('.orders-statistics-section');
+        if (ordersSection && window.getComputedStyle(ordersSection).display !== 'none') {
+            if (typeof Chart !== 'undefined') {
+                window.ordersChartsManager = new OrdersChartsManager();
             } else {
-                mainGrid.classList.remove('has-orders-section');
-                console.log('📊 Orders section not visible due to permissions');
+                setTimeout(() => {
+                    if (typeof Chart !== 'undefined') {
+                        window.ordersChartsManager = new OrdersChartsManager();
+                    }
+                }, 1000);
             }
         }
     }
@@ -771,6 +757,25 @@ class OrdersChartsManager {
             previousMonthPieces.textContent = data.previous_month.name;
         }
 
+        // Update PLT data
+        const currentPltValue = document.getElementById('plt-current-month')?.querySelector('.kpi-value');
+        if (currentPltValue) {
+            currentPltValue.textContent = data.current_month.plt_total.toLocaleString();
+        }
+        const currentMonthPlt = document.getElementById('current-month-plt');
+        if (currentMonthPlt) {
+            currentMonthPlt.textContent = data.current_month.name;
+        }
+
+        const previousPltValue = document.getElementById('plt-previous-month')?.querySelector('.kpi-value');
+        if (previousPltValue) {
+            previousPltValue.textContent = data.previous_month.plt_total.toLocaleString();
+        }
+        const previousMonthPlt = document.getElementById('previous-month-plt');
+        if (previousMonthPlt) {
+            previousMonthPlt.textContent = data.previous_month.name;
+        }
+
         // Update chart titles
         const currentChartMonth = document.getElementById('current-chart-month');
         if (currentChartMonth) {
@@ -780,11 +785,21 @@ class OrdersChartsManager {
         if (previousChartMonth) {
             previousChartMonth.textContent = data.previous_month.name;
         }
+        const carrierCurrentChartMonth = document.getElementById('carrier-current-chart-month');
+        if (carrierCurrentChartMonth) {
+            carrierCurrentChartMonth.textContent = data.current_month.name;
+        }
+        const carrierPreviousChartMonth = document.getElementById('carrier-previous-chart-month');
+        if (carrierPreviousChartMonth) {
+            carrierPreviousChartMonth.textContent = data.previous_month.name;
+        }
     }
 
     createCharts(data) {
         this.createCurrentMonthChart(data.current_month);
         this.createPreviousMonthChart(data.previous_month);
+        this.createCarrierCurrentMonthChart(data.current_month);
+        this.createCarrierPreviousMonthChart(data.previous_month);
     }
 
     createCurrentMonthChart(monthData) {
@@ -923,6 +938,120 @@ class OrdersChartsManager {
         });
     }
 
+    createCarrierCurrentMonthChart(monthData) {
+        const ctx = document.getElementById('carrier-current-month-chart');
+        const noDataElement = document.getElementById('carrier-current-chart-no-data');
+
+        if (!ctx) return;
+
+        const carriers = monthData.carriers || [];
+        if (carriers.length === 0) {
+            ctx.style.display = 'none';
+            if (noDataElement) noDataElement.style.display = 'block';
+            return;
+        }
+
+        ctx.style.display = 'block';
+        if (noDataElement) noDataElement.style.display = 'none';
+
+        const labels = carriers.map(c => c.carrier);
+        const counts = carriers.map(c => c.count);
+
+        if (this.carrierCurrentChart) {
+            this.carrierCurrentChart.destroy();
+        }
+
+        this.carrierCurrentChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: counts,
+                    backgroundColor: this.colors.slice(0, counts.length),
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, padding: 10, font: { size: 10 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const count = context.raw;
+                                const total = counts.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
+                                return `Ordini: ${count} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    createCarrierPreviousMonthChart(monthData) {
+        const ctx = document.getElementById('carrier-previous-month-chart');
+        const noDataElement = document.getElementById('carrier-previous-chart-no-data');
+
+        if (!ctx) return;
+
+        const carriers = monthData.carriers || [];
+        if (carriers.length === 0) {
+            ctx.style.display = 'none';
+            if (noDataElement) noDataElement.style.display = 'block';
+            return;
+        }
+
+        ctx.style.display = 'block';
+        if (noDataElement) noDataElement.style.display = 'none';
+
+        const labels = carriers.map(c => c.carrier);
+        const counts = carriers.map(c => c.count);
+
+        if (this.carrierPreviousChart) {
+            this.carrierPreviousChart.destroy();
+        }
+
+        this.carrierPreviousChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: counts,
+                    backgroundColor: this.colors.slice(0, counts.length),
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, padding: 10, font: { size: 10 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const count = context.raw;
+                                const total = counts.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
+                                return `Ordini: ${count} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     showError() {
         // Update KPIs with error state
         document.querySelectorAll('.orders-kpi-card .kpi-value').forEach(el => {
@@ -945,8 +1074,44 @@ class OrdersChartsManager {
         
         const currentChart = document.getElementById('current-month-chart');
         const previousChart = document.getElementById('previous-month-chart');
-        
+        const carrierCurrentChart = document.getElementById('carrier-current-month-chart');
+        const carrierPreviousChart = document.getElementById('carrier-previous-month-chart');
+
         if (currentChart) currentChart.style.display = 'none';
         if (previousChart) previousChart.style.display = 'none';
+        if (carrierCurrentChart) carrierCurrentChart.style.display = 'none';
+        if (carrierPreviousChart) carrierPreviousChart.style.display = 'none';
     }
 }
+
+// Toggle orders statistics collapsible section
+let ordersStatsInitialized = false;
+
+function toggleOrdersStats() {
+    const body = document.getElementById('orders-stats-body');
+    const arrow = document.getElementById('orders-stats-toggle-arrow');
+    if (!body) return;
+
+    const isOpen = body.style.display !== 'none';
+
+    if (isOpen) {
+        body.style.display = 'none';
+        if (arrow) arrow.textContent = '▶';
+    } else {
+        body.style.display = 'block';
+        if (arrow) arrow.textContent = '▼';
+
+        // Load charts on first open (canvas needs to be visible for correct rendering)
+        if (!ordersStatsInitialized) {
+            ordersStatsInitialized = true;
+            const manager = window.ordersChartsManager;
+            if (manager) {
+                setTimeout(() => manager.initialize(), 50);
+            } else if (typeof Chart !== 'undefined') {
+                window.ordersChartsManager = new OrdersChartsManager();
+                setTimeout(() => window.ordersChartsManager.initialize(), 50);
+            }
+        }
+    }
+}
+window.toggleOrdersStats = toggleOrdersStats;

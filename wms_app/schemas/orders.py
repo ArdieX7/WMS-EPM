@@ -35,6 +35,7 @@ class Order(OrderBase):
     archived_date: Optional[datetime] = None
     cancelled_date: Optional[datetime] = None
     ddt_number: Optional[str] = None
+    plt_number: Optional[str] = None
     lines: List[OrderLine] = []
     total_weight: Optional[float] = 0.0  # Peso totale calcolato
 
@@ -63,6 +64,38 @@ class PickConfirmation(BaseModel):
 class FulfillmentRequest(BaseModel):
     order_id: int
     ddt_number: Optional[str] = None
+    plt_number: Optional[str] = None
+
+# Schema per la Modifica Numero PLT
+class UpdatePltNumberRequest(BaseModel):
+    plt_number: Optional[str] = None
+
+    @validator('plt_number')
+    def validate_plt(cls, v):
+        if v is not None:
+            v = v.strip()
+            if v and (not v.isdigit() or not (1 <= int(v) <= 99)):
+                raise ValueError('PLT deve essere un numero da 1 a 99')
+        return v or None
+
+class UpdateCarrierRequest(BaseModel):
+    carrier_name: Optional[str] = None
+
+    @validator('carrier_name')
+    def validate_carrier(cls, v):
+        if v is not None:
+            v = v.strip()
+        return v or None
+
+
+class UpdateDdtNumberRequest(BaseModel):
+    ddt_number: Optional[str] = None
+
+    @validator('ddt_number')
+    def validate_ddt(cls, v):
+        if v is not None:
+            v = v.strip()
+        return v or None
 
 # Schema per la Modifica Data Archiviazione
 class UpdateArchivedDateRequest(BaseModel):

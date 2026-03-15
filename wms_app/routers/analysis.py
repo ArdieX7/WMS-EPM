@@ -1,17 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse, HTMLResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case, or_, extract, and_
+from sqlalchemy import func, case, or_, extract, and_, Integer, cast
 from typing import List, Dict, Any
 import io
 from datetime import datetime, timedelta
 import calendar
 
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Table, Paragraph, Spacer, KeepTogether, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, KeepTogether, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 from reportlab.lib.units import inch
 import math
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from fastapi.responses import Response
 
 from wms_app.models.products import Product
 from wms_app.models.inventory import Inventory, Location
@@ -99,7 +103,71 @@ def get_orders_statistics(db: Session = Depends(get_db), current_user = Depends(
         )
     )
     previous_month_pieces = previous_month_pieces_query.scalar() or 0
-    
+
+    # Get total PLT shipped for current month
+    current_month_plt = db.query(func.sum(cast(Order.plt_number, Integer))).filter(
+        and_(
+            extract('month', Order.archived_date) == current_month,
+            extract('year', Order.archived_date) == current_year,
+            Order.is_archived == 1,
+            Order.is_cancelled == 0,
+            Order.plt_number.isnot(None),
+            Order.plt_number != ''
+        )
+    ).scalar() or 0
+
+    # Get total PLT shipped for previous month
+    previous_month_plt = db.query(func.sum(cast(Order.plt_number, Integer))).filter(
+        and_(
+            extract('month', Order.archived_date) == previous_month,
+            extract('year', Order.archived_date) == previous_year,
+            Order.is_archived == 1,
+            Order.is_cancelled == 0,
+            Order.plt_number.isnot(None),
+            Order.plt_number != ''
+        )
+    ).scalar() or 0
+
+    # Get carriers breakdown for current month (orders per carrier, excluding unassigned)
+    current_month_carriers_query = db.query(
+        Order.carrier_name,
+        func.count(Order.id).label('order_count')
+    ).filter(
+        and_(
+            extract('month', Order.archived_date) == current_month,
+            extract('year', Order.archived_date) == current_year,
+            Order.is_archived == 1,
+            Order.is_cancelled == 0,
+            Order.carrier_name.isnot(None),
+            Order.carrier_name != ''
+        )
+    ).group_by(Order.carrier_name).order_by(func.count(Order.id).desc())
+
+    current_month_carriers = [
+        {"carrier": row.carrier_name, "count": int(row.order_count)}
+        for row in current_month_carriers_query.all()
+    ]
+
+    # Get carriers breakdown for previous month
+    previous_month_carriers_query = db.query(
+        Order.carrier_name,
+        func.count(Order.id).label('order_count')
+    ).filter(
+        and_(
+            extract('month', Order.archived_date) == previous_month,
+            extract('year', Order.archived_date) == previous_year,
+            Order.is_archived == 1,
+            Order.is_cancelled == 0,
+            Order.carrier_name.isnot(None),
+            Order.carrier_name != ''
+        )
+    ).group_by(Order.carrier_name).order_by(func.count(Order.id).desc())
+
+    previous_month_carriers = [
+        {"carrier": row.carrier_name, "count": int(row.order_count)}
+        for row in previous_month_carriers_query.all()
+    ]
+
     # Get top products for current month (for pie chart)
     current_month_products_query = db.query(
         OrderLine.product_sku,
@@ -153,13 +221,17 @@ def get_orders_statistics(db: Session = Depends(get_db), current_user = Depends(
             "name": month_names[current_month],
             "orders_count": current_month_orders,
             "pieces_total": current_month_pieces,
-            "top_products": current_month_products
+            "plt_total": current_month_plt,
+            "top_products": current_month_products,
+            "carriers": current_month_carriers
         },
         "previous_month": {
             "name": month_names[previous_month],
             "orders_count": previous_month_orders,
             "pieces_total": previous_month_pieces,
-            "top_products": previous_month_products
+            "plt_total": previous_month_plt,
+            "top_products": previous_month_products,
+            "carriers": previous_month_carriers
         }
     }
 
@@ -1219,4 +1291,161 @@ async def export_total_stock_csv(db: Session = Depends(get_db)):
         output,
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=giacenza_totale_{timestamp}.csv"}
+    )
+
+
+@router.get("/export-total-stock-xlsx")
+async def export_total_stock_xlsx(db: Session = Depends(get_db)):
+    """Esporta tutta la giacenza del magazzino in formato Excel."""
+    from datetime import datetime
+
+    shelves_results = db.query(
+        Inventory.product_sku,
+        Product.description,
+        func.sum(Inventory.quantity).label("quantity_in_shelves")
+    ).join(Product, Inventory.product_sku == Product.sku).filter(
+        Inventory.location_name != 'TERRA'
+    ).group_by(Inventory.product_sku, Product.description).all()
+
+    ground_results = db.query(
+        Inventory.product_sku,
+        Product.description,
+        func.sum(Inventory.quantity).label("quantity_on_ground")
+    ).join(Product, Inventory.product_sku == Product.sku).filter(
+        Inventory.location_name == 'TERRA'
+    ).group_by(Inventory.product_sku, Product.description).all()
+
+    outgoing_results = db.query(
+        OutgoingStock.product_sku,
+        Product.description,
+        func.sum(OutgoingStock.quantity).label("quantity_outgoing")
+    ).join(Product, OutgoingStock.product_sku == Product.sku).group_by(
+        OutgoingStock.product_sku, Product.description
+    ).all()
+
+    all_products = {p.sku: p.description for p in db.query(Product.sku, Product.description).all()}
+    shelves_map = {r.product_sku: r.quantity_in_shelves for r in shelves_results}
+    ground_map = {r.product_sku: r.quantity_on_ground for r in ground_results}
+    outgoing_map = {r.product_sku: r.quantity_outgoing for r in outgoing_results}
+    all_relevant_skus = sorted(set(shelves_map) | set(ground_map) | set(outgoing_map))
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Giacenza Totale"
+
+    headers = ["SKU", "Descrizione", "Giacenza Scaffalata", "Giacenza a Terra", "Giacenza in Uscita", "Giacenza Totale"]
+    header_fill = PatternFill(start_color="CCE5FF", end_color="CCE5FF", fill_type="solid")
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = Font(bold=True)
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+
+    for row, sku in enumerate(all_relevant_skus, 2):
+        shelves = shelves_map.get(sku, 0)
+        ground = ground_map.get(sku, 0)
+        outgoing = outgoing_map.get(sku, 0)
+        total = shelves + ground + outgoing
+        ws.append([sku, all_products.get(sku, ""), shelves, ground, outgoing, total])
+        # Bold total column
+        ws.cell(row=row, column=6).font = Font(bold=True)
+
+    # Auto-width
+    for col in ws.columns:
+        max_len = max((len(str(c.value)) for c in col if c.value), default=0)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 3, 50)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return Response(
+        content=buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=giacenza_totale_{timestamp}.xlsx"}
+    )
+
+
+@router.get("/export-total-stock-pdf")
+async def export_total_stock_pdf(db: Session = Depends(get_db)):
+    """Esporta tutta la giacenza del magazzino in formato PDF."""
+    from datetime import datetime
+
+    shelves_results = db.query(
+        Inventory.product_sku,
+        Product.description,
+        func.sum(Inventory.quantity).label("quantity_in_shelves")
+    ).join(Product, Inventory.product_sku == Product.sku).filter(
+        Inventory.location_name != 'TERRA'
+    ).group_by(Inventory.product_sku, Product.description).all()
+
+    ground_results = db.query(
+        Inventory.product_sku,
+        Product.description,
+        func.sum(Inventory.quantity).label("quantity_on_ground")
+    ).join(Product, Inventory.product_sku == Product.sku).filter(
+        Inventory.location_name == 'TERRA'
+    ).group_by(Inventory.product_sku, Product.description).all()
+
+    outgoing_results = db.query(
+        OutgoingStock.product_sku,
+        Product.description,
+        func.sum(OutgoingStock.quantity).label("quantity_outgoing")
+    ).join(Product, OutgoingStock.product_sku == Product.sku).group_by(
+        OutgoingStock.product_sku, Product.description
+    ).all()
+
+    all_products = {p.sku: p.description for p in db.query(Product.sku, Product.description).all()}
+    shelves_map = {r.product_sku: r.quantity_in_shelves for r in shelves_results}
+    ground_map = {r.product_sku: r.quantity_on_ground for r in ground_results}
+    outgoing_map = {r.product_sku: r.quantity_outgoing for r in outgoing_results}
+    all_relevant_skus = sorted(set(shelves_map) | set(ground_map) | set(outgoing_map))
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), topMargin=30, bottomMargin=30, leftMargin=30, rightMargin=30)
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=14, spaceAfter=16, alignment=1)
+
+    story = [
+        Paragraph(f"Giacenza Totale Magazzino — {datetime.now().strftime('%d/%m/%Y %H:%M')}", title_style),
+        Spacer(1, 10),
+    ]
+
+    table_data = [["SKU", "Descrizione", "Scaffalata", "Terra", "Uscita", "Totale"]]
+    for sku in all_relevant_skus:
+        shelves = shelves_map.get(sku, 0)
+        ground = ground_map.get(sku, 0)
+        outgoing = outgoing_map.get(sku, 0)
+        total = shelves + ground + outgoing
+        desc = (all_products.get(sku, "") or "")
+        desc_short = desc[:35] + "..." if len(desc) > 38 else desc
+        table_data.append([sku, desc_short, str(shelves), str(ground), str(outgoing), str(total)])
+
+    col_widths = [1.4*inch, 3.2*inch, 0.9*inch, 0.9*inch, 0.9*inch, 0.9*inch]
+    tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0097E0')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (0, 0), (1, -1), 'LEFT'),
+        ('FONTNAME', (5, 1), (5, -1), 'Helvetica-Bold'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f4f8')]),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    story.append(tbl)
+
+    doc.build(story)
+    buf.seek(0)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=giacenza_totale_{timestamp}.pdf"}
     )

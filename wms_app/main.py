@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_, or_, text
 from wms_app.routers.auth import require_permission
 from wms_app.middleware.auth_middleware import AuthMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -12,7 +12,7 @@ import atexit
 
 from wms_app.database import database
 from wms_app.database.database import SessionLocal
-from wms_app.models import products, inventory, orders, reservations, serials, ddt, settings, logs, auth, arrivals
+from wms_app.models import products, inventory, orders, reservations, serials, ddt, settings, logs, auth, arrivals, carriers
 from wms_app.models.inventory import Location, Inventory
 from wms_app.models.orders import Order, OrderLine, OutgoingStock
 from wms_app.models.serials import ProductSerial
@@ -31,6 +31,7 @@ settings.Base.metadata.create_all(bind=database.engine)
 logs.Base.metadata.create_all(bind=database.engine)
 auth.Base.metadata.create_all(bind=database.engine)
 arrivals.Base.metadata.create_all(bind=database.engine)
+carriers.Base.metadata.create_all(bind=database.engine)
 
 
 def ensure_granular_permissions():
@@ -108,6 +109,26 @@ def ensure_granular_permissions():
 
 
 ensure_granular_permissions()
+
+
+def ensure_db_migrations():
+    """Aggiunge colonne mancanti al DB per retrocompatibilità con versioni precedenti."""
+    with database.engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE orders ADD COLUMN plt_number VARCHAR"))
+            conn.commit()
+            print("✅ Migration: aggiunta colonna plt_number alla tabella orders")
+        except Exception:
+            pass  # Colonna già esistente, nessun problema
+        try:
+            conn.execute(text("ALTER TABLE orders ADD COLUMN carrier_name VARCHAR"))
+            conn.commit()
+            print("✅ Migration: aggiunta colonna carrier_name alla tabella orders")
+        except Exception:
+            pass  # Colonna già esistente, nessun problema
+
+
+ensure_db_migrations()
 
 app = FastAPI(title="WMS EPM")
 
@@ -220,7 +241,7 @@ async def test_main_endpoint():
     return {"server": "main", "status": "OK", "message": "Endpoint principale funziona"}
 
 # Qui aggiungeremo i router per le diverse sezioni dell'app
-from wms_app.routers import products, inventory, orders, analysis, warehouse, reservations, serials, ddt, logs, auth, admin, arrivals
+from wms_app.routers import products, inventory, orders, analysis, warehouse, reservations, serials, ddt, logs, auth, admin, arrivals, carriers
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(products.router)
@@ -233,6 +254,7 @@ app.include_router(serials.router)
 app.include_router(ddt.router)
 app.include_router(arrivals.router)
 app.include_router(logs.router)
+app.include_router(carriers.router, prefix="/carriers", tags=["carriers"])
 
 @app.get("/products-page", response_class=HTMLResponse)
 async def get_products_page(request: Request):

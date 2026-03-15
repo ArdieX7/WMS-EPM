@@ -211,8 +211,8 @@ async def export_orders_excel(
         
         # Headers
         headers = [
-            "N° Ordine", "Cliente", "Data Ordine", "Stato", 
-            "Quantità Totale", "N° DDT", "Evaso il"
+            "N° Ordine", "Cliente", "Data Ordine", "Stato",
+            "Quantità Totale", "N° DDT", "N° PLT", "Vettore", "Evaso il"
         ]
         
         # Styling headers
@@ -248,7 +248,9 @@ async def export_orders_excel(
             ws.cell(row=row, column=4, value=status)
             ws.cell(row=row, column=5, value=total_quantity)
             ws.cell(row=row, column=6, value=order.ddt_number or "")
-            ws.cell(row=row, column=7, value=order.archived_date.strftime("%d/%m/%Y") if order.archived_date else "")
+            ws.cell(row=row, column=7, value=order.plt_number or "")
+            ws.cell(row=row, column=8, value=order.carrier_name or "")
+            ws.cell(row=row, column=9, value=order.archived_date.strftime("%d/%m/%Y") if order.archived_date else "")
         
         # Auto-dimensiona colonne
         for column in ws.columns:
@@ -342,7 +344,7 @@ async def export_orders_pdf(
         
         # Prepara dati tabella
         table_data = []
-        table_data.append(["N° Ordine", "Cliente", "Data", "Stato", "Qtà Tot", "DDT", "Evaso il"])
+        table_data.append(["N° Ordine", "Cliente", "Data", "Stato", "Qtà Tot", "DDT", "PLT", "Vettore", "Evaso il"])
         
         for order in orders:
             # Calcola quantità totale
@@ -365,11 +367,13 @@ async def export_orders_pdf(
                 status,
                 str(total_quantity),
                 order.ddt_number or "",
+                order.plt_number or "",
+                order.carrier_name or "",
                 order.archived_date.strftime("%d/%m/%Y") if order.archived_date else ""
             ])
-        
+
         # Crea tabella
-        table = Table(table_data, colWidths=[1.2*inch, 1.5*inch, 0.8*inch, 0.8*inch, 0.6*inch, 0.8*inch, 0.8*inch])
+        table = Table(table_data, colWidths=[1.0*inch, 1.2*inch, 0.7*inch, 0.7*inch, 0.5*inch, 0.6*inch, 0.4*inch, 0.8*inch, 0.7*inch])
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -434,6 +438,8 @@ def get_archived_orders(db: Session = Depends(get_db)):
                 "is_completed": bool(order.is_completed),
                 "is_cancelled": bool(order.is_cancelled),
                 "ddt_number": order.ddt_number,
+                "plt_number": order.plt_number,
+                "carrier_name": order.carrier_name,
                 "total_weight": total_weight,
                 "lines": [
                     {
@@ -1057,6 +1063,8 @@ async def export_products_excel(
                     'customer_name': order.customer_name,
                     'order_date': order.order_date,
                     'ddt_number': order.ddt_number,
+                    'plt_number': order.plt_number,
+                    'carrier_name': order.carrier_name,
                     'is_completed': order.is_completed,
                     'is_cancelled': order.is_cancelled,
                     'is_archived': order.is_archived,
@@ -1065,10 +1073,10 @@ async def export_products_excel(
                     'picked_quantity': line.picked_quantity,
                     'description': line.product.description if line.product else ""
                 })
-        
+
         if not product_lines:
             raise HTTPException(status_code=404, detail="Nessun prodotto trovato negli ordini del periodo specificato.")
-        
+
         # Creazione del workbook Excel
         workbook = Workbook()
         worksheet = workbook.active
@@ -1080,6 +1088,8 @@ async def export_products_excel(
             "Cliente",
             "Data Ordine",
             "DDT",
+            "PLT",
+            "Vettore",
             "SKU Prodotto",
             "Descrizione Prodotto",
             "Quantità Richiesta",
@@ -1120,6 +1130,8 @@ async def export_products_excel(
                 product_line['customer_name'],
                 product_line['order_date'].strftime("%Y-%m-%d") if product_line['order_date'] else "",
                 product_line['ddt_number'] or "",
+                product_line['plt_number'] or "",
+                product_line['carrier_name'] or "",
                 product_line['product_sku'],
                 product_line['description'] or "",
                 product_line['requested_quantity'],
@@ -1204,6 +1216,8 @@ async def export_products_pdf(
                     'customer_name': order.customer_name,
                     'order_date': order.order_date,
                     'ddt_number': order.ddt_number,
+                    'plt_number': order.plt_number,
+                    'carrier_name': order.carrier_name,
                     'is_completed': order.is_completed,
                     'is_cancelled': order.is_cancelled,
                     'is_archived': order.is_archived,
@@ -1212,10 +1226,10 @@ async def export_products_pdf(
                     'picked_quantity': line.picked_quantity,
                     'description': line.product.description if line.product else ""
                 })
-        
+
         if not product_lines:
             raise HTTPException(status_code=404, detail="Nessun prodotto trovato negli ordini del periodo specificato.")
-        
+
         # Creazione del PDF
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=40, bottomMargin=40)
@@ -1243,9 +1257,9 @@ async def export_products_pdf(
         
         # Tabella con i dati
         table_data = [
-            ['N° Ordine', 'Cliente', 'Data', 'SKU', 'Descrizione', 'Richiesto', 'Prelevato', 'Stato']
+            ['N° Ordine', 'Cliente', 'Data', 'PLT', 'Vettore', 'SKU', 'Descrizione', 'Richiesto', 'Prelevato', 'Stato']
         ]
-        
+
         # Aggiungi le righe dei prodotti
         for product_line in product_lines:
             # Determina lo stato della riga prodotto
@@ -1255,12 +1269,14 @@ async def export_products_pdf(
                 riga_status = "Completo"
             else:
                 riga_status = "Parziale"
-            
+
             # Formatta i dati per la tabella (accorcia per PDF)
             row = [
                 product_line['order_number'][:12] + "..." if len(product_line['order_number']) > 15 else product_line['order_number'],
                 product_line['customer_name'][:15] + "..." if len(product_line['customer_name']) > 18 else product_line['customer_name'],
                 product_line['order_date'].strftime("%d/%m/%y") if product_line['order_date'] else "",
+                product_line['plt_number'] or "",
+                product_line['carrier_name'] or "",
                 product_line['product_sku'][:12] + "..." if len(product_line['product_sku']) > 15 else product_line['product_sku'],
                 (product_line['description'][:20] + "..." if len(product_line['description'] or "") > 23 else product_line['description'] or ""),
                 str(product_line['requested_quantity']),
@@ -1268,9 +1284,9 @@ async def export_products_pdf(
                 riga_status[:8]
             ]
             table_data.append(row)
-        
+
         # Crea la tabella
-        table = Table(table_data, colWidths=[60, 80, 45, 70, 100, 45, 45, 50])
+        table = Table(table_data, colWidths=[52, 70, 40, 26, 52, 60, 85, 36, 36, 42])
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -2161,6 +2177,10 @@ def archive_order(order_id: int, fulfillment_request: schemas.FulfillmentRequest
             order.ddt_number = ddt_number
             print(f"📄 ARCHIVE DDT: DDT number {ddt_number} assigned to order {order.order_number}")
 
+        # Salva il numero PLT se fornito
+        if fulfillment_request.plt_number:
+            order.plt_number = fulfillment_request.plt_number.strip()
+
         # COMMIT CON GESTIONE ERRORI
         try:
             print(f"💾 ARCHIVE COMMIT: Attempting database commit for order {order.order_number}")
@@ -2369,6 +2389,71 @@ def unarchive_order(order_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error unarchiving order: {str(e)}")
+
+@router.put("/{order_id}/update-carrier")
+def update_carrier_name(
+    order_id: int,
+    request: schemas.UpdateCarrierRequest,
+    db: Session = Depends(get_db)
+):
+    """Modifica il vettore di un ordine archiviato."""
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordine non trovato")
+    if not order.is_archived:
+        raise HTTPException(status_code=400, detail="Solo gli ordini archiviati possono avere il vettore modificato")
+    order.carrier_name = request.carrier_name
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore salvataggio vettore: {str(e)}")
+    return {"success": True, "carrier_name": order.carrier_name, "order_number": order.order_number}
+
+
+@router.put("/{order_id}/update-ddt")
+def update_ddt_number(
+    order_id: int,
+    request: schemas.UpdateDdtNumberRequest,
+    db: Session = Depends(get_db)
+):
+    """Modifica il numero DDT di un ordine archiviato."""
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordine non trovato")
+    if not order.is_archived:
+        raise HTTPException(status_code=400, detail="Solo gli ordini archiviati possono avere il DDT modificato")
+    order.ddt_number = request.ddt_number
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore salvataggio DDT: {str(e)}")
+    return {"success": True, "ddt_number": order.ddt_number, "order_number": order.order_number}
+
+
+@router.put("/{order_id}/update-plt")
+def update_plt_number(
+    order_id: int,
+    request: schemas.UpdatePltNumberRequest,
+    db: Session = Depends(get_db)
+):
+    """Modifica il numero di PLT di un ordine archiviato."""
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordine non trovato")
+    if not order.is_archived:
+        raise HTTPException(status_code=400, detail="Solo gli ordini archiviati possono avere il PLT modificato")
+
+    order.plt_number = request.plt_number
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore salvataggio PLT: {str(e)}")
+
+    return {"success": True, "plt_number": order.plt_number, "order_number": order.order_number}
+
 
 @router.put("/{order_id}/update-archived-date")
 def update_archived_date(

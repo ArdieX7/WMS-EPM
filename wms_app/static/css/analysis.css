@@ -4,33 +4,46 @@ body {
     background-color: #f4f7f6;
 }
 
-/* Statistics Section Layout - Top Statistics Area */
-.statistics-main-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 2rem;
-    margin-bottom: 2rem;
-}
-
-/* Fallback: force 1-column if orders section not present */
-.statistics-main-grid:not(.has-orders-section) {
-    grid-template-columns: 1fr !important;
-}
-
-.statistics-left-column,
-.statistics-right-column {
-    display: flex;
-    flex-direction: column;
-}
-
-/* Orders Statistics Section - More Compact */
+/* Orders Statistics Section - collapsible, full-width below KPIs */
 .orders-statistics-section {
     background-color: white;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    padding: 1rem;
+    padding: 0;
     border-left: 4px solid var(--secondary-color);
-    height: fit-content;
+    margin-bottom: 2rem;
+}
+
+.orders-stats-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 8px;
+    transition: background-color 0.15s;
+}
+
+.orders-stats-header:hover {
+    background-color: #f0f4f8;
+}
+
+.orders-stats-header .section-title {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--primary-color);
+}
+
+.orders-stats-arrow {
+    font-size: 0.85rem;
+    color: var(--primary-color);
+    transition: transform 0.2s;
+    font-weight: bold;
+}
+
+#orders-stats-body {
+    padding: 0 1rem 1rem 1rem;
 }
 
 .orders-statistics-section .section-title {
@@ -134,17 +147,12 @@ body {
 
 /* Responsive Design */
 @media (max-width: 1200px) {
-    .statistics-main-grid {
-        grid-template-columns: 1fr;
-        gap: 1.5rem;
-    }
-    
     .orders-kpi-grid {
         grid-template-columns: 1fr 1fr;
     }
-    
+
     .charts-section {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
         gap: 1rem;
     }
 }
@@ -153,11 +161,11 @@ body {
     body {
         margin: 1em;
     }
-    
-    .statistics-main-grid {
-        gap: 1rem;
+
+    .charts-section {
+        grid-template-columns: 1fr;
     }
-    
+
     .orders-kpi-grid {
         grid-template-columns: 1fr;
         gap: 0.5rem;
@@ -183,8 +191,8 @@ body {
         font-size: 0.8rem;
     }
     
-    .orders-statistics-section {
-        padding: 0.75rem;
+    #orders-stats-body {
+        padding: 0 0.5rem 0.5rem 0.5rem;
     }
 }
 

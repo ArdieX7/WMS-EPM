@@ -54,7 +54,8 @@
       "Bash(journalctl:*)",
       "Bash(chmod:*)",
       "Bash(xargs:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(/mnt/c/WMS_EPM/wms_app/static/css/orders.css:*)"
     ],
     "deny": []
   }

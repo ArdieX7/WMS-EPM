@@ -949,18 +949,23 @@
                 try {
                     // Richiedi il numero DDT all'operatore
                     const ddtNumber = prompt("Inserisci il numero DDT per l'ordine evaso:");
-                    
+
                     // Se l'utente annulla il prompt, non procedere
                     if (ddtNumber === null) {
                         return;
                     }
-                    
+
                     // Valida che il numero DDT non sia vuoto
                     if (ddtNumber.trim() === '') {
                         alert("Il numero DDT non può essere vuoto.");
                         return;
                     }
-                    
+
+                    // Richiedi il numero di PLT
+                    const pltInput = prompt("Inserisci il numero di PLT (pallet) usciti con l'ordine (lascia vuoto se non applicabile):");
+                    if (pltInput === null) return; // annullato
+                    const pltNumber = pltInput.trim();
+
                     // Prima marca l'ordine come completato
                     const fulfillResponse = await fetch(`/orders/${orderId}/fulfill`, {
                         method: "POST",
@@ -974,21 +979,22 @@
                         return;
                     }
 
-                    // Poi archivia l'ordine con il numero DDT
+                    // Poi archivia l'ordine con DDT e PLT
                     const archiveResponse = await fetch(`/orders/${orderId}/archive`, {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
+                        headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             order_id: parseInt(orderId),
-                            ddt_number: ddtNumber.trim()
+                            ddt_number: ddtNumber.trim(),
+                            plt_number: pltNumber || null
                         })
                     });
-                    
+
                     if (archiveResponse.ok) {
-                        alert(`Ordine evaso e archiviato con successo! DDT: ${ddtNumber.trim()}`);
+                        const pltMsg = pltNumber ? ` — PLT: ${pltNumber}` : '';
+                        alert(`Ordine evaso e archiviato con successo! DDT: ${ddtNumber.trim()}${pltMsg}`);
                         fetchOrders();
+                        fetchArchivedOrders();
                     } else {
                         const error = await archiveResponse.json();
                         alert(`Errore nell'archiviazione: ${error.detail}`);
@@ -2057,12 +2063,18 @@
                 try {
                     // Per ordini già completati, potrebbe già avere un DDT o richiederne uno nuovo
                     let ddtNumber = prompt("Inserisci il numero DDT per l'ordine (lascia vuoto se già presente):");
-                    
+
                     // Se l'utente annulla il prompt, non procedere
                     if (ddtNumber === null) {
                         return;
                     }
-                    
+
+                    const pltInput = prompt("Inserisci il numero di PLT (pallet) usciti con l'ordine (lascia vuoto se non applicabile):");
+                    if (pltInput === null) {
+                        return;
+                    }
+                    const pltNumber = pltInput.trim();
+
                     // Permetti DDT vuoto per ordini già completati che potrebbero già avere un DDT
                     const response = await fetch(`/orders/${orderId}/archive`, {
                         method: "POST",
@@ -2071,7 +2083,8 @@
                         },
                         body: JSON.stringify({
                             order_id: parseInt(orderId),
-                            ddt_number: ddtNumber ? ddtNumber.trim() : null
+                            ddt_number: ddtNumber ? ddtNumber.trim() : null,
+                            plt_number: pltNumber || null
                         })
                     });
                     
@@ -2079,7 +2092,8 @@
                     
                     if (response.ok) {
                         alert(`Ordine archiviato con successo: ${result.message}`);
-                        fetchOrders(); // Ricarica la lista degli ordini
+                        fetchOrders();
+                        fetchArchivedOrders();
                     } else {
                         alert(`Errore nell'archiviazione: ${result.detail}`);
                     }
@@ -2193,7 +2207,45 @@
                                     </button>
                                 </td>
                                 <td>${orderStatusText}</td>
-                                <td>${order.ddt_number || '-'}</td>
+                                <td style="text-align: center;">
+                                    <span class="ddt-value" data-order-id="${order.id}">${order.ddt_number || '—'}</span>
+                                    <button class="edit-ddt-button"
+                                            data-order-id="${order.id}"
+                                            data-order-number="${order.order_number}"
+                                            data-ddt="${order.ddt_number || ''}"
+                                            style="background: none; border: none; cursor: pointer; margin-left: 5px; font-size: 1.1em; opacity: 0.6; transition: opacity 0.2s;"
+                                            onmouseover="this.style.opacity='1'"
+                                            onmouseout="this.style.opacity='0.6'"
+                                            title="Modifica N° DDT">
+                                        ✏️
+                                    </button>
+                                </td>
+                                <td style="text-align: center;">
+                                    <span class="plt-value" data-order-id="${order.id}">${order.plt_number || '—'}</span>
+                                    <button class="edit-plt-button"
+                                            data-order-id="${order.id}"
+                                            data-order-number="${order.order_number}"
+                                            data-plt="${order.plt_number || ''}"
+                                            style="background: none; border: none; cursor: pointer; margin-left: 5px; font-size: 1.1em; opacity: 0.6; transition: opacity 0.2s;"
+                                            onmouseover="this.style.opacity='1'"
+                                            onmouseout="this.style.opacity='0.6'"
+                                            title="Modifica N° PLT">
+                                        ✏️
+                                    </button>
+                                </td>
+                                <td style="text-align: center;">
+                                    <span class="carrier-value" data-order-id="${order.id}">${order.carrier_name || '—'}</span>
+                                    <button class="edit-carrier-button"
+                                            data-order-id="${order.id}"
+                                            data-order-number="${order.order_number}"
+                                            data-carrier="${order.carrier_name || ''}"
+                                            style="background: none; border: none; cursor: pointer; margin-left: 5px; font-size: 1.1em; opacity: 0.6; transition: opacity 0.2s;"
+                                            onmouseover="this.style.opacity='1'"
+                                            onmouseout="this.style.opacity='0.6'"
+                                            title="Modifica Vettore">
+                                        ✏️
+                                    </button>
+                                </td>
                                 <td style="text-align: center;">${formattedWeight}</td>
                                 <td>
                                     <button class="view-archived-order-button" data-order-id="${order.id}">
@@ -2245,8 +2297,41 @@
                                 showEditArchivedDateOverlay(orderId, orderNumber, currentDate);
                             });
                         });
+
+                        // Gestore per modifica PLT
+                        document.querySelectorAll(".edit-plt-button").forEach(button => {
+                            button.addEventListener("click", function(e) {
+                                e.stopPropagation();
+                                const orderId = this.getAttribute("data-order-id");
+                                const orderNumber = this.getAttribute("data-order-number");
+                                const currentPlt = this.getAttribute("data-plt");
+                                showEditPltOverlay(orderId, orderNumber, currentPlt);
+                            });
+                        });
+
+                        // Gestore per modifica Vettore
+                        document.querySelectorAll(".edit-carrier-button").forEach(button => {
+                            button.addEventListener("click", function(e) {
+                                e.stopPropagation();
+                                const orderId = this.getAttribute("data-order-id");
+                                const orderNumber = this.getAttribute("data-order-number");
+                                const currentCarrier = this.getAttribute("data-carrier");
+                                showEditCarrierOverlay(orderId, orderNumber, currentCarrier);
+                            });
+                        });
+
+                        // Gestore per modifica DDT
+                        document.querySelectorAll(".edit-ddt-button").forEach(button => {
+                            button.addEventListener("click", function(e) {
+                                e.stopPropagation();
+                                const orderId = this.getAttribute("data-order-id");
+                                const orderNumber = this.getAttribute("data-order-number");
+                                const currentDdt = this.getAttribute("data-ddt");
+                                showEditDdtOverlay(orderId, orderNumber, currentDdt);
+                            });
+                        });
                     } else {
-                        archivedOrdersTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #666;">Nessun ordine archiviato</td></tr>';
+                        archivedOrdersTableBody.innerHTML = '<tr><td colspan="11" style="text-align: center; color: #666;">Nessun ordine archiviato</td></tr>';
                     }
             }
 
@@ -2286,11 +2371,19 @@
                             aValue = a.total_weight || 0;
                             bValue = b.total_weight || 0;
                             break;
+                        case 'plt_number':
+                            aValue = parseInt(a.plt_number) || 0;
+                            bValue = parseInt(b.plt_number) || 0;
+                            break;
+                        case 'carrier_name':
+                            aValue = a.carrier_name || '';
+                            bValue = b.carrier_name || '';
+                            break;
                         default:
                             return 0;
                     }
-                    
-                    if (column === 'order_date' || column === 'archived_at' || column === 'id' || column === 'total_weight') {
+
+                    if (column === 'order_date' || column === 'archived_at' || column === 'id' || column === 'total_weight' || column === 'plt_number') {
                         return direction === 'asc' ? aValue - bValue : bValue - aValue;
                     } else {
                         return direction === 'asc' ? 
@@ -5163,6 +5256,230 @@
         window.closeEditArchivedDateOverlay = closeEditArchivedDateOverlay;
         window.confirmUpdateArchivedDate = confirmUpdateArchivedDate;
 
+        // ============================================================
+        // EDIT PLT OVERLAY
+        // ============================================================
+
+        let currentEditPltOrderId = null;
+
+        function showOrderToast(message, isError = false) {
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+                z-index: 99999;
+                background: ${isError ? '#dc3545' : '#28a745'};
+                color: white; padding: 12px 28px; border-radius: 8px;
+                font-weight: 600; font-size: 0.95rem;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+                opacity: 0; transition: opacity 0.2s ease;
+                white-space: nowrap;
+            `;
+            document.body.appendChild(toast);
+            requestAnimationFrame(() => { toast.style.opacity = '1'; });
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 200);
+            }, 2500);
+        }
+
+        function showEditPltOverlay(orderId, orderNumber, currentPlt) {
+            currentEditPltOrderId = orderId;
+            document.getElementById('edit-plt-order-number').textContent = orderNumber;
+            document.getElementById('edit-plt-current').textContent = currentPlt || '—';
+            const input = document.getElementById('new-plt-input');
+            input.value = currentPlt || '';
+            document.getElementById('edit-plt-overlay').style.display = 'flex';
+            setTimeout(() => input.focus(), 50);
+        }
+
+        function closeEditPltOverlay() {
+            document.getElementById('edit-plt-overlay').style.display = 'none';
+            currentEditPltOrderId = null;
+        }
+
+        document.getElementById('new-plt-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); confirmUpdatePlt(); }
+            if (e.key === 'Escape') { closeEditPltOverlay(); }
+        });
+
+        async function confirmUpdatePlt() {
+            if (!currentEditPltOrderId) return;
+
+            const newPlt = document.getElementById('new-plt-input').value.trim();
+
+            if (newPlt && (!/^\d+$/.test(newPlt) || parseInt(newPlt) < 1 || parseInt(newPlt) > 99)) {
+                showOrderToast('❌ PLT deve essere un numero tra 1 e 99', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`/orders/${currentEditPltOrderId}/update-plt`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plt_number: newPlt || null })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    const span = document.querySelector(`.plt-value[data-order-id="${currentEditPltOrderId}"]`);
+                    if (span) span.textContent = result.plt_number || '—';
+                    const btn = document.querySelector(`.edit-plt-button[data-order-id="${currentEditPltOrderId}"]`);
+                    if (btn) btn.setAttribute('data-plt', result.plt_number || '');
+
+                    closeEditPltOverlay();
+                    showOrderToast(`✅ PLT aggiornato — Ordine #${result.order_number}`);
+                } else {
+                    showOrderToast(`❌ ${result.detail || 'Errore sconosciuto'}`, true);
+                }
+            } catch (error) {
+                console.error("Errore durante l'aggiornamento PLT:", error);
+                closeEditPltOverlay();
+                showOrderToast('❌ Errore di rete', true);
+            }
+        }
+
+        window.showEditPltOverlay = showEditPltOverlay;
+        window.closeEditPltOverlay = closeEditPltOverlay;
+        window.confirmUpdatePlt = confirmUpdatePlt;
+
+        // ============================================================
+        // EDIT DDT OVERLAY
+        // ============================================================
+
+        let currentEditDdtOrderId = null;
+
+        function showEditDdtOverlay(orderId, orderNumber, currentDdt) {
+            currentEditDdtOrderId = orderId;
+            document.getElementById('edit-ddt-order-number').textContent = orderNumber;
+            document.getElementById('edit-ddt-current').textContent = currentDdt || '—';
+            const input = document.getElementById('new-ddt-input');
+            input.value = currentDdt || '';
+            document.getElementById('edit-ddt-overlay').style.display = 'flex';
+            setTimeout(() => input.focus(), 50);
+        }
+
+        function closeEditDdtOverlay() {
+            document.getElementById('edit-ddt-overlay').style.display = 'none';
+            currentEditDdtOrderId = null;
+        }
+
+        document.getElementById('new-ddt-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); confirmUpdateDdt(); }
+            if (e.key === 'Escape') { closeEditDdtOverlay(); }
+        });
+
+        async function confirmUpdateDdt() {
+            if (!currentEditDdtOrderId) return;
+
+            const newDdt = document.getElementById('new-ddt-input').value.trim();
+
+            try {
+                const response = await fetch(`/orders/${currentEditDdtOrderId}/update-ddt`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ddt_number: newDdt || null })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    const span = document.querySelector(`.ddt-value[data-order-id="${currentEditDdtOrderId}"]`);
+                    if (span) span.textContent = result.ddt_number || '—';
+                    const btn = document.querySelector(`.edit-ddt-button[data-order-id="${currentEditDdtOrderId}"]`);
+                    if (btn) btn.setAttribute('data-ddt', result.ddt_number || '');
+
+                    closeEditDdtOverlay();
+                    showOrderToast(`✅ DDT aggiornato — Ordine #${result.order_number}`);
+                } else {
+                    showOrderToast(`❌ ${result.detail || 'Errore sconosciuto'}`, true);
+                }
+            } catch (error) {
+                console.error("Errore durante l'aggiornamento DDT:", error);
+                closeEditDdtOverlay();
+                showOrderToast('❌ Errore di rete', true);
+            }
+        }
+
+        window.showEditDdtOverlay = showEditDdtOverlay;
+        window.closeEditDdtOverlay = closeEditDdtOverlay;
+        window.confirmUpdateDdt = confirmUpdateDdt;
+
+        // ============================================================
+        // EDIT CARRIER (VETTORE) OVERLAY
+        // ============================================================
+
+        let currentEditCarrierOrderId = null;
+
+        async function fetchCarriersForSelect(currentCarrier) {
+            try {
+                const resp = await fetch('/carriers/');
+                const data = await resp.json();
+                const sel = document.getElementById('carrier-select');
+                sel.innerHTML = '<option value="">— Nessun vettore —</option>';
+                data.carriers.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.name;
+                    opt.textContent = c.name;
+                    if (c.name === currentCarrier) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            } catch (e) {
+                console.error('Errore caricamento vettori:', e);
+            }
+        }
+
+        async function showEditCarrierOverlay(orderId, orderNumber, currentCarrier) {
+            currentEditCarrierOrderId = orderId;
+            document.getElementById('edit-carrier-order-number').textContent = orderNumber;
+            document.getElementById('edit-carrier-current').textContent = currentCarrier || '—';
+            document.getElementById('edit-carrier-overlay').style.display = 'flex';
+            await fetchCarriersForSelect(currentCarrier);
+            document.getElementById('carrier-select').focus();
+        }
+
+        function closeEditCarrierOverlay() {
+            document.getElementById('edit-carrier-overlay').style.display = 'none';
+            currentEditCarrierOrderId = null;
+        }
+
+        async function confirmUpdateCarrier() {
+            if (!currentEditCarrierOrderId) return;
+
+            const carrierName = document.getElementById('carrier-select').value || null;
+
+            try {
+                const response = await fetch(`/orders/${currentEditCarrierOrderId}/update-carrier`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ carrier_name: carrierName })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    const span = document.querySelector(`.carrier-value[data-order-id="${currentEditCarrierOrderId}"]`);
+                    if (span) span.textContent = result.carrier_name || '—';
+                    const btn = document.querySelector(`.edit-carrier-button[data-order-id="${currentEditCarrierOrderId}"]`);
+                    if (btn) btn.setAttribute('data-carrier', result.carrier_name || '');
+
+                    closeEditCarrierOverlay();
+                    showOrderToast(`✅ Vettore aggiornato — Ordine #${result.order_number}`);
+                } else {
+                    showOrderToast(`❌ ${result.detail || 'Errore sconosciuto'}`, true);
+                }
+            } catch (error) {
+                console.error("Errore aggiornamento vettore:", error);
+                closeEditCarrierOverlay();
+                showOrderToast('❌ Errore di rete', true);
+            }
+        }
+
+        window.showEditCarrierOverlay = showEditCarrierOverlay;
+        window.closeEditCarrierOverlay = closeEditCarrierOverlay;
+        window.confirmUpdateCarrier = confirmUpdateCarrier;
+
 // ============================================================
 // PRELIEVI REAL-TIME
 // ============================================================
@@ -5754,25 +6071,6 @@ function checkPickingRtOrderComplete() {
     if (btn) btn.style.display = allDone ? 'inline-block' : 'none';
 }
 
-async function fulfillPickingRtOrder() {
-    if (!confirm(`Evadere l'ordine #${pickingRtState.orderNumber}? Tutti i prelievi sono stati completati.`)) return;
-
-    try {
-        const res = await window.modernAuth.authenticatedFetch(`/orders/${pickingRtState.orderId}/fulfill`, { method: 'POST' });
-        if (res.ok) {
-            // Ordine evaso: cancella la sessione salvata
-            clearPickingRtSession(pickingRtState.orderId);
-            alert(`✅ Ordine #${pickingRtState.orderNumber} evaso con successo!`);
-            closePickingRealtimeOverlay();
-            location.reload();
-        } else {
-            const err = await res.json();
-            alert(`❌ Errore evasione: ${err.detail || 'Errore sconosciuto'}`);
-        }
-    } catch (e) {
-        alert('❌ Errore di rete durante l\'evasione');
-    }
-}
 
 // --- Bottom sheet: ubicazioni prodotto ---
 
@@ -5821,6 +6119,10 @@ function closeProductLocationsSheet() {
 
 function closePickingRealtimeOverlay() {
     closeProductLocationsSheet();
+    // Se l'ordine era completamente prelevato, pulisci il localStorage
+    const allDone = pickingRtState.pickingPlan.length > 0 &&
+        pickingRtState.pickingPlan.every(l => l.remaining <= 0);
+    if (allDone) clearPickingRtSession(pickingRtState.orderId);
     document.getElementById('picking-realtime-overlay').style.display = 'none';
     pickingRtState = {
         orderId: null, orderNumber: null, customerName: null, sessionId: null,
@@ -5863,6 +6165,5 @@ window.backToEanStep = backToEanStep;
 window.pickingRtQtyChange = pickingRtQtyChange;
 window.confirmPickingRtPick = confirmPickingRtPick;
 window.undoPickingRtPick = undoPickingRtPick;
-window.fulfillPickingRtOrder = fulfillPickingRtOrder;
 window.showProductLocations = showProductLocations;
 window.closeProductLocationsSheet = closeProductLocationsSheet;
