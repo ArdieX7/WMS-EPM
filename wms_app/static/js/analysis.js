@@ -308,10 +308,17 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // Export button per giacenza totale
+    // Export buttons per giacenza totale
     document.getElementById("export-total-stock-csv").addEventListener("click", function() {
-        // Avvia il download del CSV con tutta la giacenza
         window.location.href = '/analysis/export-total-stock-csv';
+    });
+
+    document.getElementById("export-total-stock-xlsx").addEventListener("click", function() {
+        window.location.href = '/analysis/export-total-stock-xlsx';
+    });
+
+    document.getElementById("export-total-stock-pdf").addEventListener("click", function() {
+        window.location.href = '/analysis/export-total-stock-pdf';
     });
     
     // Export buttons per prodotti a TERRA
