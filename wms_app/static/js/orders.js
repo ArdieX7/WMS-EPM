@@ -4876,10 +4876,12 @@
                 const toDate = document.getElementById('export-to-date').value;
                 
                 // Costruisci URL con parametri date
+                const dateField = document.querySelector('input[name="orders-date-field"]:checked')?.value || 'order';
                 let url = '/orders/export-excel';
                 const params = new URLSearchParams();
                 if (fromDate) params.append('from_date', fromDate);
                 if (toDate) params.append('to_date', toDate);
+                params.append('date_field', dateField);
                 if (params.toString()) url += '?' + params.toString();
                 
                 // Mostra loading
@@ -4941,10 +4943,12 @@
                 const toDate = document.getElementById('export-to-date').value;
                 
                 // Costruisci URL con parametri date
+                const dateField = document.querySelector('input[name="orders-date-field"]:checked')?.value || 'order';
                 let url = '/orders/export-pdf';
                 const params = new URLSearchParams();
                 if (fromDate) params.append('from_date', fromDate);
                 if (toDate) params.append('to_date', toDate);
+                params.append('date_field', dateField);
                 if (params.toString()) url += '?' + params.toString();
                 
                 // Mostra loading
@@ -5007,10 +5011,12 @@
                 const toDate = document.getElementById('export-products-to-date').value;
                 
                 // Costruisci URL con parametri date
+                const dateField = document.querySelector('input[name="products-date-field"]:checked')?.value || 'order';
                 let url = '/orders/export-products-excel';
                 const params = new URLSearchParams();
                 if (fromDate) params.append('from_date', fromDate);
                 if (toDate) params.append('to_date', toDate);
+                params.append('date_field', dateField);
                 if (params.toString()) url += '?' + params.toString();
                 
                 // Mostra loading
@@ -5066,10 +5072,12 @@
                 const toDate = document.getElementById('export-products-to-date').value;
                 
                 // Costruisci URL con parametri date
+                const dateField = document.querySelector('input[name="products-date-field"]:checked')?.value || 'order';
                 let url = '/orders/export-products-pdf';
                 const params = new URLSearchParams();
                 if (fromDate) params.append('from_date', fromDate);
                 if (toDate) params.append('to_date', toDate);
+                params.append('date_field', dateField);
                 if (params.toString()) url += '?' + params.toString();
                 
                 // Mostra loading

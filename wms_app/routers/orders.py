@@ -5,7 +5,7 @@ from sqlalchemy.sql import func
 from sqlalchemy import and_
 from typing import List, Dict, Tuple, Any, Optional
 from collections import defaultdict
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import os
 import shutil
 from pathlib import Path
@@ -180,10 +180,38 @@ def read_orders(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 
 # --- EXPORT ENDPOINTS (devono essere prima di /{order_id}) ---
 
+def _apply_export_date_filter(query, date_field: str, from_date, to_date):
+    """
+    Applica il filtro per range di date agli export ordini.
+
+    date_field:
+      - 'order'    -> filtra per data ordine (comportamento storico)
+      - 'archived' -> filtra per data di evasione/archiviazione e include solo
+                      gli ordini effettivamente archiviati (archived_date valorizzata)
+
+    Nota: order_date e archived_date sono colonne DateTime, quindi il limite
+    superiore è reso inclusivo dell'intera giornata (< to_date + 1 giorno) per
+    non escludere i record del giorno finale con orario successivo a mezzanotte.
+    """
+    if date_field == "archived":
+        column = models.Order.archived_date
+        # Solo ordini realmente archiviati (esclude quelli non ancora evasi)
+        query = query.filter(models.Order.archived_date.isnot(None))
+    else:
+        column = models.Order.order_date
+
+    if from_date:
+        query = query.filter(column >= from_date)
+    if to_date:
+        query = query.filter(column < to_date + timedelta(days=1))
+    return query
+
+
 @router.get("/export-excel")
 async def export_orders_excel(
     from_date: Optional[date] = Query(None, description="Data inizio (YYYY-MM-DD)"),
     to_date: Optional[date] = Query(None, description="Data fine (YYYY-MM-DD)"),
+    date_field: str = Query("order", description="Campo data per il filtro: 'order' (data ordine) o 'archived' (data evasione)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -197,11 +225,8 @@ async def export_orders_excel(
         # Query unificata per ordini attivi e archiviati
         query = db.query(models.Order).options(joinedload(models.Order.lines))
         
-        # Applica filtri date se forniti
-        if from_date:
-            query = query.filter(models.Order.order_date >= from_date)
-        if to_date:
-            query = query.filter(models.Order.order_date <= to_date)
+        # Applica filtro per range di date (data ordine o data evasione)
+        query = _apply_export_date_filter(query, date_field, from_date, to_date)
             
         orders = query.order_by(models.Order.order_date.desc()).all()
         
@@ -295,6 +320,7 @@ async def export_orders_excel(
 async def export_orders_pdf(
     from_date: Optional[date] = Query(None, description="Data inizio (YYYY-MM-DD)"),
     to_date: Optional[date] = Query(None, description="Data fine (YYYY-MM-DD)"),
+    date_field: str = Query("order", description="Campo data per il filtro: 'order' (data ordine) o 'archived' (data evasione)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -305,11 +331,8 @@ async def export_orders_pdf(
         # Query unificata per ordini attivi e archiviati
         query = db.query(models.Order).options(joinedload(models.Order.lines))
         
-        # Applica filtri date se forniti
-        if from_date:
-            query = query.filter(models.Order.order_date >= from_date)
-        if to_date:
-            query = query.filter(models.Order.order_date <= to_date)
+        # Applica filtro per range di date (data ordine o data evasione)
+        query = _apply_export_date_filter(query, date_field, from_date, to_date)
             
         orders = query.order_by(models.Order.order_date.desc()).all()
         
@@ -1028,6 +1051,7 @@ async def import_picking_from_txt_legacy(file: UploadFile = File(...), db: Sessi
 async def export_products_excel(
     from_date: Optional[date] = Query(None, description="Data inizio (YYYY-MM-DD)"),
     to_date: Optional[date] = Query(None, description="Data fine (YYYY-MM-DD)"),
+    date_field: str = Query("order", description="Campo data per il filtro: 'order' (data ordine) o 'archived' (data evasione)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -1043,11 +1067,8 @@ async def export_products_excel(
             joinedload(models.Order.lines).joinedload(models.OrderLine.product)
         )
         
-        # Applica filtri date se forniti
-        if from_date:
-            query = query.filter(models.Order.order_date >= from_date)
-        if to_date:
-            query = query.filter(models.Order.order_date <= to_date)
+        # Applica filtro per range di date (data ordine o data evasione)
+        query = _apply_export_date_filter(query, date_field, from_date, to_date)
         
         # Ordinamento per data decrescente
         orders = query.order_by(models.Order.order_date.desc()).all()
@@ -1190,6 +1211,7 @@ async def export_products_excel(
 async def export_products_pdf(
     from_date: Optional[date] = Query(None, description="Data inizio (YYYY-MM-DD)"),
     to_date: Optional[date] = Query(None, description="Data fine (YYYY-MM-DD)"),
+    date_field: str = Query("order", description="Campo data per il filtro: 'order' (data ordine) o 'archived' (data evasione)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -1202,11 +1224,8 @@ async def export_products_pdf(
             joinedload(models.Order.lines).joinedload(models.OrderLine.product)
         )
         
-        # Applica filtri date se forniti
-        if from_date:
-            query = query.filter(models.Order.order_date >= from_date)
-        if to_date:
-            query = query.filter(models.Order.order_date <= to_date)
+        # Applica filtro per range di date (data ordine o data evasione)
+        query = _apply_export_date_filter(query, date_field, from_date, to_date)
         
         # Ordinamento per data decrescente
         orders = query.order_by(models.Order.order_date.desc()).all()
