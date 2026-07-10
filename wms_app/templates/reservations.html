@@ -121,12 +121,12 @@
             <div class="stat-value stat-active">{{ stats.active }}</div>
         </div>
         <div class="stat-box">
-            <h3>Prenotazioni Scadute</h3>
-            <div class="stat-value stat-expired">{{ stats.expired }}</div>
-        </div>
-        <div class="stat-box">
             <h3>Prenotazioni Completate</h3>
             <div class="stat-value stat-completed">{{ stats.completed }}</div>
+        </div>
+        <div class="stat-box">
+            <h3>Prenotazioni Cancellate</h3>
+            <div class="stat-value stat-expired">{{ stats.cancelled }}</div>
         </div>
     </div>
 
@@ -135,12 +135,6 @@
         <details>
             <summary>🧹 Operazioni di Pulizia</summary>
             <div class="details-content">
-                <div class="cleanup-section">
-                    <h3>Pulizia Automatica</h3>
-                    <p>Rimuove automaticamente le prenotazioni scadute (oltre 4 ore).</p>
-                    <button class="btn-cleanup" onclick="cleanupExpired()">Pulisci Scadute</button>
-                </div>
-                
                 <div class="cleanup-section cleanup-emergency">
                     <h3>⚠️ Reset Emergenza</h3>
                     <p><strong>ATTENZIONE:</strong> Cancella TUTTE le prenotazioni attive. Usare solo in caso di problemi gravi.</p>
@@ -174,7 +168,6 @@
                     <th>Ubicazione</th>
                     <th>Quantità</th>
                     <th>Prenotato</th>
-                    <th>Scade</th>
                     <th>Status</th>
                     <th>Azioni</th>
                 </tr>
@@ -188,7 +181,6 @@
                     <td>{{ reservation.location_name }}</td>
                     <td>{{ reservation.reserved_quantity }}</td>
                     <td>{{ reservation.reserved_at.strftime('%H:%M %d/%m') }}</td>
-                    <td>{{ reservation.expires_at.strftime('%H:%M %d/%m') }}</td>
                     <td><span class="status-{{ reservation.status }}">{{ reservation.status }}</span></td>
                     <td>
                         {% if reservation.status == 'active' %}
@@ -199,7 +191,7 @@
                 {% endfor %}
                 {% if not active_reservations %}
                 <tr>
-                    <td colspan="9" style="text-align: center; padding: 20px;">Nessuna prenotazione attiva</td>
+                    <td colspan="8" style="text-align: center; padding: 20px;">Nessuna prenotazione attiva</td>
                 </tr>
                 {% endif %}
             </tbody>
@@ -214,19 +206,6 @@
     <script src="/static/js/modern-auth.js"></script>
     <script>
         // Funzioni di cleanup
-        async function cleanupExpired() {
-            if (confirm('Vuoi pulire tutte le prenotazioni scadute?')) {
-                try {
-                    const response = await fetch('/reservations/cleanup/expired', { method: 'POST' });
-                    const data = await response.json();
-                    alert(data.message);
-                    window.location.reload();
-                } catch (error) {
-                    alert('Errore durante la pulizia: ' + error.message);
-                }
-            }
-        }
-
         async function emergencyCleanup() {
             if (confirm('⚠️ ATTENZIONE: Stai per cancellare TUTTE le prenotazioni attive!\n\nQuesta operazione non può essere annullata.\n\nSei sicuro di voler procedere?')) {
                 if (confirm('Ultima conferma: RESET TOTALE delle prenotazioni?')) {
