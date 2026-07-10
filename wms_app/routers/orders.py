@@ -10,6 +10,7 @@ import os
 import shutil
 from pathlib import Path
 import io
+import logging
 
 # Import per export Excel e PDF
 try:
@@ -1065,6 +1066,7 @@ async def export_products_excel(
                     'ddt_number': order.ddt_number,
                     'plt_number': order.plt_number,
                     'carrier_name': order.carrier_name,
+                    'archived_date': order.archived_date,
                     'is_completed': order.is_completed,
                     'is_cancelled': order.is_cancelled,
                     'is_archived': order.is_archived,
@@ -1090,6 +1092,7 @@ async def export_products_excel(
             "DDT",
             "PLT",
             "Vettore",
+            "Data Evasione",
             "SKU Prodotto",
             "Descrizione Prodotto",
             "Quantità Richiesta",
@@ -1128,10 +1131,11 @@ async def export_products_excel(
             data = [
                 product_line['order_number'],
                 product_line['customer_name'],
-                product_line['order_date'].strftime("%Y-%m-%d") if product_line['order_date'] else "",
+                product_line['order_date'].strftime("%d/%m/%Y") if product_line['order_date'] else "",
                 product_line['ddt_number'] or "",
                 product_line['plt_number'] or "",
                 product_line['carrier_name'] or "",
+                product_line['archived_date'].strftime("%d/%m/%Y") if product_line['archived_date'] else "",
                 product_line['product_sku'],
                 product_line['description'] or "",
                 product_line['requested_quantity'],
@@ -1173,9 +1177,12 @@ async def export_products_excel(
         }
         
         return Response(content=buffer.read(), headers=headers)
-        
+
+    except HTTPException:
+        # Lascia passare gli errori HTTP espliciti (es. 404 nessun ordine nel periodo)
+        raise
     except Exception as e:
-        logger.error(f"Errore nella generazione dell'Excel prodotti per ordine: {str(e)}")
+        logging.getLogger(__name__).error(f"Errore nella generazione dell'Excel prodotti per ordine: {str(e)}")
         raise HTTPException(status_code=500, detail="Errore interno del server")
 
 
