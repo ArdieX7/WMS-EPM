@@ -1,0 +1,23 @@
+# Normalizza i fine-riga: i file di testo sono salvati con LF nel repo
+# e ottenuti con LF anche nel working tree (niente più rumore CRLF).
+* text=auto eol=lf
+
+# File binari: git non tocca MAI i byte (niente conversione fine-riga,
+# niente diff testuale). Protegge database, immagini, certificati, ecc.
+*.db     binary
+*.sqlite binary
+*.sqlite3 binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.pdf    binary
+*.xlsx   binary
+*.xls    binary
+*.zip    binary
+*.gz     binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.eot    binary
