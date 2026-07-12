@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
@@ -16,7 +15,8 @@ class ReservationService:
     
     def __init__(self, db: Session):
         self.db = db
-        self.reservation_timeout_hours = 4  # 4 ore come richiesto
+        # Le prenotazioni non scadono più a tempo: restano attive finché
+        # l'ordine non viene evaso (complete_reservation) o cancellato manualmente.
     
     def parse_location(self, location_name: str) -> Dict:
         """
@@ -115,13 +115,12 @@ class ReservationService:
         
         physical_quantity = inventory.quantity if inventory else 0
         
-        # Quantità prenotata (solo prenotazioni attive e non scadute)
+        # Quantità prenotata (tutte le prenotazioni attive, senza scadenza a tempo)
         reserved_quantity = self.db.query(func.sum(InventoryReservation.reserved_quantity)).filter(
             and_(
                 InventoryReservation.location_name == location_name,
                 InventoryReservation.product_sku == product_sku,
-                InventoryReservation.status == 'active',
-                InventoryReservation.expires_at > datetime.utcnow()
+                InventoryReservation.status == 'active'
             )
         ).scalar() or 0
         
@@ -145,8 +144,7 @@ class ReservationService:
         locations_with_active_reservations = self.db.query(InventoryReservation.location_name).filter(
             and_(
                 InventoryReservation.product_sku == product_sku,
-                InventoryReservation.status == 'active',
-                InventoryReservation.expires_at > datetime.utcnow()
+                InventoryReservation.status == 'active'
             )
         ).distinct().all()
         
@@ -226,15 +224,13 @@ class ReservationService:
         if available < quantity:
             raise ValueError(f"Quantità insufficiente. Disponibile: {available}, richiesto: {quantity}")
         
-        # Calcola scadenza (4 ore da ora)
-        expires_at = datetime.utcnow() + timedelta(hours=self.reservation_timeout_hours)
-        
+        # Nessuna scadenza a tempo: expires_at resta NULL
         reservation = InventoryReservation(
             order_id=order_id,
             product_sku=product_sku,
             location_name=location_name,
             reserved_quantity=quantity,
-            expires_at=expires_at,
+            expires_at=None,
             status='active'
         )
         
@@ -267,8 +263,7 @@ class ReservationService:
                 and_(
                     InventoryReservation.order_id == order_id,
                     InventoryReservation.product_sku == sku,
-                    InventoryReservation.status == 'active',
-                    InventoryReservation.expires_at > datetime.utcnow()
+                    InventoryReservation.status == 'active'
                 )
             ).all()
             
@@ -365,17 +360,11 @@ class ReservationService:
     
     def cleanup_expired_reservations(self) -> int:
         """
-        Pulisce le prenotazioni scadute automaticamente
+        Le prenotazioni non hanno più una scadenza a tempo: questo metodo è
+        mantenuto come no-op per compatibilità con i punti che lo richiamano
+        (es. flusso di picking in orders.py). Non marca più nulla come 'expired'.
         """
-        expired_count = self.db.query(InventoryReservation).filter(
-            and_(
-                InventoryReservation.status == 'active',
-                InventoryReservation.expires_at <= datetime.utcnow()
-            )
-        ).update({'status': 'expired'})
-        
-        self.db.commit()
-        return expired_count
+        return 0
     
     def manual_cleanup_all_reservations(self) -> int:
         """

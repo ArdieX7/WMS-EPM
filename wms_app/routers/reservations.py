@@ -25,13 +25,13 @@ async def get_reservations_dashboard(request: Request, db: Session = Depends(get
     active_count = db.query(InventoryReservation).filter(
         InventoryReservation.status == 'active'
     ).count()
-    
-    expired_count = db.query(InventoryReservation).filter(
-        InventoryReservation.status == 'expired'
-    ).count()
-    
+
     completed_count = db.query(InventoryReservation).filter(
         InventoryReservation.status == 'completed'
+    ).count()
+
+    cancelled_count = db.query(InventoryReservation).filter(
+        InventoryReservation.status == 'cancelled'
     ).count()
     
     # Ottieni prenotazioni attive
@@ -44,8 +44,8 @@ async def get_reservations_dashboard(request: Request, db: Session = Depends(get
         "active_page": "reservations",
         "stats": {
             "active": active_count,
-            "expired": expired_count,
-            "completed": completed_count
+            "completed": completed_count,
+            "cancelled": cancelled_count
         },
         "active_reservations": active_reservations
     })
@@ -88,7 +88,7 @@ def get_active_reservations(db: Session = Depends(get_db)):
         "location_name": r.location_name,
         "reserved_quantity": r.reserved_quantity,
         "reserved_at": r.reserved_at.isoformat(),
-        "expires_at": r.expires_at.isoformat(),
+        "expires_at": r.expires_at.isoformat() if r.expires_at else None,
         "status": r.status
     } for r in reservations]
 

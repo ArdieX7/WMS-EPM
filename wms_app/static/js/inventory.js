@@ -3438,6 +3438,12 @@ async function processSpostamentoBarcode(barcodeValue) {
             return;
         }
 
+        // TERRA non è consentita nello spostamento generico: usare il flusso dedicato
+        if (barcodeValue.toUpperCase() === 'TERRA') {
+            showRealtimeFeedback("❌ TERRA non è consentita qui. Usa '📍 Ubicazione da Terra' per spostare DA terra.", '#dc3545');
+            return;
+        }
+
         // Salva ubicazione origine
         realtimeSessionData.locationFrom = barcodeValue.toUpperCase();
         showRealtimeFeedback(`📍 Origine: ${realtimeSessionData.locationFrom}. Scansiona prodotti o destinazione...`, '#007bff');
@@ -3448,6 +3454,12 @@ async function processSpostamentoBarcode(barcodeValue) {
     const isLocation = await validateLocation(barcodeValue);
 
     if (isLocation) {
+        // TERRA non è consentita come destinazione nello spostamento generico
+        if (barcodeValue.toUpperCase() === 'TERRA') {
+            showRealtimeFeedback("❌ TERRA non è consentita qui. Usa '📦 Scarico Container a Terra' per spostare VERSO terra.", '#dc3545');
+            return;
+        }
+
         // È una ubicazione destinazione
         realtimeSessionData.locationTo = barcodeValue.toUpperCase();
 

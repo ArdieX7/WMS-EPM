@@ -3140,6 +3140,19 @@ async def finalize_spostamento_realtime(
                 content={"success": False, "message": "Origine e destinazione non possono essere uguali"}
             )
 
+        # TERRA non è gestibile dallo spostamento generico: ha una regola diversa
+        # (può contenere SKU multipli) ed esistono flussi dedicati con le validazioni
+        # corrette -> "Ubicazione da Terra" per spostare DA terra, "Scarico Container
+        # a Terra" per spostare VERSO terra.
+        if location_from == "TERRA" or location_to == "TERRA":
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "message": "TERRA non è consentita nello spostamento generico. Usa 'Ubicazione da Terra' per spostare DA terra oppure 'Scarico Container a Terra' per spostare VERSO terra."
+                }
+            )
+
         # Valida ubicazione origine esiste
         location_from_obj = db.query(models.Location).filter(
             models.Location.name == location_from

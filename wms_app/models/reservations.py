@@ -12,7 +12,7 @@ class InventoryReservation(Base):
     reserved_quantity = Column(Integer, nullable=False)
     order_id = Column(String, nullable=False)  # Riferimento all'ordine
     reserved_at = Column(DateTime(timezone=True), server_default=func.now())
-    expires_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=True)  # NULL = nessuna scadenza (prenotazione valida finché non evasa/cancellata)
     status = Column(String, default="active")  # 'active', 'completed', 'expired', 'cancelled'
     
     # Relazioni
