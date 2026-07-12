@@ -204,7 +204,10 @@
                                     {% set total_weight.value = total_weight.value + (line.product.weight * line.requested_quantity) %}
                                 {% endif %}
                             {% endfor %}
-                            <div class="order-item" onclick="openDDTModal('{{ order.order_number }}', '{{ order.customer_name }}', '{% if total_weight.value > 0 %}{{ "%.1f"|format(total_weight.value) }} kg{% endif %}')">
+                            <div class="order-item"
+                                 data-order-number="{{ order.order_number }}"
+                                 data-customer-name="{{ order.customer_name }}"
+                                 data-total-weight="{% if total_weight.value > 0 %}{{ "%.1f"|format(total_weight.value) }} kg{% endif %}">
                                 <div class="order-header">
                                     <span class="order-number">{{ order.order_number }}</span>
                                     <small class="text-muted">{{ order.order_date.strftime('%d/%m/%Y') }}</small>
@@ -855,6 +858,19 @@
                 alert('Errore di rete');
             }
         }
+
+        // Apertura modal DDT dagli ordini senza DDT.
+        // I dati sono letti da attributi data-* (non da onclick inline) così nomi cliente
+        // con apostrofi/virgolette/caratteri speciali non rompono più il click.
+        document.querySelectorAll('.order-item').forEach(function(item) {
+            item.addEventListener('click', function() {
+                openDDTModal(
+                    this.dataset.orderNumber,
+                    this.dataset.customerName,
+                    this.dataset.totalWeight || ''
+                );
+            });
+        });
 
         // Carica vettori quando la sezione viene aperta (dopo toggleSection che aggiunge la classe 'show')
         document.querySelector('[onclick="toggleSection(\'carriers-section\')"]').addEventListener('click', function() {
