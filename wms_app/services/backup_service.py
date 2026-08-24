@@ -12,6 +12,10 @@ from wms_app.services.logging_service import LoggingService
 from wms_app.models.logs import OperationType, OperationCategory
 
 
+# Namespace per generare backup_id stabili sui file privi di metadata.
+BACKUP_ID_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "wms-backup")
+
+
 class BackupService:
     """
     Servizio per la gestione completa dei backup del database WMS.
@@ -387,23 +391,40 @@ class BackupService:
         backups.sort(key=lambda x: x.get("created_at", ""), reverse=True)
         return backups
     
-    def _create_fallback_metadata(self, backup_file: Path, backup_type: str) -> Dict[str, Any]:
+    def _deterministic_backup_id(self, backup_file: Path, backup_type: str) -> str:
         """
-        Crea metadata di fallback per backup senza metadata.
-        
+        Genera un backup_id stabile per i backup privi di file metadata.
+
+        L'id deve essere deterministico: ripristino, download, validazione ed
+        eliminazione ricalcolano la lista ad ogni richiesta, quindi un uuid
+        casuale renderebbe il backup irraggiungibile ("backup non trovato").
+
         Args:
             backup_file: Path al file backup
             backup_type: Tipo di backup
-            
+
+        Returns:
+            str: UUID derivato da tipo e nome file
+        """
+        return str(uuid.uuid5(BACKUP_ID_NAMESPACE, f"{backup_type}/{backup_file.name}"))
+
+    def _create_fallback_metadata(self, backup_file: Path, backup_type: str) -> Dict[str, Any]:
+        """
+        Crea metadata di fallback per backup senza metadata.
+
+        Args:
+            backup_file: Path al file backup
+            backup_type: Tipo di backup
+
         Returns:
             dict: Metadata di base
         """
         try:
             stat = backup_file.stat()
             file_size = stat.st_size
-            
+
             return {
-                "backup_id": str(uuid.uuid4()),
+                "backup_id": self._deterministic_backup_id(backup_file, backup_type),
                 "backup_type": backup_type,
                 "filename": backup_file.name,
                 "filepath": str(backup_file),
@@ -416,7 +437,7 @@ class BackupService:
             }
         except Exception:
             return {
-                "backup_id": str(uuid.uuid4()),
+                "backup_id": self._deterministic_backup_id(backup_file, backup_type),
                 "backup_type": backup_type,
                 "filename": backup_file.name,
                 "filepath": str(backup_file),
@@ -428,6 +449,34 @@ class BackupService:
                 "is_valid": False
             }
     
+    def _adopt_backup_metadata(self, backup_info: Dict[str, Any], backup_path: Path, is_valid: bool) -> None:
+        """
+        Salva su disco i metadata di un backup che ne era privo (es. file copiato
+        manualmente nella cartella backups). Mantiene il backup_id deterministico
+        già mostrato in interfaccia.
+
+        Args:
+            backup_info: Metadata di fallback correnti
+            backup_path: Path al file backup
+            is_valid: Esito della verifica di integrità SQLite
+        """
+        metadata_file = self.metadata_dir / f"{backup_path.stem}.json"
+        try:
+            metadata = dict(backup_info)
+            metadata["file_hash"] = self._calculate_file_hash(backup_path)
+            metadata["is_valid"] = is_valid
+            metadata["adopted_at"] = datetime.now().isoformat()
+
+            with open(metadata_file, 'w') as f:
+                json.dump(metadata, f, indent=2)
+        except Exception as e:
+            if self.logger:
+                self.logger.log_warning(
+                    operation_type="BACKUP_METADATA_ADOPT_WARNING",
+                    warning_message=f"Impossibile salvare metadata adottati: {str(e)}",
+                    operation_category=OperationCategory.SYSTEM
+                )
+
     def restore_backup(self, backup_id: str, user_id: str = "restore") -> Dict[str, Any]:
         """
         Ripristina un backup specifico.
@@ -749,7 +798,14 @@ class BackupService:
             if current_hash:
                 result["current_hash"] = current_hash
                 result["expected_hash"] = backup_info.get("file_hash")
-            
+
+            # Adozione: i backup copiati a mano nella cartella non hanno metadata,
+            # quindi restano "Non verificato" ad ogni ricaricamento della lista.
+            # Alla prima validazione salviamo i metadata reali (hash + esito).
+            metadata_file = self.metadata_dir / f"{backup_path.stem}.json"
+            if not metadata_file.exists():
+                self._adopt_backup_metadata(backup_info, backup_path, is_valid)
+
             if self.logger:
                 self.logger.log_operation(
                     operation_type="BACKUP_VALIDATION_COMPLETED",
